@@ -4,307 +4,108 @@ Change log for µGrid
 unreleased
 ----------
 
-- ENH: The reference-material (Green) preconditioner can now *evaluate* its
-  symbol per Fourier mode instead of assembling and storing it. A uniform
-  operator is a `3^dim` stencil — 243 numbers in 3D — so
-  `K(q) = Σ_d S[d] exp(-2πi q·d)` is closed form, and the new
-  `AnalyticReferencePreconditioner` keeps the stencil rather than `n²` complex
-  values per mode (2.3 GB at 512³ for three components in single precision, and
-  it grows with the grid). `linalg/green_symbol.{hh,cc}` is the host kernel and
-  `green_symbol_gpu.cc` the CUDA/HIP one, bound as
-  `linalg.apply_green_symbol_{2,3}d[_f32]` and `..._gpu_*`
-- ENH: `make_reference_stiffness_preconditioner` and
-  `make_green_jacobi_preconditioner` take `evaluate_symbol`, which defaults to
-  evaluating on a device and storing on the host. On an H200 at 512³ with three
-  components, evaluating is 2.7x (float32) and 1.9x (float64) faster per apply
-  than the stored symbol, holds 4.9 GB less device memory, and sets up in 1.3 s
-  against 168 s. On the host the apply is ~28% slower, so the stored symbol
-  stays the default there; pass `evaluate_symbol=True`/`False` to override.
-  The measured device win is larger than an arithmetic-intensity estimate
-  predicts, because the stored path's per-mode multiply runs component by
-  component through CuPy and is far from its own bandwidth floor
+- ENH: The Green preconditioner can evaluate its symbol per Fourier mode instead
+  of storing it: `AnalyticReferencePreconditioner` keeps the `3^dim` stencil, 243
+  numbers in 3D, where the stored symbol is 2.3 GB at 512³
+- ENH: `evaluate_symbol` on the reference and Green-Jacobi factories, defaulting to
+  evaluate on a device and store on the host. H200 at 512³: 2.7x (f32) faster per
+  apply, 4.9 GB less device memory, setup 1.3 s against 168 s
 - ENH: `reference_stencil` is public and is the single definition of the uniform
-  reference operator: it *probes* the real C++ operator on an 8^dim serial grid
-  rather than re-deriving `B(q)` from the element tables, so it matches the
-  discretisation by construction. `stencil_symbol` generalises the hybrid
-  preconditioner's `_z_coupling_blocks` — which already assembled its blocks
-  this way — to either phase every axis or leave one explicit, so both
-  preconditioners now derive from the same stencil
-- ENH: The assembled route uses the stencil too, when the caller names the
-  operator (`element` + `grid_spacing` + Lamé), which removes the impulse
-  response, the `n` full-grid FFTs and the three engine-sized fields it needed.
-  An opaque callable still takes the impulse route, which is the only one that
-  works for an operator muGrid cannot name. The two agree to assembly
-  round-off: 1.0e-15 in 3D at float64, ~1e-06 at float32
+  reference operator; `stencil_symbol` generalises the hybrid's
+  `_z_coupling_blocks`, so both preconditioners now derive from one stencil
+- ENH: The assembled route uses the stencil too when the caller names the operator,
+  dropping the impulse response, the `n` full-grid FFTs and three engine-sized
+  fields. An opaque callable still takes the impulse route
 
 v1.4.0 (23Sep26)
 ----------------
 
-- FIX: `vecdot`, `norm_sq`, `axpy_norm_sq` and `pipelined_cg_dots` now return
-  `linalg::reduction_result_t<T>` — double precision for a `Real32`/`Complex32`
-  field — instead of narrowing the double accumulator back to the field's scalar
-  type on return. The narrowing turned any single-precision reduction whose true
-  value exceeded ~3.4e38 into `inf`, and that bound is reached by ordinary large
-  solves: it tightens as `1/sqrt(N)` with the summation and again as `h²` with the
-  operator norm, so it is some 500x tighter at 512³ than at 64³. The failure was
-  silent rather than loud — an infinite `pAp` makes CG's `alpha = rz/pAp` exactly
-  zero, so the iterate stops moving and the residual repeats bit-for-bit until
-  maxiter, while the pipelined variant divided by the resulting zero `alpha_prev`
-  and raised `ZeroDivisionError` from inside the recurrence. On an `A = 1e25·I`
-  system (condition number 1) a float32 solve stalled for 25 iterations where the
-  float64 one converged in 1; it now also converges in 1. Python sees no API
-  change: both precisions already crossed the binding boundary as a plain `float`
-- FIX: Both CG solvers now reject a non-finite residual, curvature term or
-  inner product with a `ConvergenceError` naming the cause, instead of checking
-  only for NaN and letting infinities through. An infinite curvature term made
-  the step length exactly zero, so the solve stalled on an unmoving iterate and
-  reported a generic "did not converge"; in the pipelined variant that zero
-  became the next iteration's `alpha_prev` and a bare `ZeroDivisionError` escaped
-  from inside the recurrence, past the solver's own `ConvergenceError` contract.
-  A zero curvature term (a search direction in the operator's null space) and a
-  zero step length on an unconverged residual are reported too. NaN and overflow
-  get different messages, since one means an indefinite operator and the other
-  means the iterate has outgrown the work fields' dynamic range
-- FIX: A single-precision solve given an `rtol` below the float32 accuracy floor
-  (~1e-6) now warns that the tolerance is unreachable, rather than silently
-  running to maxiter. float32 eps is 1.19e-7, so the true residual `b - Ax`
-  stagnates around there even while the recursively updated CG residual keeps
-  shrinking. Double-precision solves are unaffected
-- TST: `tests/python_solvers_test.py` is renamed to `python_solvers_tests.py`.
-  pytest collects `python_*_tests.py`, so the file -- and with it the only test
-  of `conjugate_gradients_pipelined` in the repo -- had never run
-- FIX: The FFT transpose's all-to-all counts and displacements are narrowed to
-  MPI's `int` through `checked_mpi_int` instead of a bare `static_cast`, so an
-  oversized transform throws rather than wrapping to a negative count and
-  corrupting the transform. This is the default exchange path on the GPU, not
-  only the env-gated host one. `checked_mpi_int` moved out of
-  `cartesian_communicator.cc`'s anonymous namespace into the new
-  `mpi/mpi_counts.hh` so both callers narrow the same way
-- FIX: GPU kernels compute their global thread index through new
-  `global_thread_{x,y,z}()` / `grid_stride_x()` helpers in `memory/gpu_runtime.hh`
-  rather than open-coding `blockIdx.x * blockDim.x + threadIdx.x`. All three
-  operands are `unsigned int`, so the product was evaluated in 32 bits and
-  wrapped above 2^32 threads *before* any widening — assigning the result to an
-  `Index_t` did not help. Element counts are `nb_pixels * nb_components *
-  nb_sub_pts` and grow with the cube of the resolution, so the bound is reachable.
-  48 sites across linalg, laplace, convolution, FEM-gradient and solid-stiffness
-  kernels; `ghost_accumulate_gpu.cc` already widened by hand and is unchanged
-- FIX: The reduction kernels widen each operand *before* multiplying instead of
-  forming the product in the field's precision and widening afterwards. Squaring
-  in `float32` discards half the mantissa and overflows at `|x| ~ 1.8e19`, far
-  below what the accumulator holds; this affected the scalar (non-vectorised)
-  interior paths on the host — so `pipelined_cg_dots`, which has no vectorised
-  path, lost ~7e-9 relative accuracy where `vecdot`/`norm_sq` did not — and the
-  `dot`/`interior_dot`/`axpy_norm_sq` kernels on the device. The fp32 `sq_norm`
-  overload is gone so the mistake cannot be made again
-- PERF: `make_reference_stiffness_preconditioner` assembles the symbol at the
-  solve precision and inverts it one slab of Fourier modes at a time, in place.
-  It previously held `K_hat` in `complex128` regardless of the requested dtype,
-  then built four more arrays that size in a row: `np.zeros_like`, the
-  `blocks[nonzero]` boolean gather, `np.linalg.inv`'s output, and the
-  normalisation multiply. The symbol is n² values per Fourier point — 9.7 GB at
-  512³ in `complex128` — so that chain was tens of GB for one preconditioner.
-  The `complex128` was also half illusory in a single-precision solve: the data
-  reaches it from `column_hat`, a `complex_dtype` field, so it has already been
-  through a float32 FFT. Only the per-mode n×n *inversion* gains from double,
-  and that still happens in double. The singular q=0 block is made the identity
-  before inversion and zeroed after, instead of mask-indexing around it.
-  Measured peak RSS at 96³ with 3 components: 508 → 376 MB single, 575 → 444 MB
-  double. `SYMBOL_INVERSION_SLAB_BYTES` bounds the working set and is
-  module-level so tests can shrink it; the slab boundaries provably do not
-  change the result (`test_reference_stiffness_symbol_is_slab_invariant`)
-- PERF: `BlockFourierPreconditioner`'s Hermitian detection tests one component
-  pair at a time. `np.abs(blocks)` and `blocks - conj(swapaxes(blocks, 0, 1))`
-  each allocated an array the size of the whole symbol, the second complex
-- ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between two
-  nested nodal grids differing by a factor of two in every direction, and its
-  exact adjoint `R = Pᵀ`, the tensor product of the `[1/2, 1, 1/2]` stencil.
-  These are the grid-transfer half of a geometric multigrid hierarchy. Both act
-  component-wise and never mix the components of a vector field, which is what
-  makes them right for elasticity: multilinear interpolation reproduces linear
-  displacement fields exactly, so `range(P)` contains every rigid-body mode and
-  every constant strain — the near-nullspace property an algebraic multigrid
-  must be told about explicitly. `R = Pᵀ` rather than the `1/2^dim`-normalised
-  full weighting, because the restricted residual is a force (a functional) and
-  carries no measure factor; that pairing is also what keeps a V-cycle built
-  from these operators symmetric, as plain CG requires of a preconditioner
-- ENH: The transfers require the two decompositions to be *nested* — the fine
-  subdomain twice the coarse one in extent and starting at twice its global
-  location — so no transfer crosses a rank boundary and both directions are
-  pure local work plus the caller's existing halo exchange. A violation is
-  rejected with an error naming the offending axis and both extents rather than
-  silently corrupting the subdomain seams, which is the failure mode that would
-  otherwise only show up as a slightly wrong convergence rate under MPI
-- ENH: New `MultigridReferencePreconditioner`: a V-cycle approximation of the
-  reference-stiffness inverse `Kʳᵉᶠ⁻¹`, with the existing FFT block symbol
-  solving the coarsest level exactly. A drop-in for
-  `make_reference_stiffness_preconditioner`, and usable as the `green` argument
-  of `GreenJacobiPreconditioner` exactly as the FFT version is. The motivation
-  is parallel scaling: an FFT apply costs four all-to-all transposes, each a
-  full barrier across all ranks, and forces the solver onto the FFT engine's
-  pencil decomposition in which the x axis is never distributed; a V-cycle needs
-  only nearest-neighbour halo exchange per level. The cycle runs on the
-  *uniform* reference operator, so no material field is restricted and every
-  level is a rediscretisation rather than a Galerkin product — heterogeneity
-  stays where it already is, in the `J^{1/2} · G · J^{1/2}` scaling. Serial for
-  now; the MPI path raises rather than returning a wrong answer
-- ENH: The Jacobi damping is derived, not configured: `ω = 1.7 / λ_max(D⁻¹K)`
-  with `λ_max` measured by power iteration at setup. The stability limit is
-  `2/λ_max` and `λ_max` moves with dimension and element kind, so a hardcoded
-  value that is optimal in 2D (0.7) diverges outright in 3D. `D⁻¹K` is
-  invariant under uniform refinement, so one estimate on the coarsest level
-  serves the whole hierarchy. The nodal block is likewise probed rather than
-  assumed: it is `c·I` for Q1 in either dimension and for P1 in 3D, so the
-  smoother is a single scaled `axpy`, while 2D P1 — whose two-triangle Kuhn
-  split leaves `K01 = λ + μ` — is refused with an explanatory error instead of
-  being smoothed with the wrong diagonal
-- BUILD: Clang's `--gcc-install-dir` is now derived from the directory holding
-  `crtbegin.o` rather than the one holding `libstdc++.so`. The two coincide on
-  many installations but not all: where `libstdc++.so` sits in `<prefix>/lib64`
-  — as it does on an EasyBuild GCCcore toolchain — the hint named a directory
-  that is not a GCC installation at all, and configuring a HIP build died with
-  `does not contain a GCC installation` before compiling a line. The reported
-  path is also normalised, since GCC returns it relative to its own driver
-  location with `..` components left in
-- BUG: `MultigridReferencePreconditioner` now builds its coarse levels on the
-  same device as the fine one. They were created without a device argument and
-  so always landed on the host, which under a device fine grid is a mismatch
-  rather than a slow path: the cycle moves fields straight between levels. The
-  V-cycle still cannot run on a device end to end, because `GridTransfer` has
-  host-space overloads only, but every other part of it now can — which is
-  what lets the cycle be priced on a GPU a piece at a time
-- BUG: Two failures that used to surface far from their cause now say what is
-  wrong. A grid too coarse to halve even once produced an `AttributeError`
-  about a missing `real_space_collection`, and is now rejected on the grounds
-  that a V-cycle needs at least two levels. Applying the cycle to device fields
-  produced a pybind overload mismatch from three frames down, and now names the
-  missing device grid-transfer kernels
-- ENH: `examples/homogenization.py` gained `-P multigrid`, which applies the
-  same reference operator as `-P reference` by a V-cycle instead of a fine-grid
-  FFT, and `--sync-timers`, which brackets every timed region with a device
-  synchronisation. The latter is needed for any GPU cost attribution from this
-  example: kernel launches are asynchronous, so an unsynchronised host-side
-  timer around a region that only launches work measures the launch, and the
-  work is charged to whichever region is open at the next implicit
-  synchronisation -- usually a CG dot product pulling a scalar back. Totals are
-  unaffected; the breakdown is not, and the symptom is a sub-timer that stops
-  growing with the grid or shrinks
-- ENH: New `examples/vcycle_vs_fft.py`, which measures the one number that
-  decides whether the V-cycle is worth having: R, the cost of a V-cycle apply
-  over the cost of an FFT apply, on a single device. The two scale in opposite
-  directions -- a cycle is halo-only, an FFT's all-to-all is not -- so R at one
-  rank predicts the crossover instead of waiting to observe it. R > 1 is
-  expected and is not a failure. It is reported three ways: modelled from the
-  matvec alone, priced from the cycle's parts as timed on a GPU, and measured
-  end to end wherever the cycle runs. The script also carries the iteration
-  penalty, since a cheaper apply that needs more CG iterations is not cheaper
-- ENH: `examples/homogenization.py --decomposition` unties the domain split
-  from the preconditioner. `muGrid.FFTEngine` does not merely add transforms to
-  a `CartesianDecomposition`, it also dictates how the domain is divided, so a
-  measurement that swaps the preconditioner alone moves both at once and cannot
-  say which it moved. The JSON output now also records the split that was
-  actually used -- rank count, subdivisions and subdomain extents -- since the
-  FFT engine picks its own and ignores `suggest_subdivisions`
-- ENH: New `examples/decomposition_baseline.py`, which measures what the FFT
-  engine's domain split costs on its own, with the preconditioner held at
-  `-P none` so that no transform runs in either arm. The split turns out to be
-  a *slab*, `[1, 1, P]` -- only the last axis is ever distributed -- which caps
-  a run at `P <= N` ranks and grows its halo twice as fast as a 3D split. On a
-  single shared-memory node it nonetheless costs nothing measurable, and its
-  halo exchange is the faster of the two, because it has 2 MPI neighbours where
-  a 3D split has 6 and per-message latency beats volume there
-- ENH: `examples/homogenization.py --mg-nu` and `--mg-cycles` expose the
-  V-cycle's smoothing and cycle counts, so the cost/convergence trade can be
-  measured rather than guessed. Measured, `nu = 1` beats the default of 2 at
-  every grid tried: smoothing costs `2*nu+1` per level while iterations fall
-  far more slowly, so the whole-solve penalty against the FFT preconditioner
-  drops from 4.5x to 3.8x at 256 cubed. Raising `nb_cycles` instead is strictly
-  worse -- `nu=1, cycles=2` buys exactly the iteration count of `nu=2` for about
-  27% more work
-- TST: `test_preconditioner_is_symmetric` and
-  `test_vcycle_converges_on_the_reference_operator` now sweep `nu` over
-  {1, 2, 3} in both dimensions. Symmetry is what allows plain CG to be used at
-  all, and a guarantee that held only at whichever `nu` happened to be the
-  default would be worth little now that `nu` is a tuning parameter
-- ENH: New `HybridFourierTridiagonalPreconditioner`, reachable as
-  `examples/homogenization.py -P hybrid`. It applies the same reference
-  operator as `-P reference` but transforms only the rank-local axes, solving
-  block-tridiagonally along the distributed one -- so it never performs the
-  all-to-all a full FFT forces, and unlike the V-cycle it is *exact*. Measured
-  at 1, 2, 4 and 8 ranks it reproduces `-P reference`'s CG count to the
-  iteration, where the V-cycle costs about 1.5x of it. Two properties make it
-  work, and neither is separability: the reference operator is uniform, so
-  transforming the local axes decouples every mode exactly, and the stencil
-  reaches one node along the distributed axis for Q1 and P1 alike. The
-  distributed solve is the Spike/partitioned-Thomas scheme, whose small reduced
-  interface system also absorbs the periodic wrap-around. Slab decomposition
-  only
-- ENH: `HybridFourierTridiagonalPreconditioner` runs on the GPU. Host and device
-  share one implementation -- the array module follows the decomposition -- so
-  the two cannot drift apart, and a test asserts the device reproduces the host
-  *result* rather than merely a small residual. Validated on 2x MI300A at 1, 2
-  and 4 ranks: the solve is exact to 8e-16 and its checksum matches the host's
-  to twelve decimals. The interface exchange stages device buffers through the
-  host, so this does not require a GPU-aware MPI build
-- PERF: The hybrid's tridiagonal sweep is a fused HIP/CUDA kernel -- one thread
-  per Fourier mode, marching the distributed axis with the coupling blocks in
-  registers -- replacing a Python loop that issued four kernels per plane. It is
-  52x faster at 256 cubed and 119x at 64 cubed, reaching 1755 GB/s, and agrees
-  with the loop to round-off. The internal layout is now z-major so a wavefront
-  reads contiguous bytes, which cost nothing to adopt because a permutation was
-  already being materialised. Two consequences of making the sweep fast: the
-  real-space mean projection is gone, since projecting off the rigid
-  translations is just zeroing the all-zero mode's z-mean, and the spike arrays
-  are no longer stored at all, since correcting the right-hand side at its two
-  end planes and solving again is the same thing for one extra sweep instead of
-  a pass over 2.4 GB
-- PERF: The hybrid's Thomas factors are stored compressed. Their recurrence has
-  constant coefficients and is therefore a fixed-point iteration whose
-  convergence distribution turns out to be independent of the grid -- median 10
-  steps, 90th percentile 16 at every size measured -- so the first 32 factors
-  are kept densely, everything beyond reuses the last, and the ~2% of modes that
-  have not converged by then keep a full line. Exact rather than approximate: a
-  mode is exceptional when reusing the last factor would be wrong anywhere along
-  the remaining axis. 6.9x less storage at 256 cubed, 1217 MB down to 177 MB,
-  and the sweep gains 21% because it streams those factors
-- BUG: The hybrid preconditioner deflates the nullspace of its singular `q = 0`
-  z-line instead of pseudo-inverting it. The kernel there is known exactly --
-  the rigid translation, one per component, constant along the distributed axis
-  -- so shifting it out of the way and inverting is both exact and better
-  conditioned. `pinv` had to separate it by magnitude instead, and the gap it
-  was given is not one it can resolve: the computed zeros sit within a digit of
-  its default `1e-15 * sigma_max` cutoff, so which side they land on is a
-  property of the LAPACK build. numpy 2.5 lands one of them on the wrong side
-  at 32 planes, which keeps a kernel direction scaled by `1e13` and costs the
-  2D preconditioner four digits of exactness -- enough to break
-  `test_hybrid_is_the_exact_reference_inverse`, and, unnoticed, to slow every
-  solve that used it
-- BUG: `_batched_inverse` is told which mode may be singular instead of
-  discovering it. It used to mark a block for pseudo-inversion when
-  `|A A⁻¹ - I|` exceeded an absolute `1e-8` — a threshold below the rounding
-  noise of a *healthy* complex64 block, so at `dtype=np.float32` it fired on
-  hundreds of sound modes (174 in 2D at 32, 1747 in 3D at 16) and replaced each
-  one, through a Python loop over modes, with a pseudo-inverse computed at that
-  same precision. The one mode that is genuinely singular is the all-zero one,
-  it is singular by construction, and `apply` discards its solve wholesale, so
-  it is now named by its caller and zeroed — the same thing
-  `make_reference_stiffness_preconditioner` does at `q = 0`. The tolerance that
-  remains is a verification, not a switch, and scales with the working
-  precision; a mode that is singular without being declared so now raises
-  rather than riding along pseudo-inverted
-- BUG: `_compress_factors` compares its deviation against a scaled tolerance
-  instead of dividing by a guard floor of `1e-300`, which is not a small number
-  in single precision but zero
+- FIX: Reductions return `reduction_result_t<T>`, double for a `Real32`/`Complex32`
+  field, instead of narrowing back — which turned any value past ~3.4e38 into `inf`.
+  An infinite `pAp` zeroes CG's step, so float32 stalled where float64 converged
+- FIX: Both CG solvers reject a non-finite residual, curvature term or inner
+  product with a `ConvergenceError` naming the cause, not only NaN. A zero
+  curvature term and a zero step on an unconverged residual are reported too
+- FIX: A float32 solve given an `rtol` below the ~1e-6 accuracy floor warns that it
+  is unreachable instead of running to maxiter. Double precision is unaffected
+- TST: `python_solvers_test.py` renamed to `python_solvers_tests.py`; pytest
+  collects `python_*_tests.py`, so it — and the only test of
+  `conjugate_gradients_pipelined` — had never run
+- FIX: The FFT transpose narrows its all-to-all counts through `checked_mpi_int`
+  rather than a bare cast, so an oversized transform throws instead of wrapping.
+  Now in `mpi/mpi_counts.hh`; this is the default exchange path on the GPU
+- FIX: GPU kernels use new `global_thread_{x,y,z}()` / `grid_stride_x()` helpers
+  instead of open-coding `blockIdx.x * blockDim.x`, whose all-`unsigned int`
+  product wraps above 2^32 threads before any widening. 48 sites
+- FIX: The reduction kernels widen each operand before multiplying, not after; an
+  fp32 square loses half the mantissa and overflows at `|x| ~ 1.8e19`. The fp32
+  `sq_norm` overload is gone so it cannot recur
+- PERF: The reference symbol is assembled at the solve precision and inverted one
+  slab of modes at a time, in place, not `complex128` plus four full-size arrays.
+  Peak RSS at 96³: 508 → 376 MB single, 575 → 444 MB double
+- PERF: `BlockFourierPreconditioner`'s Hermitian detection walks one component pair
+  at a time instead of allocating two arrays the size of the whole symbol
+- ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between nested nodal
+  grids and its exact adjoint `R = Pᵀ`. Both act component-wise, so `range(P)`
+  contains every rigid-body mode and constant strain
+- ENH: The transfers require nested decompositions, so no transfer crosses a rank
+  boundary; a violation is rejected naming the axis and both extents rather than
+  corrupting the subdomain seams
+- ENH: New `MultigridReferencePreconditioner`: a V-cycle approximation of `Kʳᵉᶠ⁻¹`
+  with the FFT block symbol solving the coarsest level exactly. It needs only
+  nearest-neighbour halo where an FFT apply costs four all-to-all. Serial for now
+- ENH: The Jacobi damping is derived, `ω = 1.7 / λ_max(D⁻¹K)` by power iteration at
+  setup, since a value optimal in 2D diverges outright in 3D. 2D P1 is refused with
+  an explanatory error rather than smoothed with the wrong diagonal
+- BUILD: Clang's `--gcc-install-dir` is derived from the directory holding
+  `crtbegin.o`, not `libstdc++.so`; the two differ on an EasyBuild GCCcore
+  toolchain, where a HIP build died before compiling a line
+- BUG: `MultigridReferencePreconditioner` builds its coarse levels on the fine
+  level's device. They always landed on the host, which under a device fine grid is
+  a mismatch rather than a slow path
+- BUG: Two multigrid failures now say what is wrong: a grid too coarse to halve is
+  rejected as needing two levels, and a device-field apply names the missing
+  grid-transfer kernels
+- ENH: `examples/homogenization.py` gained `-P multigrid` and `--sync-timers`; the
+  latter is needed for GPU cost attribution, since asynchronous launches otherwise
+  charge the work to whichever region is open at the next synchronisation
+- ENH: New `examples/vcycle_vs_fft.py`, measuring R — V-cycle apply cost over FFT
+  apply cost on one device. The two scale oppositely, so R at one rank predicts the
+  crossover. It carries the iteration penalty too
+- ENH: `--decomposition` unties the domain split from the preconditioner, which
+  `FFTEngine` otherwise dictates; the JSON output now records the split used
+- ENH: New `examples/decomposition_baseline.py`, pricing the FFT engine's split on
+  its own. It is a slab, `[1, 1, P]`, which caps a run at `P <= N` ranks, though on
+  one shared-memory node it costs nothing measurable
+- ENH: `--mg-nu` and `--mg-cycles` expose the V-cycle's smoothing and cycle counts.
+  `nu = 1` beats the default of 2 at every grid tried, dropping the penalty against
+  the FFT preconditioner from 4.5x to 3.8x at 256³
+- TST: The symmetry and V-cycle convergence tests sweep `nu` over {1, 2, 3} in both
+  dimensions, since symmetry is what allows plain CG and `nu` is now tunable
+- ENH: New `HybridFourierTridiagonalPreconditioner` (`-P hybrid`): transforms only
+  the rank-local axes and solves block-tridiagonally along the distributed one, so
+  no all-to-all. Exact — it matches `-P reference`'s CG count at 1–8 ranks
+- ENH: The hybrid runs on the GPU, host and device sharing one implementation.
+  Validated on 2x MI300A at 1, 2 and 4 ranks: exact to 8e-16, and no GPU-aware MPI
+  build is needed
+- PERF: The hybrid's tridiagonal sweep is a fused HIP/CUDA kernel, one thread per
+  mode, replacing a Python loop that issued four kernels per plane. 52x faster at
+  256³ and 119x at 64³, reaching 1755 GB/s
+- PERF: The hybrid's Thomas factors are stored compressed: 32 kept densely, the rest
+  reusing the last, and the ~2% of modes not converged by then keeping a full line.
+  Exact, not approximate. 1217 → 177 MB at 256³, and the sweep gains 21%
+- BUG: The hybrid deflates the nullspace of its singular `q = 0` line instead of
+  pseudo-inverting it. `pinv`'s cutoff cannot resolve the gap — numpy 2.5 lands a
+  computed zero on the wrong side, keeping a kernel direction scaled by `1e13`
+- BUG: `_batched_inverse` is told which mode may be singular instead of discovering
+  it by an absolute `1e-8` threshold that sits below a healthy complex64 block's own
+  rounding noise, and so fired on hundreds of sound modes
+- BUG: `_compress_factors` compares against a scaled tolerance rather than dividing
+  by a guard floor of `1e-300`, which is not a small number in single precision but
+  zero
 - TST: `test_hybrid_is_exact_in_single_precision` runs the hybrid end to end at
-  `dtype=np.float32`, which nothing else covered — every tolerance on that path
-  was unmeasured, and two of them were wrong. It is also the sharper form of
-  `test_hybrid_is_the_exact_reference_inverse`: in double the computed zeros of
-  the singular mode straddle `pinv`'s cutoff, so a retained nullspace showed up
-  in 2D but not 3D and only on some numpy versions, while at complex64 they sit
-  ~1e-7 of the largest singular value and are always on the wrong side of it.
-  The same defect therefore registers at every size, in both dimensions, on any
-  numpy — 1.4e-1 in 2D and 1.1e-2 in 3D against a floor of ~1e-6
-
+  float32, which nothing covered and where two tolerances were wrong. Sharper than
+  the double test, where the defect showed only on some numpy versions
 
 v1.3.0 (16Sep26)
 ----------------
