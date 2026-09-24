@@ -271,8 +271,13 @@ apply_green_symbol_3d_f32 = _linalg.apply_green_symbol_3d_f32
 # The device sweeps are present only in a CUDA/HIP build, and take device
 # addresses rather than buffers. Opt in with MUGRID_BLOCK_THOMAS_COMPILED=1;
 # see HybridFourierTridiagonalPreconditioner.
+# The device symbol application likewise; AnalyticReferencePreconditioner picks
+# it when its work field lives on a device.
 for _name in ("block_thomas_gpu_2d", "block_thomas_gpu_3d",
-              "block_thomas_gpu_2d_f32", "block_thomas_gpu_3d_f32"):
+              "block_thomas_gpu_2d_f32", "block_thomas_gpu_3d_f32",
+              "apply_green_symbol_gpu_2d", "apply_green_symbol_gpu_3d",
+              "apply_green_symbol_gpu_2d_f32",
+              "apply_green_symbol_gpu_3d_f32"):
     if hasattr(_linalg, _name):
         globals()[_name] = getattr(_linalg, _name)
 del _name

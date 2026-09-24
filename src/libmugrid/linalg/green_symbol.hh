@@ -118,8 +118,13 @@ namespace muGrid {
          * Defined in `green_symbol_gpu.cc`. One thread per mode, with the
          * symbol, its inverse and the component vector all held in registers,
          * which is the whole point: the per-mode block never reaches memory.
-         * Pointers are device pointers, except `nb_fourier_grid_pts` and the
-         * table of table-pointers, which are read on the host.
+         * A thread block shares the hoisted sums over the slower axes through
+         * shared memory; see that file for why this is load-bearing.
+         *
+         * `field` and the per-axis tables `q[d]` are device pointers. The
+         * stencil, `nb_fourier_grid_pts` and the table of table-pointers are
+         * read on the host: the stencil is copied into the launch's parameter
+         * space, which is constant memory, so it needs no device allocation.
          */
         template <Dim_t Dim, typename T>
         void apply_inverse_gpu(std::complex<T> * field,

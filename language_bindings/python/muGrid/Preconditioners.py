@@ -771,11 +771,15 @@ class AnalyticReferencePreconditioner(Preconditioner):
     rebuilt for one mode, inverted and applied entirely in registers. What this
     class stores is the stencil.
 
-    The trade is arithmetic for memory, and it is close to even rather than
-    free. Rebuilding costs ~630 flops per mode against ~36 bytes read for the
-    stored symbol, so it wants about 17.6 flops/byte to break even: an A100
-    balances at 12.6 and an H100 at 17.9, while a CPU socket is nearer 5. Use
-    it where memory is the binding constraint, which on a large grid it is.
+    The trade is arithmetic for memory. Rebuilding costs ~630 flops per mode
+    against ~36 bytes read for the stored symbol, so it wants about 17.6
+    flops/byte to break even. A CPU socket is nearer 5, and there the apply is
+    about 28% slower (128³, float32). On a GPU it wins outright: on an H200 at
+    512³, three components, the apply is 9.3 ms against 25.5 ms stored in
+    float32 and 16.1 against 31.2 ms in float64, with 4.9 GB less device
+    memory and a 1.3 s setup instead of 168 s. That is why
+    :func:`make_reference_stiffness_preconditioner` picks this class on a
+    device and the stored symbol on the host.
 
     The per-mode cost would be nine times higher done naively. Modes along the
     fastest axis share the frequencies of every other axis, so the kernel
@@ -849,8 +853,47 @@ class AnalyticReferencePreconditioner(Preconditioner):
 
         self._work = engine.fourier_space_field(
             f"{name}-work", components=(dim,), dtype=complex_dtype)
-        self._kernel = getattr(linalg, f"apply_green_symbol_{dim}d{suffix}")
         self._normalisation = real_dtype.type(engine.normalisation)
+
+        # The work field's view says where the transforms leave the data: a
+        # cupy array means the device kernel, which takes device addresses.
+        # The frequency tables go to the device once, here -- a few kilobytes,
+        # not worth a transfer per apply. The stencil stays on the host; the
+        # kernel receives it by value, in constant memory.
+        sample = self._work.s
+        self._on_device = type(sample).__module__.startswith("cupy")
+        if self._on_device:
+            import cupy
+
+            self._kernel = getattr(
+                linalg, f"apply_green_symbol_gpu_{dim}d{suffix}", None)
+            if self._kernel is None:
+                raise RuntimeError(
+                    "the work field lives on a device but this muGrid build "
+                    "has no device kernel for the evaluated symbol")
+            self._q_device = [cupy.asarray(qd) for qd in self._q]
+            self._q_ptrs = [qd.data.ptr for qd in self._q_device]
+        else:
+            self._kernel = getattr(linalg, f"apply_green_symbol_{dim}d{suffix}")
+
+        # Element strides of the component and first Fourier axes, read off
+        # the view rather than assumed. The host buffer is array-of-structures
+        # (components fastest, strides 1 and dim) and the device buffer is
+        # structure-of-arrays (strides nb_modes and 1); both must have the
+        # Fourier axes Fortran-ordered, axis 0 fastest, which is how the kernel
+        # decomposes the flat mode index.
+        itemsize = sample.dtype.itemsize
+        shape, strides = sample.shape, sample.strides
+        if shape[1] != 1:
+            raise ValueError(
+                f"expected one sub-point per Fourier mode, got {shape[1]}")
+        self._stride_component = strides[0] // itemsize
+        self._stride_mode = strides[2] // itemsize
+        for d in range(dim - 1):
+            if self._nb_modes and strides[3 + d] != strides[2 + d] * shape[2 + d]:
+                raise ValueError(
+                    f"Fourier work field is not axis-0-fastest over its "
+                    f"modes: shape {shape}, strides {strides}")
 
     def _timed(self, label):
         return self._timer(label) if self._timer is not None else nullcontext()
@@ -864,13 +907,20 @@ class AnalyticReferencePreconditioner(Preconditioner):
                 # No local modes; the transforms above and below are still
                 # collective and must not be skipped.
                 pass
+            elif self._on_device:
+                # In place through the device address; strides as read off
+                # the view in __init__ (structure-of-arrays on a device).
+                self._kernel(self._work.s.data.ptr, self._stride_component,
+                             self._stride_mode, self._stencil, self._q_ptrs,
+                             list(self._fourier_shape), self._normalisation)
             else:
                 # The Fourier buffer is Fortran-ordered, so an order="F"
                 # ravel is a contiguous *view*: components fastest, then modes
                 # with axis 0 fastest, exactly the layout the kernel indexes.
                 # Nothing is copied and the kernel writes back through it.
                 flat = np.asarray(self._work.s).ravel(order="F")
-                self._kernel(flat, 1, self._dim, self._stencil, self._q,
+                self._kernel(flat, self._stride_component, self._stride_mode,
+                             self._stencil, self._q,
                              list(self._fourier_shape), self._normalisation)
         with self._timed("ifft"):
             engine.ifft(self._work, z)
@@ -888,6 +938,7 @@ def make_reference_stiffness_preconditioner(
     grid_spacing=None,
     lambda_ref=None,
     mu_ref=None,
+    evaluate_symbol=None,
 ):
     """
     Build the reference-material (Green's-function) preconditioner of Ladecký et
@@ -937,11 +988,25 @@ def make_reference_stiffness_preconditioner(
         fields; ``apply_reference_stiffness`` is therefore invoked on fields of
         this precision too. The symbol itself is assembled and inverted in
         double regardless, for accuracy.
+    element, grid_spacing, lambda_ref, mu_ref : optional
+        Name the reference operator instead of passing
+        ``apply_reference_stiffness``: the symbol is then built from its
+        ``3^dim`` stencil (:func:`reference_stencil`), with no impulse response
+        and no setup transforms.
+    evaluate_symbol : bool, optional
+        Analytic route only. ``True`` returns an
+        :class:`AnalyticReferencePreconditioner`, which keeps only the stencil
+        and rebuilds the symbol per mode on every apply; ``False`` assembles and
+        stores the inverse symbol (``n²`` complex values per Fourier mode,
+        2.3 GB at 512³ in single precision). The default, ``None``, evaluates
+        when the engine's fields live on a device and stores on the host: on
+        a GPU evaluating is both faster and smaller than storing, on a CPU it
+        is ~28% slower (see :class:`AnalyticReferencePreconditioner`).
 
     Returns
     -------
-    BlockFourierPreconditioner
-        The assembled preconditioner, ready to pass as ``prec=`` to
+    BlockFourierPreconditioner or AnalyticReferencePreconditioner
+        Ready to pass as ``prec=`` to
         :func:`muGrid.Solvers.conjugate_gradients`.
     """
     fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
@@ -959,6 +1024,10 @@ def make_reference_stiffness_preconditioner(
         raise ValueError(
             "the analytic route needs `grid_spacing`, `lambda_ref` and "
             "`mu_ref` alongside `element`")
+    if evaluate_symbol and element is None:
+        raise ValueError(
+            "evaluate_symbol needs the analytic route: pass `element` with "
+            "`grid_spacing`, `lambda_ref` and `mu_ref`")
 
     real_dtype = np.dtype(dtype)
     if real_dtype == np.dtype(np.float32):
@@ -984,6 +1053,20 @@ def make_reference_stiffness_preconditioner(
     # grid, each followed by a full-grid FFT. This stays because it is the
     # only route that works for an operator muGrid cannot name.
     analytic = element is not None
+    if analytic:
+        S = reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
+        if S.shape[-1] != n:
+            raise ValueError(
+                f"reference stencil has {S.shape[-1]} components but the "
+                f"preconditioner was asked for {n}")
+        if evaluate_symbol is None:
+            evaluate_symbol = not _engine_on_host(engine)
+        if evaluate_symbol:
+            # Decided before K_hat below is allocated: the point is that the
+            # full-size symbol never exists, not even during setup.
+            return AnalyticReferencePreconditioner(
+                engine, S, name=name, timer=timer, dtype=real_dtype)
+
     impulse_name = f"{name}-impulse"
     column_name = f"{name}-column"
     column_hat_name = f"{name}-column-hat"
@@ -1003,11 +1086,6 @@ def make_reference_stiffness_preconditioner(
     slab = max(1, SYMBOL_INVERSION_SLAB_BYTES // max(bytes_per_index, 1))
 
     if analytic:
-        S = reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
-        if S.shape[-1] != n:
-            raise ValueError(
-                f"reference stencil has {S.shape[-1]} components but the "
-                f"preconditioner was asked for {n}")
         # Slab at a time: stencil_symbol builds one array of the mode shape per
         # stencil offset, so evaluating the whole grid at once would allocate
         # 3^dim transients the size of the symbol.
@@ -1101,6 +1179,12 @@ def make_reference_stiffness_preconditioner(
         engine, K_inv, name=name, timer=timer, dtype=real_dtype)
 
 
+def _engine_on_host(engine):
+    """Whether the engine's fields live in host memory."""
+    device = getattr(engine, "device", None)
+    return device is None or device.is_host
+
+
 def make_green_jacobi_preconditioner(
     engine,
     stiffness_op,
@@ -1115,6 +1199,7 @@ def make_green_jacobi_preconditioner(
     name="green-jacobi-preconditioner",
     timer=None,
     dtype=None,
+    evaluate_symbol=None,
 ):
     r"""
     Assemble the Green-Jacobi (J-FFT) preconditioner for FFT-accelerated FE
@@ -1167,6 +1252,10 @@ def make_green_jacobi_preconditioner(
         Green preconditioner's fields so their transforms pair with the solver's
         fields. Defaults to the dtype of ``lambda_field``, so a single-precision
         material yields a single-precision preconditioner automatically.
+    evaluate_symbol : bool, optional
+        Forwarded to :func:`make_reference_stiffness_preconditioner`; only
+        meaningful with ``element``. By default the Green symbol is evaluated
+        per mode on a device and stored on the host.
 
     Returns
     -------
@@ -1219,6 +1308,7 @@ def make_green_jacobi_preconditioner(
         timer=timer, dtype=dtype, element=element, grid_spacing=grid_spacing,
         lambda_ref=reference_lambda if element is not None else None,
         mu_ref=reference_mu if element is not None else None,
+        evaluate_symbol=evaluate_symbol,
     )
 
     diagonal = engine.real_space_field(

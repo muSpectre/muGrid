@@ -1186,6 +1186,94 @@ def test_evaluated_symbol_stores_only_the_stencil(comm, dim):
     assert stored_scalars == 3 ** dim * dim * dim + sum(fourier_shape)
 
 
+@pytest.mark.parametrize("dim,shape", [
+    (2, (16, 16)), (3, (10, 10, 10)),
+    # axis 0 halves to two modes, so a thread block spans more lines than it
+    # keeps in shared memory and every thread builds its own hoisted sums
+    (2, (2, 64)), (3, (3, 16, 16)),
+])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
+                                                           dtype):
+    """The device kernel must reproduce the stored symbol applied on the host.
+
+    What it can get wrong silently is the layout: the device Fourier buffer is
+    structure-of-arrays (component stride ``nb_modes``, mode stride 1) where
+    the host one is array-of-structures, and the kernel's thread blocks share
+    the hoisted sums over axes 1 and 2 per axis-0 line. The short-axis-0 grids
+    take the path where a block spans too many lines to share them.
+    """
+    skip_if_gpu_unavailable("gpu")
+    import cupy
+
+    from muGrid.Preconditioners import AnalyticReferencePreconditioner
+
+    # Isotropic even where the grid is not: a 32:1 element is ill-conditioned
+    # enough to push single precision past the tolerance on its own.
+    spacing = (1.0 / shape[-1],) * dim
+    lam, mu = 1.3, 0.7
+    element = muGrid.FEMElement.q1
+    tag = f"{dim}d-{shape[0]}-{np.dtype(dtype).name}"
+
+    host = muGrid.FFTEngine(shape, comm)
+    device = muGrid.FFTEngine(shape, comm, device=create_device("gpu"))
+    stored = make_reference_stiffness_preconditioner(
+        host, nb_components=dim, dtype=dtype, element=element,
+        grid_spacing=spacing, lambda_ref=lam, mu_ref=mu,
+        evaluate_symbol=False, name=f"stored-{tag}")
+    evaluated = make_reference_stiffness_preconditioner(
+        device, nb_components=dim, dtype=dtype, element=element,
+        grid_spacing=spacing, lambda_ref=lam, mu_ref=mu,
+        name=f"eval-{tag}")
+    assert isinstance(stored, BlockFourierPreconditioner)
+    assert isinstance(evaluated, AnalyticReferencePreconditioner)
+
+    r_h = host.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
+    z_h = host.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
+    r_d = device.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
+    z_d = device.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
+    x = np.random.default_rng(0).standard_normal(r_h.p.shape).astype(dtype)
+    r_h.p[...] = x
+    r_d.p[...] = cupy.asarray(x)
+
+    stored(r_h, z_h)
+    evaluated(r_d, z_d)
+
+    a = np.asarray(z_h.p).astype(np.float64)
+    b = cupy.asnumpy(z_d.p).astype(np.float64)
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    assert np.abs(a - b).max() / np.abs(a).max() < tol
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_reference_factory_chooses_storage_by_device(comm, device):
+    """By default the analytic route evaluates the symbol on a device and
+    stores it on the host; ``evaluate_symbol`` overrides either way."""
+    skip_if_gpu_unavailable(device)
+    from muGrid.Preconditioners import AnalyticReferencePreconditioner
+
+    dim, n = 3, 8
+    engine = muGrid.FFTEngine((n,) * dim, comm, device=create_device(device))
+    kw = dict(nb_components=dim, element=muGrid.FEMElement.q1,
+              grid_spacing=(1.0 / n,) * dim, lambda_ref=1.3, mu_ref=0.7)
+
+    default = make_reference_stiffness_preconditioner(
+        engine, name=f"default-{device}", **kw)
+    expected = (BlockFourierPreconditioner if device == "cpu"
+                else AnalyticReferencePreconditioner)
+    assert isinstance(default, expected)
+
+    forced = make_reference_stiffness_preconditioner(
+        engine, name=f"forced-{device}", evaluate_symbol=device == "cpu",
+        **kw)
+    assert not isinstance(forced, expected)
+
+    with pytest.raises(ValueError, match="analytic route"):
+        make_reference_stiffness_preconditioner(
+            engine, lambda u, f: None, dim, evaluate_symbol=True,
+            name=f"opaque-{device}")
+
+
 def test_evaluated_symbol_rejects_a_malformed_stencil(comm):
     from muGrid.Preconditioners import AnalyticReferencePreconditioner
 
