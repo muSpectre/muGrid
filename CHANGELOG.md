@@ -1,27 +1,32 @@
 Change log for µGrid
 ====================
 
-v1.4.0 (24Sep26)
+v1.4.0 (25Sep26)
 ----------------
 
-- FIX: Reductions return `reduction_result_t<T>`, double for a `Real32`/`Complex32`
+- BUG: `HybridFourierTridiagonalPreconditioner` allocates and computes on its
+  decomposition's GPU instead of cupy's *current* device. With one GPU per rank,
+  rank 1 put its factors on GPU 0 next to fields on GPU 1, faulted with
+  `CUDA_ERROR_ILLEGAL_ADDRESS`, and left the other ranks deadlocked in the
+  interface exchange. First multi-GPU test of the hybrid preconditioner
+- BUG: Reductions return `reduction_result_t<T>`, double for a `Real32`/`Complex32`
   field, instead of narrowing back — which turned any value past ~3.4e38 into `inf`.
   An infinite `pAp` zeroes CG's step, so float32 stalled where float64 converged
-- FIX: Both CG solvers reject a non-finite residual, curvature term or inner
+- BUG: Both CG solvers reject a non-finite residual, curvature term or inner
   product with a `ConvergenceError` naming the cause, not only NaN. A zero
   curvature term and a zero step on an unconverged residual are reported too
-- FIX: A float32 solve given an `rtol` below the ~1e-6 accuracy floor warns that it
+- BUG: A float32 solve given an `rtol` below the ~1e-6 accuracy floor warns that it
   is unreachable instead of running to maxiter. Double precision is unaffected
 - TST: `python_solvers_test.py` renamed to `python_solvers_tests.py`; pytest
   collects `python_*_tests.py`, so it — and the only test of
   `conjugate_gradients_pipelined` — had never run
-- FIX: The FFT transpose narrows its all-to-all counts through `checked_mpi_int`
+- BUG: The FFT transpose narrows its all-to-all counts through `checked_mpi_int`
   rather than a bare cast, so an oversized transform throws instead of wrapping.
   Now in `mpi/mpi_counts.hh`; this is the default exchange path on the GPU
-- FIX: GPU kernels use new `global_thread_{x,y,z}()` / `grid_stride_x()` helpers
+- BUG: GPU kernels use new `global_thread_{x,y,z}()` / `grid_stride_x()` helpers
   instead of open-coding `blockIdx.x * blockDim.x`, whose all-`unsigned int`
   product wraps above 2^32 threads before any widening. 48 sites
-- FIX: The reduction kernels widen each operand before multiplying, not after; an
+- BUG: The reduction kernels widen each operand before multiplying, not after; an
   fp32 square loses half the mantissa and overflows at `|x| ~ 1.8e19`. The fp32
   `sq_norm` overload is gone so it cannot recur
 - PERF: The reference symbol is assembled at the solve precision and inverted one
