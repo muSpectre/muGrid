@@ -2206,6 +2206,26 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     def __init__(self, decomposition, grid_spacing, lambda_ref, mu_ref,
                  communicator=None, element=None, timer=None,
                  dtype=np.float64, name="hybrid-fourier-tridiagonal"):
+        # Everything below allocates through cupy, which places arrays on its
+        # *current* device -- device 0 unless the caller switched it. With one
+        # GPU per rank that puts rank 1's factors on GPU 0 next to fields on
+        # GPU 1, and the first kernel that mixes them faults. Pin the
+        # decomposition's device instead of relying on the caller to.
+        self._device_id = (None if decomposition.device.is_host
+                           else decomposition.device.device_id)
+        with self._on_own_device():
+            self._setup(decomposition, grid_spacing, lambda_ref, mu_ref,
+                        communicator, element, timer, dtype, name)
+
+    def _on_own_device(self):
+        """Make the decomposition's GPU cupy's current device (no-op on host)."""
+        if self._device_id is None:
+            return nullcontext()
+        import cupy
+        return cupy.cuda.Device(self._device_id)
+
+    def _setup(self, decomposition, grid_spacing, lambda_ref, mu_ref,
+               communicator, element, timer, dtype, name):
         from .Parallel import Communicator
         from .Wrappers import _muGrid
 
@@ -2786,6 +2806,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
     def apply(self, r, z):
         """``z = M⁻¹ r``."""
+        with self._on_own_device():
+            self._apply(r, z)
+
+    def _apply(self, r, z):
         xp = self._xp
         dim = self.dim
         axes = tuple(range(1, dim))

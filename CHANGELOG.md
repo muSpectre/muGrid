@@ -1,6 +1,15 @@
 Change log for µGrid
 ====================
 
+unreleased
+----------
+
+- FIX: `HybridFourierTridiagonalPreconditioner` allocates and computes on its
+  decomposition's GPU instead of cupy's *current* device. With one GPU per rank,
+  rank 1 put its factors on GPU 0 next to fields on GPU 1, faulted with
+  `CUDA_ERROR_ILLEGAL_ADDRESS`, and left the other ranks deadlocked in the
+  interface exchange. First multi-GPU test of the hybrid preconditioner
+
 v1.4.0 (24Sep26)
 ----------------
 

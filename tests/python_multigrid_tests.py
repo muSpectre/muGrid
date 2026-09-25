@@ -955,3 +955,65 @@ def test_hybrid_fused_kernel_matches_the_loop(comm, dim, n):
 
     scale = float(cp.abs(loop).max())
     assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
+
+
+def _nb_gpus():
+    try:
+        import cupy
+        return cupy.cuda.runtime.getDeviceCount()
+    except Exception:
+        return 0
+
+
+@pytest.mark.skipif(_nb_gpus() < 2, reason="needs two GPUs")
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_runs_on_its_own_gpu(comm, dim, n):
+    """The preconditioner works on the decomposition's GPU, whatever cupy's
+    current device is.
+
+    With one GPU per rank, every rank but one holds its fields on a device other
+    than cupy's default. The preconditioner used to allocate its factors on
+    cupy's *current* device regardless, and the first kernel that mixed the two
+    faulted with an illegal address -- after which the other ranks deadlocked in
+    the interface exchange. Here cupy is left on device 0 while the fields live
+    on ``(rank + 1) % nb_gpus``, which puts at least one rank on another device
+    even in a serial run; the result must match the host path.
+    """
+    import cupy as cp
+
+    nb_ranks = 1 if comm is None else comm.size
+    rank = 0 if comm is None else comm.rank
+    if n % nb_ranks or n // nb_ranks < 2:
+        pytest.skip(f"{n} planes do not split into {nb_ranks} slabs")
+    gpu = (rank + 1) % _nb_gpus()
+    spacing = (1.0 / n,) * dim
+    glob = _zero_mean_global(dim, n, 13)
+
+    host_decomp, _, host_prec, _, _ = _slab_setup(comm, dim, n)
+    hr, hz = (host_decomp.collection.real_field(f"hyb-own-h{s}", (dim,))
+              for s in "rz")
+    hr.p[...] = _slab_slice(host_decomp, glob)
+    host_prec.apply(hr, hz)
+
+    cp.cuda.Device(0).use()
+    dev_decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * (dim - 1) + [nb_ranks],
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim,
+        device=muGrid.Device.gpu(gpu))
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+    dev_prec = HybridFourierTridiagonalPreconditioner(
+        dev_decomp, spacing, 1.3, 0.7, communicator=comm)
+    dr, dz = (dev_decomp.collection.real_field(f"hyb-own-d{s}", (dim,))
+              for s in "rz")
+    with cp.cuda.Device(gpu):
+        dr.p[...] = cp.asarray(_slab_slice(dev_decomp, glob))
+    # Allocating a device field leaves the CUDA current device on the field's
+    # GPU, so put cupy back on device 0 just before the apply under test.
+    cp.cuda.Device(0).use()
+    dev_prec.apply(dr, dz)
+
+    assert cp.cuda.runtime.getDevice() == 0, "apply() leaked a device switch"
+    with cp.cuda.Device(gpu):
+        got = cp.asnumpy(cp.asarray(dz.p))
+    want = np.asarray(hz.p)
+    assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()
