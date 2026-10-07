@@ -35,9 +35,10 @@
 #include "device.hh"
 #include "memory/device_alloc.hh"
 
+#include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 
 #include "core/exception.hh"
 #include "memory/gpu_runtime.hh"
@@ -59,33 +60,66 @@ namespace muGrid {
 #endif
         }
 
+        //! One set_device_allocator() call. Shared by the allocator state
+        //! (while current) and by every pointer it produced, so `ctx` is
+        //! released only when nothing can call back into it any more.
+        struct Registration {
+            DeviceAllocator allocator;
+            explicit Registration(const DeviceAllocator & a) : allocator{a} {}
+            Registration(const Registration &) = delete;
+            Registration & operator=(const Registration &) = delete;
+            ~Registration() {
+                if (allocator.release != nullptr) {
+                    allocator.release(allocator.ctx);
+                }
+            }
+        };
+
         struct DeviceAllocatorState {
-            DeviceAllocateFn allocate{nullptr};
-            DeviceDeallocateFn deallocate{nullptr};
-            // Pointers produced by the external allocator. A pointer must be
-            // freed by the allocator that produced it, even if the hook was
-            // switched in between.
-            std::unordered_set<void *> external_ptrs{};
+            std::shared_ptr<Registration> current{};
+            // Owner of each externally allocated pointer. A pointer must be
+            // freed by the registration that produced it, even if the
+            // allocator was replaced or cleared in between.
+            std::unordered_map<void *, std::shared_ptr<Registration>>
+                external_ptrs{};
             std::mutex mutex{};
         };
 
         DeviceAllocatorState & allocator_state() {
-            static DeviceAllocatorState state{};
-            return state;
+            // Intentionally leaked: device buffers may still be freed during
+            // static destruction, and no release() callback (which may call
+            // into a finalized interpreter) should run at exit.
+            static auto * state{new DeviceAllocatorState{}};
+            return *state;
+        }
+
+        //! Swap in a new current registration. The previous one is destroyed
+        //! (if unreferenced) after the lock is dropped, so its release()
+        //! callback runs without muGrid's lock held.
+        void replace_current(std::shared_ptr<Registration> next) {
+            auto & state{allocator_state()};
+            {
+                std::lock_guard<std::mutex> lock{state.mutex};
+                state.current.swap(next);
+            }
         }
     }  // namespace
 
-    void set_device_allocator(DeviceAllocateFn allocate,
-                              DeviceDeallocateFn deallocate) {
-        if ((allocate == nullptr) != (deallocate == nullptr)) {
+    void set_device_allocator(const DeviceAllocator & allocator) {
+        if (allocator.allocate == nullptr || allocator.deallocate == nullptr) {
             throw RuntimeError(
                 "set_device_allocator: allocate and deallocate must both be "
-                "set or both be null");
+                "set; use clear_device_allocator() to restore the default");
         }
+        replace_current(std::make_shared<Registration>(allocator));
+    }
+
+    void clear_device_allocator() { replace_current(nullptr); }
+
+    bool device_allocator_is_external() {
         auto & state{allocator_state()};
         std::lock_guard<std::mutex> lock{state.mutex};
-        state.allocate = allocate;
-        state.deallocate = deallocate;
+        return static_cast<bool>(state.current);
     }
 
     void * device_allocate(std::size_t bytes, const char * label) {
@@ -97,17 +131,23 @@ namespace muGrid {
         }
         void * ptr{nullptr};
         auto & state{allocator_state()};
+        std::shared_ptr<Registration> registration{};
         {
             std::lock_guard<std::mutex> lock{state.mutex};
-            if (state.allocate != nullptr) {
-                ptr = state.allocate(bytes);
-                if (ptr == nullptr) {
-                    throw RuntimeError(
-                        "External device allocator failed to allocate " +
-                        std::to_string(bytes) + " bytes");
-                }
-                state.external_ptrs.insert(ptr);
+            registration = state.current;
+        }
+        if (registration) {
+            // Called without the lock: the callback may block (e.g. on the
+            // Python GIL) or allocate re-entrantly.
+            ptr = registration->allocator.allocate(registration->allocator.ctx,
+                                                   bytes);
+            if (ptr == nullptr) {
+                throw RuntimeError(
+                    "External device allocator failed to allocate " +
+                    std::to_string(bytes) + " bytes");
             }
+            std::lock_guard<std::mutex> lock{state.mutex};
+            state.external_ptrs.emplace(ptr, std::move(registration));
         }
         if (ptr == nullptr) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -139,19 +179,19 @@ namespace muGrid {
         }
         AllocationProfiler::instance().record_free(ptr);
         auto & state{allocator_state()};
+        std::shared_ptr<Registration> owner{};
         {
             std::lock_guard<std::mutex> lock{state.mutex};
             auto it{state.external_ptrs.find(ptr)};
             if (it != state.external_ptrs.end()) {
+                owner = std::move(it->second);
                 state.external_ptrs.erase(it);
-                if (state.deallocate != nullptr) {
-                    state.deallocate(ptr);
-                }
-                // If the external allocator was unregistered while its
-                // allocations were alive there is nothing safe to do; the
-                // pointer is intentionally leaked (documented contract).
-                return;
             }
+        }
+        if (owner) {
+            // Without the lock; dropping `owner` may release its ctx.
+            owner->allocator.deallocate(owner->allocator.ctx, ptr);
+            return;
         }
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         GPU_FREE(ptr);

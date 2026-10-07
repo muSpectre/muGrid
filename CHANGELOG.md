@@ -1,6 +1,27 @@
 Change log for µGrid
 ====================
 
+v1.4.1 (07Oct26)
+----------------
+
+- BUG: Clearing or replacing the device allocator (`clear_device_allocator`,
+  `set_device_allocator`) no longer frees memory still owned by live device
+  fields. With `use_cupy_allocator()` it dropped the cupy `MemoryPointer`s
+  backing them, returning their blocks to the pool for reuse; and a pointer
+  from the old allocator was freed through the new one. Each pointer is now
+  freed through the allocator that produced it, which stays alive until then
+- API: The C++ device-allocator hook takes a `DeviceAllocator` struct with an
+  opaque `ctx` passed to `allocate`/`deallocate` and an optional `release`,
+  instead of two bare function pointers, so a stateful allocator (an Umpire
+  pool, a specific cupy pool) needs no global state. New
+  `clear_device_allocator()` and `device_allocator_is_external()`. The Python
+  API is unchanged. External allocator callbacks no longer run under muGrid's
+  lock, which could deadlock against the GIL
+- BUG: The GPU `IsotropicStiffnessOperator` average reduction bypassed
+  `device_allocate`, allocating raw device memory beside an external allocator
+  (e.g. cupy's pool), and did so on every call. It now uses a cached scratch
+  buffer, visible to the allocation profiler as `stiffness-average-scratch`
+
 v1.4.0 (25Sep26)
 ----------------
 

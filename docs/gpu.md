@@ -209,10 +209,12 @@ fc = muGrid.GlobalFieldCollection([512, 512, 512], device="gpu")
     no PCIe migration; a modest first-touch / page-fault overhead is still
     possible and worth benchmarking for latency-sensitive runs.
 
-!!! warning "Install the allocator before the first device field"
-    `use_cupy_allocator()` and the managed pool must be set before any GPU field
-    is created. Re-registering the allocator while device fields are live drops
-    the keepalive of their buffers and can free them out from under µGrid.
+!!! note "Install the allocator before the first device field"
+    `use_cupy_allocator()` and the managed pool only govern allocations made
+    after they are set, so set them before any GPU field is created. Switching
+    or clearing the allocator later is safe: each buffer is freed through the
+    allocator that produced it, which is kept alive until its last buffer is
+    gone.
 
 ## Zero-copy data exchange
 
