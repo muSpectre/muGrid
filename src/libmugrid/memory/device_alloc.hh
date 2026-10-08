@@ -49,21 +49,46 @@
 
 namespace muGrid {
 
-    //! Signature of an external device allocator: returns a device pointer
-    //! to at least `bytes` bytes, or nullptr on failure.
-    using DeviceAllocateFn = void * (*)(std::size_t bytes);
-    //! Signature of the matching deallocator.
-    using DeviceDeallocateFn = void (*)(void * ptr);
+    /**
+     * An external device allocator (e.g. one drawing from cupy's memory pool,
+     * or an Umpire pool). `ctx` is passed back to every callback, so a
+     * stateful allocator needs no global state.
+     *
+     * Every pointer is freed through the registration that produced it, and
+     * a registration stays alive while any of its pointers do: replacing or
+     * clearing the allocator never frees memory still in use. Once a
+     * registration is replaced or cleared *and* its last pointer is freed,
+     * `release(ctx)` (if set) is called to dispose of `ctx`. muGrid's
+     * allocator state is never torn down, so `release` is not called for a
+     * registration still live at process exit.
+     *
+     * The callbacks are invoked without any muGrid lock held.
+     */
+    struct DeviceAllocator {
+        //! Return a device pointer to at least `bytes` bytes, or nullptr on
+        //! failure.
+        void * (*allocate)(void * ctx, std::size_t bytes){nullptr};
+        //! Free a pointer previously returned by `allocate` with this `ctx`.
+        void (*deallocate)(void * ctx, void * ptr){nullptr};
+        //! Optional: dispose of `ctx` once it is no longer referenced.
+        void (*release)(void * ctx){nullptr};
+        //! Opaque state handed to the callbacks.
+        void * ctx{nullptr};
+    };
 
     /**
-     * Register an external device allocator (e.g. one drawing from cupy's
-     * memory pool). Pass nullptrs to restore the default backend
-     * allocator. Pointers allocated before the switch are freed through
-     * the allocator that produced them; do not unregister while such
-     * allocations are alive unless the external allocator outlives them.
+     * Route all subsequent device allocations through `allocator`. Both
+     * `allocate` and `deallocate` must be set. Allocations made through a
+     * previously registered allocator are still freed through it.
      */
-    void set_device_allocator(DeviceAllocateFn allocate,
-                              DeviceDeallocateFn deallocate);
+    void set_device_allocator(const DeviceAllocator & allocator);
+
+    //! Restore the default backend allocator (raw cudaMalloc/hipMalloc) for
+    //! subsequent allocations.
+    void clear_device_allocator();
+
+    //! True if an external device allocator is currently registered.
+    bool device_allocator_is_external();
 
     /**
      * Allocate `bytes` bytes of device memory through the registered

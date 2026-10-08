@@ -39,6 +39,7 @@
 #include "collection/field_collection_global.hh"
 #include "core/exception.hh"
 
+#include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -899,6 +900,32 @@ __global__ void isotropic_stiffness_3d_sensitivity_kernel(
 
 namespace isotropic_stiffness_kernels {
 
+/**
+ * Grow-only device scratch for the two-pass average reduction: per-block
+ * partial sums followed by the final NCOMP-sized result.
+ *
+ * Allocating this on every call cost a cudaMalloc/cudaFree pair per average
+ * and, worse, bypassed device_allocate(), so with an external allocator
+ * registered (e.g. use_cupy_allocator) these bytes came from a second owner
+ * on the device. Same contract as reduction_scratch in linalg_gpu.cc: each
+ * average ends in a blocking device->host copy, so the buffer is free again
+ * when the call returns; it is never freed (process-lifetime cache). Not
+ * thread-safe, matching muGrid's single-threaded host call sites.
+ */
+Real * average_scratch(Index_t n_reals) {
+    static Real * ptr{nullptr};
+    static Index_t cap{0};
+    if (n_reals > cap) {
+        if (ptr) {
+            device_deallocate(ptr);
+        }
+        ptr = static_cast<Real *>(device_allocate(
+            n_reals * sizeof(Real), "stiffness-average-scratch"));
+        cap = n_reals;
+    }
+    return ptr;
+}
+
 // The geometry matrices (Gu/Vu/Dbar/E_macro) stay in double __constant__
 // memory — uploaded as `const Real*` regardless of T — and are cast to T
 // inside the kernels. The stiffness matrices G/V, which the hot kernels read
@@ -1148,11 +1175,8 @@ void isotropic_stiffness_2d_gpu_average(
     Index_t num_blocks = (nel + block - 1) / block;
     if (num_blocks < 1) num_blocks = 1;  // one block still reduces an empty grid
 
-    Real * d_partial{nullptr};
-    Real * d_out{nullptr};
-    GPU_MALLOC(reinterpret_cast<void **>(&d_partial),
-               NCOMP * num_blocks * sizeof(Real));
-    GPU_MALLOC(reinterpret_cast<void **>(&d_out), NCOMP * sizeof(Real));
+    Real * d_partial{average_scratch(NCOMP * (num_blocks + 1))};
+    Real * d_out{d_partial + NCOMP * num_blocks};
 
     auto kern = isotropic_stiffness_2d_average_kernel<T>;
     GPU_LAUNCH_KERNEL(kern, static_cast<int>(num_blocks), block,
@@ -1164,15 +1188,11 @@ void isotropic_stiffness_2d_gpu_average(
 
     const char * err{gpu_last_error()};
     if (err != nullptr) {
-        GPU_FREE(d_partial);
-        GPU_FREE(d_out);
         throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
 
     GPU_DEVICE_SYNCHRONIZE();
     GPU_MEMCPY_D2H(accum_out, d_out, NCOMP * sizeof(Real));
-    GPU_FREE(d_partial);
-    GPU_FREE(d_out);
     for (int k = 0; k < NCOMP; ++k) accum_out[k] *= vol_elem;
 }
 
@@ -1195,11 +1215,8 @@ void isotropic_stiffness_3d_gpu_average(
     Index_t num_blocks = (nel + block - 1) / block;
     if (num_blocks < 1) num_blocks = 1;
 
-    Real * d_partial{nullptr};
-    Real * d_out{nullptr};
-    GPU_MALLOC(reinterpret_cast<void **>(&d_partial),
-               NCOMP * num_blocks * sizeof(Real));
-    GPU_MALLOC(reinterpret_cast<void **>(&d_out), NCOMP * sizeof(Real));
+    Real * d_partial{average_scratch(NCOMP * (num_blocks + 1))};
+    Real * d_out{d_partial + NCOMP * num_blocks};
 
     auto kern = isotropic_stiffness_3d_average_kernel<T>;
     GPU_LAUNCH_KERNEL(kern, static_cast<int>(num_blocks), block,
@@ -1211,15 +1228,11 @@ void isotropic_stiffness_3d_gpu_average(
 
     const char * err{gpu_last_error()};
     if (err != nullptr) {
-        GPU_FREE(d_partial);
-        GPU_FREE(d_out);
         throw RuntimeError("GPU kernel launch failed: " + std::string(err));
     }
 
     GPU_DEVICE_SYNCHRONIZE();
     GPU_MEMCPY_D2H(accum_out, d_out, NCOMP * sizeof(Real));
-    GPU_FREE(d_partial);
-    GPU_FREE(d_out);
     for (int k = 0; k < NCOMP; ++k) accum_out[k] *= vol_elem;
 }
 

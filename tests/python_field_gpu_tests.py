@@ -346,6 +346,31 @@ class CupyAllocatorTests(unittest.TestCase):
         gc.collect()
         self.assertEqual(pool.used_bytes(), used_before)
 
+    def test_clear_keeps_live_fields_valid(self):
+        # Clearing the allocator used to drop the cupy MemoryPointers backing
+        # live fields, returning their blocks to the pool for reuse.
+        import gc
+
+        muGrid.use_cupy_allocator()
+        gc.collect()
+        pool = cp.get_default_memory_pool()
+        used_before = pool.used_bytes()
+
+        fc = muGrid.GlobalFieldCollection([16, 16], device=muGrid.Device.gpu())
+        field = fc.real_field("survivor")
+        field.s[...] = 2.0
+        muGrid.clear_device_allocator()
+
+        # The pool block is still held, so new cupy arrays cannot reuse it
+        self.assertGreaterEqual(pool.used_bytes() - used_before, 16 * 16 * 8)
+        clobber = cp.full(16 * 16, 7.0)
+        self.assertAlmostEqual(float(cp.sum(field.s)), 2.0 * 16 * 16)
+
+        # Freeing the field returns its block through the cleared allocator
+        del clobber, field, fc
+        gc.collect()
+        self.assertEqual(pool.used_bytes(), used_before)
+
     def test_clear_restores_default_allocator(self):
         muGrid.use_cupy_allocator()
         pool = cp.get_default_memory_pool()

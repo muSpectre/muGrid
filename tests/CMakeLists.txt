@@ -23,6 +23,7 @@ if(Boost_FOUND)
         test_allocation_profiler.cc
         test_ccoord_operations.cc
         test_convolution_operator.cc
+        test_device_alloc.cc
         test_exception.cc
         test_field.cc
         test_field_gpu.cc
