@@ -418,6 +418,12 @@ namespace muGrid {
      */
     void write() const;
 
+    //! The file this frame belongs to.
+    FileIOBase & get_parent() const { return this->parent; }
+
+    //! The index of this frame in its file.
+    Index_t get_frame() const { return this->frame; }
+
    protected:
     /**
      * @brief The FileIOBase object.

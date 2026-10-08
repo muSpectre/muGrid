@@ -45,7 +45,10 @@
 #include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 using muGrid::FileIOBase;
@@ -108,6 +111,122 @@ namespace {
         "Unsupported numpy dtype for a per-frame variable (kind '" +
         std::string(1, kind) + "', itemsize " + std::to_string(size) + ").");
   }
+
+  /**
+   * Inverse of numpy_dtype_to_nc_type, for the types it produces.
+   */
+  py::dtype nc_type_to_numpy_dtype(const nc_type & type) {
+    switch (type) {
+    case NC_DOUBLE:
+      return py::dtype::of<double>();
+    case NC_FLOAT:
+      return py::dtype::of<float>();
+    case NC_INT64:
+      return py::dtype::of<std::int64_t>();
+    case NC_INT:
+      return py::dtype::of<std::int32_t>();
+    case NC_SHORT:
+      return py::dtype::of<std::int16_t>();
+    case NC_UINT64:
+      return py::dtype::of<std::uint64_t>();
+    case NC_UINT:
+      return py::dtype::of<std::uint32_t>();
+    case NC_USHORT:
+      return py::dtype::of<std::uint16_t>();
+    default:
+      throw muGrid::FileIOError("Unsupported NetCDF data type " +
+                                std::to_string(type) +
+                                " for a per-frame variable.");
+    }
+  }
+
+  /**
+   * A numpy array that views the host buffer of the per-frame variable
+   * `name`. The array's base keeps the FileIONetCDF alive, so the view stays
+   * valid as long as it is used.
+   */
+  py::array frame_variable_view(FileIONetCDF & file_io_object,
+                                const std::string & name) {
+    muGrid::NetCDFVarFrameData & var{file_io_object.get_frame_variable(name)};
+    py::dtype dt{nc_type_to_numpy_dtype(var.get_data_type())};
+    const auto & shape{var.get_component_shape()};
+    std::vector<py::ssize_t> np_shape(shape.begin(), shape.end());
+    std::vector<py::ssize_t> strides(np_shape.size());
+    py::ssize_t stride{dt.itemsize()};
+    for (size_t i{np_shape.size()}; i-- > 0;) {
+      strides[i] = stride;
+      stride *= np_shape[i];
+    }
+    return py::array(dt, np_shape, strides, var.get_buf(),
+                     py::cast(&file_io_object));
+  }
+
+  /**
+   * Store keyword values in the buffers of the per-frame variables they name
+   * and return those names. Every value is checked (name, shape, and a
+   * same-kind cast to the variable's dtype) before any buffer is touched, so
+   * a rejected call leaves all buffers unchanged.
+   */
+  std::vector<std::string> set_frame_values(FileIONetCDF & file_io_object,
+                                            const py::kwargs & values) {
+    py::module_ np{py::module_::import("numpy")};
+    std::vector<std::string> names{};
+    std::vector<std::pair<py::array, py::object>> assignments{};
+    for (const auto & item : values) {
+      const std::string name{py::cast<std::string>(item.first)};
+      py::array view{frame_variable_view(file_io_object, name)};
+      py::object value{np.attr("asarray")(item.second)};
+      if (!py::cast<bool>(np.attr("can_cast")(value.attr("dtype"),
+                                              view.attr("dtype"),
+                                              "same_kind"))) {
+        throw py::type_error(
+            "Cannot store a value of dtype " +
+            py::cast<std::string>(py::str(value.attr("dtype"))) +
+            " in the per-frame variable '" + name + "' of dtype " +
+            py::cast<std::string>(py::str(view.attr("dtype"))) + ".");
+      }
+      // raises ValueError if the value does not fit the variable's shape
+      np.attr("broadcast_to")(value, view.attr("shape"));
+      names.push_back(name);
+      assignments.emplace_back(view, value);
+    }
+    for (auto & [view, value] : assignments) {
+      np.attr("copyto")(view, value, "casting"_a = "same_kind");
+    }
+    return names;
+  }
+
+  /**
+   * Write frame `frame`: store the keyword values (see set_frame_values),
+   * then write `field_names` plus the variables given as keywords, or every
+   * registered variable if `field_names` is None.
+   */
+  void write_frame(FileIONetCDF & file_io_object, const Index_t & frame,
+                   const py::object & field_names, const py::kwargs & values) {
+    const std::vector<std::string> value_names{
+        set_frame_values(file_io_object, values)};
+    if (field_names.is_none()) {
+      file_io_object.write(frame);
+      return;
+    }
+    auto names{py::cast<std::vector<std::string>>(field_names)};
+    for (const auto & name : value_names) {
+      if (std::find(names.begin(), names.end(), name) == names.end()) {
+        names.push_back(name);
+      }
+    }
+    file_io_object.write(frame, names);
+  }
+
+  constexpr const char * write_frame_doc{
+      R"(Write a frame. Per-frame variables can be given their value for this
+frame as keyword arguments, e.g. write(iteration=12, objective=0.5); a value is
+stored in the variable's buffer, so it stays there for later frames until it
+is set again. All keyword values are checked (known per-frame variable, shape,
+same-kind cast to its dtype, so a float is not silently truncated into an
+integer variable) before anything is stored. With `field_names`, only those
+fields/variables are written, plus the ones given as keywords; without it,
+every registered field and variable is written.)"};
 }  // namespace
 #endif  // WITH_NETCDF_IO
 
@@ -215,11 +334,33 @@ void add_file_frame(py::module & mod) {
       .def("read", [](FileFrame & frame) { return frame.read(); })
       .def(
           "write",
-          [](FileFrame & frame, const std::vector<std::string> & field_names) {
-            return frame.write(field_names);
+          [](FileFrame & frame, const py::object & field_names,
+             const py::kwargs & values) {
+#ifdef WITH_NETCDF_IO
+            auto * netcdf{dynamic_cast<FileIONetCDF *>(&frame.get_parent())};
+            if (netcdf != nullptr) {
+              write_frame(*netcdf, frame.get_frame(), field_names, values);
+              return;
+            }
+#endif  // WITH_NETCDF_IO
+            if (values.size() > 0) {
+              throw muGrid::FileIOError(
+                  "Keyword values are only supported for per-frame "
+                  "variables of a FileIONetCDF.");
+            }
+            if (field_names.is_none()) {
+              frame.write();
+            } else {
+              frame.write(py::cast<std::vector<std::string>>(field_names));
+            }
           },
-          "field_names"_a)
-      .def("write", [](FileFrame & frame) { return frame.write(); });
+          "field_names"_a = py::none(),
+#ifdef WITH_NETCDF_IO
+          write_frame_doc
+#else
+          "Write a frame: `field_names`, or every registered field if None."
+#endif  // WITH_NETCDF_IO
+      );
 }
 
 #ifdef WITH_NETCDF_IO
@@ -260,32 +401,25 @@ void add_file_io_netcdf(py::module & mod) {
             // Register the (grid-less) per-frame variable and return a numpy
             // array that *views* its host buffer, so the caller sets the value
             // for the current frame by writing into it and then calling
-            // write()/append_frame(). The array's base keeps the FileIONetCDF
-            // alive, so the view stays valid as long as it is used.
+            // write()/append_frame().
             py::dtype dt{py::dtype::from_args(dtype)};
             file_io_object.register_frame_variable(
                 name, shape, numpy_dtype_to_nc_type(dt));
-            IOSize_t nbytes{};
-            void * ptr{
-                file_io_object.get_frame_variable_buffer(name, nbytes)};
-            std::vector<py::ssize_t> np_shape(shape.begin(), shape.end());
-            std::vector<py::ssize_t> strides(np_shape.size());
-            py::ssize_t stride{dt.itemsize()};
-            for (size_t i{np_shape.size()}; i-- > 0;) {
-              strides[i] = stride;
-              stride *= np_shape[i];
-            }
-            return py::array(dt, np_shape, strides, ptr,
-                             py::cast(&file_io_object));
+            return frame_variable_view(file_io_object, name);
           },
           "name"_a, "shape"_a, "dtype"_a,
           R"(Register a per-frame, grid-less quantity (a small tensor with one
 value for the whole domain per frame, replicated across MPI ranks) and return a
 numpy array that views its buffer. Call before the first frame is written; set
-the current frame's value by writing into the returned array, then flush it via
-write()/append_frame(). Args: name (str), shape (sequence of int, the shape of a
-single frame's value), dtype (numpy dtype). See also write_global_attribute for
-values that do not vary per frame.)")
+the current frame's value by passing it to write() as a keyword argument, e.g.
+append_frame().write(name=value), or by writing into the returned array before
+write(). Args: name (str), shape (sequence of int, the shape of a single
+frame's value; [] for a scalar), dtype (numpy dtype). See also
+write_global_attribute for values that do not vary per frame.)")
+      .def("frame_variable", &frame_variable_view, "name"_a,
+           R"(Return a numpy array that views the buffer of the registered
+per-frame variable `name`: the value the next write() stores, or the one the
+last read() loaded.)")
       .def(
           "read",
           [](FileIONetCDF & file_io_object, const Index_t & frame,
@@ -299,19 +433,8 @@ values that do not vary per frame.)")
             file_io_object.read(frame);
           },
           "frame"_a)
-      .def(
-          "write",
-          [](FileIONetCDF & file_io_object, const Index_t & frame,
-             const std::vector<std::string> & field_names) {
-            file_io_object.write(frame, field_names);
-          },
-          "frame"_a, "field_names"_a)
-      .def(
-          "write",
-          [](FileIONetCDF & file_io_object, const Index_t & frame) {
-            file_io_object.write(frame);
-          },
-          "frame"_a)
+      .def("write", &write_frame, "frame"_a, "field_names"_a = py::none(),
+           write_frame_doc)
       .def("write_global_attribute",
            &FileIONetCDF::write_global_attribute<std::string &>, "att_name"_a,
            "value"_a)

@@ -1634,6 +1634,13 @@ namespace muGrid {
                             const nc_type & data_type);
 
     /**
+     * @brief Returns the registered per-frame variable `name`. Throws if there
+     * is no variable of that name or if it is a field rather than a per-frame
+     * variable.
+     */
+    NetCDFVarFrameData & get_frame_variable(const std::string & name);
+
+    /**
      * @brief Returns the raw host buffer (and its byte size) of a registered
      * frame variable, so a caller (e.g. the Python bindings) can view/set the
      * current frame's value in place.

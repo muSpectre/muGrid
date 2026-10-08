@@ -254,17 +254,24 @@ namespace muGrid {
   }
 
   /* ---------------------------------------------------------------------- */
-  void * FileIONetCDF::get_frame_variable_buffer(const std::string & name,
-                                                 IOSize_t & size_in_bytes) {
+  NetCDFVarFrameData &
+  FileIONetCDF::get_frame_variable(const std::string & name) {
     NetCDFVarBase & var{this->variables.get_variable(name)};
     auto * frame_var{dynamic_cast<NetCDFVarFrameData *>(&var)};
     if (frame_var == nullptr) {
       throw FileIOError("The variable '" + name +
                         "' is not a per-frame variable.");
     }
-    IOSize_t nb_elements{frame_var->get_bufcount_mpi_global()};
-    size_in_bytes = nb_elements * frame_var->get_element_size();
-    return frame_var->get_buf();
+    return *frame_var;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void * FileIONetCDF::get_frame_variable_buffer(const std::string & name,
+                                                 IOSize_t & size_in_bytes) {
+    NetCDFVarFrameData & frame_var{this->get_frame_variable(name)};
+    IOSize_t nb_elements{frame_var.get_bufcount_mpi_global()};
+    size_in_bytes = nb_elements * frame_var.get_element_size();
+    return frame_var.get_buf();
   }
 
   /* ---------------------------------------------------------------------- */

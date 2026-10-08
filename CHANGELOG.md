@@ -1,6 +1,20 @@
 Change log for µGrid
 ====================
 
+v1.5.0 (07Oct26)
+----------------
+
+- API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
+  as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
+  instead of requiring writes into the array `register_frame_variable` returned.
+  Every value is checked (registered per-frame variable, shape, same-kind cast, so
+  a NaN or float is not truncated into an integer variable) before any is stored.
+  With `field_names` the keyword variables are written in addition; values stay in
+  the buffer for later frames until set again
+- API: `FileIONetCDF.frame_variable(name)` returns the view of a registered
+  per-frame variable's buffer, so a value read back with `read()` is reachable
+  without keeping the array from registration around
+
 v1.4.0 (25Sep26)
 ----------------
 
