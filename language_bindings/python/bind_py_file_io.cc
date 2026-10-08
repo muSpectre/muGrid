@@ -47,6 +47,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -162,19 +163,52 @@ namespace {
   }
 
   /**
+   * The fill value of the per-frame variable `name` as a numpy scalar of its
+   * dtype, or None if it has none.
+   */
+  py::object frame_variable_fill_value(FileIONetCDF & file_io_object,
+                                       const std::string & name) {
+    muGrid::NetCDFVarFrameData & var{file_io_object.get_frame_variable(name)};
+    if (!var.has_fill_value()) {
+      return py::none();
+    }
+    py::dtype dt{nc_type_to_numpy_dtype(var.get_data_type())};
+    // copy the one element into a 0-d array, then hand out its scalar
+    py::array fill(dt, std::vector<py::ssize_t>{});
+    std::memcpy(fill.mutable_data(), var.get_fill_value(), dt.itemsize());
+    return fill.attr("__getitem__")(py::tuple());
+  }
+
+  /**
    * Store keyword values in the buffers of the per-frame variables they name
-   * and return those names. Every value is checked (name, shape, and a
-   * same-kind cast to the variable's dtype) before any buffer is touched, so
-   * a rejected call leaves all buffers unchanged.
+   * and return those names. None marks the value as missing: the buffer is
+   * set to the variable's fill value. Every value is checked (name, shape,
+   * and a same-kind cast to the variable's dtype; for None, that there is a
+   * fill value) before any buffer is touched, so a rejected call leaves all
+   * buffers unchanged.
    */
   std::vector<std::string> set_frame_values(FileIONetCDF & file_io_object,
                                             const py::kwargs & values) {
     py::module_ np{py::module_::import("numpy")};
     std::vector<std::string> names{};
     std::vector<std::pair<py::array, py::object>> assignments{};
+    std::vector<muGrid::NetCDFVarFrameData *> missing{};
     for (const auto & item : values) {
       const std::string name{py::cast<std::string>(item.first)};
       py::array view{frame_variable_view(file_io_object, name)};
+      if (item.second.is_none()) {
+        muGrid::NetCDFVarFrameData & var{
+            file_io_object.get_frame_variable(name)};
+        if (!var.has_fill_value()) {
+          throw py::value_error(
+              "The per-frame variable '" + name +
+              "' has no fill value (the file declares no _FillValue for "
+              "it), so it cannot be written as missing (None).");
+        }
+        names.push_back(name);
+        missing.push_back(&var);
+        continue;
+      }
       py::object value{np.attr("asarray")(item.second)};
       if (!py::cast<bool>(np.attr("can_cast")(value.attr("dtype"),
                                               view.attr("dtype"),
@@ -192,6 +226,9 @@ namespace {
     }
     for (auto & [view, value] : assignments) {
       np.attr("copyto")(view, value, "casting"_a = "same_kind");
+    }
+    for (auto * var : missing) {
+      var->fill_buffer();
     }
     return names;
   }
@@ -222,7 +259,8 @@ namespace {
       R"(Write a frame. Per-frame variables can be given their value for this
 frame as keyword arguments, e.g. write(iteration=12, objective=0.5); a value is
 stored in the variable's buffer, so it stays there for later frames until it
-is set again. All keyword values are checked (known per-frame variable, shape,
+is set again. None marks a value as missing: the variable's fill value (its
+_FillValue attribute) is stored, which NetCDF readers report as missing. All keyword values are checked (known per-frame variable, shape,
 same-kind cast to its dtype, so a float is not silently truncated into an
 integer variable) before anything is stored. With `field_names`, only those
 fields/variables are written, plus the ones given as keywords; without it,
@@ -397,25 +435,48 @@ void add_file_io_netcdf(py::module & mod) {
       .def(
           "register_frame_variable",
           [](FileIONetCDF & file_io_object, const std::string & name,
-             std::vector<IOSize_t> shape, py::object dtype) {
+             std::vector<IOSize_t> shape, py::object dtype,
+             py::object fill_value) {
             // Register the (grid-less) per-frame variable and return a numpy
             // array that *views* its host buffer, so the caller sets the value
             // for the current frame by writing into it and then calling
             // write()/append_frame().
             py::dtype dt{py::dtype::from_args(dtype)};
+            py::array fill{};
+            const void * fill_ptr{nullptr};
+            if (!fill_value.is_none()) {
+              py::module_ np{py::module_::import("numpy")};
+              py::object value{np.attr("asarray")(fill_value)};
+              if (py::cast<py::ssize_t>(value.attr("size")) != 1 ||
+                  !py::cast<bool>(np.attr("can_cast")(
+                      value.attr("dtype"), dt, "same_kind"))) {
+                throw py::type_error(
+                    "The fill value of the per-frame variable '" + name +
+                    "' must be a single value castable to its dtype " +
+                    py::cast<std::string>(py::str(dt)) + ".");
+              }
+              fill = np.attr("ascontiguousarray")(value, "dtype"_a = dt);
+              fill_ptr = fill.data();
+            }
             file_io_object.register_frame_variable(
-                name, shape, numpy_dtype_to_nc_type(dt));
+                name, shape, numpy_dtype_to_nc_type(dt), fill_ptr);
             return frame_variable_view(file_io_object, name);
           },
-          "name"_a, "shape"_a, "dtype"_a,
+          "name"_a, "shape"_a, "dtype"_a, "fill_value"_a = py::none(),
           R"(Register a per-frame, grid-less quantity (a small tensor with one
 value for the whole domain per frame, replicated across MPI ranks) and return a
 numpy array that views its buffer. Call before the first frame is written; set
 the current frame's value by passing it to write() as a keyword argument, e.g.
 append_frame().write(name=value), or by writing into the returned array before
 write(). Args: name (str), shape (sequence of int, the shape of a single
-frame's value; [] for a scalar), dtype (numpy dtype). See also
-write_global_attribute for values that do not vary per frame.)")
+frame's value; [] for a scalar), dtype (numpy dtype), fill_value (marker of a
+missing value, stored as the variable's _FillValue attribute; default NetCDF's
+default fill value for the dtype; ignored when reading, where the file's
+_FillValue is used). See also write_global_attribute for values that do not
+vary per frame.)")
+      .def("frame_variable_fill_value", &frame_variable_fill_value, "name"_a,
+           R"(Return the fill value (missing-value marker) of the registered
+per-frame variable `name` as a numpy scalar, or None if it has none.)")
       .def("frame_variable", &frame_variable_view, "name"_a,
            R"(Return a numpy array that views the buffer of the registered
 per-frame variable `name`: the value the next write() stores, or the one the

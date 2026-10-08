@@ -44,6 +44,7 @@
 
 #include "io/file_io_netcdf.hh"
 
+#include <algorithm>
 #include <cstdint>
 
 using muGrid::operator<<;
@@ -183,7 +184,7 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   NetCDFVarFrameData & FileIONetCDF::register_frame_variable(
       const std::string & name, const std::vector<IOSize_t> & shape,
-      const nc_type & data_type) {
+      const nc_type & data_type, const void * fill_value) {
     check_variable_not_registered(this->variables, name, "frame variable");
 
     // dimensions: {frame, <name>-0, <name>-1, ...}. The component dimensions
@@ -218,7 +219,16 @@ namespace muGrid {
       define_netcdf_dimensions(this->dimensions);
       define_netcdf_variables(this->variables);
       define_netcdf_attributes(this->variables);
-      int status{ncmu_enddef(this->netcdf_id)};
+      // The missing-value marker. Written here rather than through the
+      // variable's NetCDFAtt list, which cannot hold every data type a frame
+      // variable may have (_FillValue must have the variable's own type).
+      var.set_fill_value(fill_value);
+      int status{ncmu_put_att(this->netcdf_id, var.get_id(), "_FillValue",
+                              data_type, 1, var.get_fill_value())};
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+      status = ncmu_enddef(this->netcdf_id);
       if (status != NC_NOERR) {
         throw FileIOError(ncmu_strerror(status));
       }
@@ -246,6 +256,21 @@ namespace muGrid {
         throw FileIOError(ncmu_strerror(status));
       }
       var.register_id(var_id);
+      // Take the fill value the file declares, if it declares one of the
+      // variable's type (files written before muGrid 1.5.0 have none).
+      nc_type fill_type{};
+      IOSize_t fill_len{};
+      status = ncmu_inq_att(this->netcdf_id, var_id, "_FillValue", &fill_type,
+                            &fill_len);
+      if (status == NC_NOERR && fill_type == data_type && fill_len == 1) {
+        std::vector<char> fill(var.get_element_size());
+        status = ncmu_get_att(this->netcdf_id, var_id, "_FillValue",
+                              fill.data());
+        if (status != NC_NOERR) {
+          throw FileIOError(ncmu_strerror(status));
+        }
+        var.set_fill_value(fill.data());
+      }
     } else {
       throw FileIOError("Unknown open mode!");
     }
@@ -1026,6 +1051,12 @@ namespace muGrid {
           throw FileIOError(ncmu_strerror(status_2));
         }
         std::string att_name(&name[0]);
+        // A per-frame variable keeps its _FillValue itself (it is read in
+        // register_frame_variable); NetCDFAtt cannot hold every type it has.
+        if (att_name == "_FillValue" &&
+            dynamic_cast<NetCDFVarFrameData *>(var.get()) != nullptr) {
+          continue;
+        }
         var->register_attribute(att_name, att_data_type, att_nelems);
       }
     }
@@ -3156,6 +3187,43 @@ namespace muGrid {
                           "' for a per-frame variable.");
       }
     }
+
+    //! one element holding `value`, as raw bytes
+    template <typename T>
+    std::vector<char> element_bytes(const T & value) {
+      const char * ptr{reinterpret_cast<const char *>(&value)};
+      return std::vector<char>(ptr, ptr + sizeof(T));
+    }
+
+    //! NetCDF's default fill value for a data type, as raw bytes
+    std::vector<char> default_fill_value(const nc_type & data_type) {
+      switch (data_type) {
+      case NC_CHAR:
+        return element_bytes(static_cast<char>(NC_FILL_CHAR));
+      case NC_BYTE:
+        return element_bytes(static_cast<signed char>(NC_FILL_BYTE));
+      case NC_SHORT:
+        return element_bytes(static_cast<std::int16_t>(NC_FILL_SHORT));
+      case NC_USHORT:
+        return element_bytes(static_cast<std::uint16_t>(NC_FILL_USHORT));
+      case NC_INT:
+        return element_bytes(static_cast<std::int32_t>(NC_FILL_INT));
+      case NC_UINT:
+        return element_bytes(static_cast<std::uint32_t>(NC_FILL_UINT));
+      case NC_FLOAT:
+        return element_bytes(static_cast<float>(NC_FILL_FLOAT));
+      case NC_DOUBLE:
+        return element_bytes(static_cast<double>(NC_FILL_DOUBLE));
+      case NC_INT64:
+        return element_bytes(static_cast<std::int64_t>(NC_FILL_INT64));
+      case NC_UINT64:
+        return element_bytes(static_cast<std::uint64_t>(NC_FILL_UINT64));
+      default:
+        throw FileIOError("Unsupported NetCDF data type '" +
+                          std::to_string(data_type) +
+                          "' for a per-frame variable.");
+      }
+    }
   }  // namespace
 
   /* ---------------------------------------------------------------------- */
@@ -3271,6 +3339,38 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   IOSize_t NetCDFVarFrameData::get_element_size() const {
     return this->element_size;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarFrameData::set_fill_value(const void * value) {
+    if (value == nullptr) {
+      this->fill_value = default_fill_value(this->get_data_type());
+    } else {
+      const char * ptr{static_cast<const char *>(value)};
+      this->fill_value.assign(ptr, ptr + this->element_size);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  bool NetCDFVarFrameData::has_fill_value() const {
+    return !this->fill_value.empty();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  const void * NetCDFVarFrameData::get_fill_value() const {
+    return this->has_fill_value() ? this->fill_value.data() : nullptr;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  void NetCDFVarFrameData::fill_buffer() {
+    if (!this->has_fill_value()) {
+      throw FileIOError("The per-frame variable '" + this->name +
+                        "' has no fill value, so it cannot be marked missing.");
+    }
+    for (size_t i{0}; i < this->buffer.size(); i += this->element_size) {
+      std::copy(this->fill_value.begin(), this->fill_value.end(),
+                this->buffer.begin() + i);
+    }
   }
 
   /* ---------------------------------------------------------------------- */

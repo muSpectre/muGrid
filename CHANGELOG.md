@@ -14,6 +14,13 @@ v1.5.0 (08Oct26)
 - API: `FileIONetCDF.frame_variable(name)` returns the view of a registered
   per-frame variable's buffer, so a value read back with `read()` is reachable
   without keeping the array from registration around
+- API: Per-frame variables carry a `_FillValue` attribute, NetCDF's default fill
+  value for their dtype unless `register_frame_variable(..., fill_value=x)` sets
+  one, and `write(name=None)` stores it, so a value that does not exist for a
+  frame (e.g. before the first evaluation) is missing to NetCDF readers rather
+  than an invented NaN or -1. Reading takes the file's `_FillValue`;
+  `FileIONetCDF.frame_variable_fill_value(name)` returns it. muGrid writes
+  without NetCDF fill mode, so a value never written stays undefined, not missing
 
 v1.4.1 (07Oct26)
 ----------------

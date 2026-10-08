@@ -1253,10 +1253,27 @@ namespace muGrid {
     //! size in bytes of one buffer element (derived from the data type)
     IOSize_t get_element_size() const;
 
+    //! Set the fill value: one element in this variable's data type, which
+    //! marks a missing value and is stored as its `_FillValue` attribute.
+    //! nullptr selects NetCDF's default fill value for the data type.
+    void set_fill_value(const void * value);
+
+    //! true if the variable has a fill value (always when it was registered
+    //! for writing; when opened from a file, if the file declares one)
+    bool has_fill_value() const;
+
+    //! pointer to the fill value (one element), nullptr if there is none
+    const void * get_fill_value() const;
+
+    //! set every element of the buffer to the fill value, i.e. mark the
+    //! current frame's value as missing
+    void fill_buffer();
+
    protected:
     std::vector<IOSize_t> component_shape{};  // shape excluding the frame dim
     IOSize_t element_size{0};                 // bytes per element
     mutable std::vector<char> buffer{};       // owned contiguous host buffer
+    std::vector<char> fill_value{};           // one element, empty if none
   };
 
   /**
@@ -1623,15 +1640,23 @@ namespace muGrid {
      * for the current frame is set by writing into the buffer returned by
      * `get_frame_variable_buffer` and then calling `write`/`append_frame`.
      *
+     * When the file is written, the variable gets a `_FillValue` attribute
+     * (`fill_value`, or NetCDF's default fill value for `data_type` if it is
+     * nullptr), the conventional NetCDF marker of a missing value. When the
+     * file is read or appended to, the fill value is the one the file
+     * declares, if any.
+     *
      * @param name Unique variable name.
      * @param shape Shape of a single frame's value (e.g. {dim, dim}).
      * @param data_type NetCDF data type of the elements (e.g. NC_DOUBLE).
+     * @param fill_value One element of type `data_type`, or nullptr.
      * @return Reference to the created variable (owns the host buffer).
      */
     NetCDFVarFrameData &
     register_frame_variable(const std::string & name,
                             const std::vector<IOSize_t> & shape,
-                            const nc_type & data_type);
+                            const nc_type & data_type,
+                            const void * fill_value = nullptr);
 
     /**
      * @brief Returns the registered per-frame variable `name`. Throws if there
