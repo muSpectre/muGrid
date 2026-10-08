@@ -634,6 +634,161 @@ class FileIOTest(unittest.TestCase):
             if os.path.exists(fname):
                 os.remove(fname)
 
+    def test_FileIONetCDF_frame_variable_write_kwargs(self):
+        """Per-frame variables given as keyword arguments to write(): stored
+        and written with the frame, sticky across frames, and checked (name,
+        shape, dtype kind) before any buffer is touched."""
+        fname = "python_binding_io_frame-variable-kwargs-tests.nc"
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+        self.comm.barrier()
+
+        field = self.fc_glob.register_real_field("kwargs-density", 1, "pixel")
+        np.from_dlpack(field)[...] = 3.0
+
+        fio_w = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Overwrite, self.comm)
+        fio_w.register_field_collection(self.fc_glob,
+                                        field_names=["kwargs-density"])
+        fio_w.register_frame_variable("iteration", [], np.int32)
+        fio_w.register_frame_variable("objective", [], np.float64)
+        fio_w.register_frame_variable("stress", [2, 2], np.float64)
+
+        frame = fio_w.append_frame()
+        # Rejected calls store nothing, not even the values that were valid.
+        with self.assertRaises(TypeError):
+            frame.write(objective=7.0, iteration=np.nan)  # float -> int
+        with self.assertRaises(ValueError):
+            frame.write(objective=7.0, stress=np.zeros(3))  # wrong shape
+        with self.assertRaises(RuntimeError):
+            frame.write(objective=7.0, no_such_variable=1)
+        with self.assertRaises(RuntimeError):
+            frame.write(objective=7.0, **{"kwargs-density": 1.0})  # a field
+        self.assertEqual(float(fio_w.frame_variable("objective")), 0.0)
+
+        # frame 0: everything registered (no field_names), stress broadcast
+        frame.write(iteration=0, objective=np.nan, stress=1.0)
+        # frame 1: only the field plus the keyword variables; `stress` keeps
+        # its buffer but is not written to this frame
+        fio_w.append_frame().write(["kwargs-density"], iteration=5,
+                                   objective=0.5)
+        # frame 2: no keywords -- the buffers still hold frame 1's values
+        fio_w.append_frame().write()
+        # frame 3: FileIONetCDF.write with an explicit frame index
+        fio_w.append_frame()
+        fio_w.write(3, iteration=np.int64(9), objective=2,
+                    stress=np.eye(2))
+        np.testing.assert_array_equal(fio_w.frame_variable("stress"),
+                                      np.eye(2))
+        fio_w.close()
+
+        self.comm.barrier()
+
+        fio_r = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read, self.comm)
+        self.assertEqual(len(fio_r), 4)
+        fio_r.register_frame_variable("iteration", [], np.int32)
+        fio_r.register_frame_variable("objective", [], np.float64)
+        fio_r.register_frame_variable("stress", [2, 2], np.float64)
+        iteration = fio_r.frame_variable("iteration")
+        objective = fio_r.frame_variable("objective")
+        stress = fio_r.frame_variable("stress")
+        self.assertEqual(iteration.dtype, np.int32)
+        self.assertEqual(iteration.shape, ())
+        expected = [(0, np.nan, np.ones((2, 2))), (5, 0.5, None),
+                    (5, 0.5, np.ones((2, 2))), (9, 2.0, np.eye(2))]
+        for k, (it, obj, s) in enumerate(expected):
+            names = ["iteration", "objective"] + ([] if s is None
+                                                  else ["stress"])
+            fio_r.read(k, names)
+            self.assertEqual(int(iteration), it)
+            np.testing.assert_equal(float(objective), obj)
+            if s is not None:
+                np.testing.assert_array_equal(stress, s)
+        fio_r.close()
+
+        self.comm.barrier()
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+
+    def test_FileIONetCDF_frame_variable_missing_values(self):
+        """None writes a per-frame variable's fill value, declared as its
+        _FillValue attribute (NetCDF's default for the dtype unless given), so
+        NetCDF readers report the value as missing."""
+        fname = "python_binding_io_frame-variable-missing-tests.nc"
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+        self.comm.barrier()
+
+        nc_fill_double = 9.969209968386869e36  # NC_FILL_DOUBLE
+        nc_fill_int = -2147483647  # NC_FILL_INT
+
+        fio_w = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Overwrite, self.comm)
+        fio_w.register_frame_variable("iteration", [], np.int32)
+        fio_w.register_frame_variable("objective", [], np.float64)
+        fio_w.register_frame_variable("stress", [2, 2], np.float64)
+        fio_w.register_frame_variable("ratio", [], np.float32,
+                                      fill_value=-1.0)
+        with self.assertRaises(TypeError):  # not a single value
+            fio_w.register_frame_variable("bad", [], np.float64,
+                                          fill_value=[1.0, 2.0])
+        with self.assertRaises(TypeError):  # float into an integer variable
+            fio_w.register_frame_variable("bad", [], np.int32,
+                                          fill_value=np.nan)
+        self.assertEqual(fio_w.frame_variable_fill_value("objective"),
+                         nc_fill_double)
+        self.assertEqual(fio_w.frame_variable_fill_value("iteration"),
+                         nc_fill_int)
+        fill = fio_w.frame_variable_fill_value("ratio")
+        self.assertEqual(fill.dtype, np.float32)
+        self.assertEqual(fill, -1.0)
+
+        fio_w.append_frame().write(iteration=0, objective=None, stress=None,
+                                   ratio=None)
+        fio_w.append_frame().write(iteration=1, objective=0.5,
+                                   stress=np.eye(2), ratio=0.25)
+        fio_w.close()
+
+        self.comm.barrier()
+
+        # muGrid reads the file's fill values back, and the raw values
+        fio_r = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read, self.comm)
+        fio_r.register_frame_variable("objective", [], np.float64)
+        fio_r.register_frame_variable("stress", [2, 2], np.float64)
+        fio_r.register_frame_variable("ratio", [], np.float32)
+        self.assertEqual(fio_r.frame_variable_fill_value("objective"),
+                         nc_fill_double)
+        self.assertEqual(fio_r.frame_variable_fill_value("ratio"), -1.0)
+        fio_r.read(0, ["objective", "stress", "ratio"])
+        self.assertEqual(float(fio_r.frame_variable("objective")),
+                         nc_fill_double)
+        np.testing.assert_array_equal(fio_r.frame_variable("stress"),
+                                      np.full((2, 2), nc_fill_double))
+        self.assertEqual(float(fio_r.frame_variable("ratio")), -1.0)
+        fio_r.read(1, ["objective"])
+        self.assertEqual(float(fio_r.frame_variable("objective")), 0.5)
+        fio_r.close()
+
+        # a NetCDF reader reports frame 0 as missing
+        try:
+            import netCDF4
+        except ImportError:
+            netCDF4 = None
+        if netCDF4 is not None and self.comm.rank == 0:
+            with netCDF4.Dataset(fname) as ds:
+                for name in ("objective", "stress", "ratio"):
+                    values = ds[name][:]
+                    self.assertTrue(np.ma.getmaskarray(values)[0].all())
+                    self.assertFalse(np.ma.getmaskarray(values)[1].any())
+                self.assertEqual(ds["ratio"]._FillValue.dtype, np.float32)
+                self.assertFalse(np.ma.getmaskarray(ds["iteration"][:]).any())
+
+        self.comm.barrier()
+        if self.comm.rank == 0:
+            if os.path.exists(fname):
+                os.remove(fname)
+
 
 if __name__ == "__main__":
     unittest.main()
