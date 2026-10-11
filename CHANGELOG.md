@@ -4,6 +4,10 @@ Change log for µGrid
 v1.5.0 (08Oct26)
 ----------------
 
+- BUG: `GenericLinearOperator` `apply` and `transpose` gave wrong results on the
+  GPU when a pixel has more than one nodal sub-point (e.g. biquadratic elements):
+  the device (Structure-of-Arrays) operator used the interleaved nodal index
+  instead of one plane of pixels per nodal sub-point
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
