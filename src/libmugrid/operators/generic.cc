@@ -476,8 +476,9 @@ namespace muGrid {
                                     //       + op * (total_pixels * nb_quad_pts)
                                     //       + quad * total_pixels
                                     //       + pixel_offset (added by kernel)
+                                    // nodal: every nodal sub-point is its own plane of total_pixels
                                     index_diff_nodal = i_component * total_nodal_elements
-                                                       + pixel_count * this->nb_pixel_input_components_ + i_node;
+                                                       + i_node * total_pixels + pixel_count;
                                     index_diff_quad = i_component * total_quad_elements
                                                       + i_operator * (total_pixels * this->nb_quad_pts_)
                                                       + i_quad * total_pixels;
@@ -582,7 +583,9 @@ namespace muGrid {
                                                       + i_operator * (total_pixels * this->nb_quad_pts_)
                                                       + i_quad * total_pixels
                                                       - pixel_count;
-                                    index_diff_nodal = i_component * total_nodal_elements + i_node;
+                                    // nodal: every nodal sub-point is its own plane of total_pixels
+                                    index_diff_nodal = i_component * total_nodal_elements
+                                                       + i_node * total_pixels;
                                 }
 
                                 // Add the entry (use [] for Array access)
