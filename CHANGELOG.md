@@ -88,6 +88,24 @@ v1.5.0 (08Oct26)
   into float32, float into an integer -- rounded or truncated the values
   without an error. Such reads now raise `FileIOError`; widening reads (float
   into double, smaller into larger integers) still convert exactly
+- BUG: Out-of-bounds reads and writes on unchecked inputs: `linalg.cross`
+  and `leray_project` did not compare sub-point counts (the number of
+  three-vectors is taken from one operand); the float32 host
+  `pipelined_cg_dots` did not validate its operands at all; and the
+  flat-buffer kernels (the device's `axpy`/`scal`/`axpby`/`copy`/reductions,
+  the field-valued `scal`, `cross`, `leray_project`) assumed dense pixel
+  storage and silently computed on padding for collections with custom pixel
+  strides. All now raise. The transposes of `FEMGradientOperator` and
+  `GenericLinearOperator` check that `weights` has one entry per quadrature
+  point instead of reading past its end
+- BUG: MPI reductions: `Communicator.gather` checked for uneven row counts only
+  with an `assert`, so release builds scrambled the result; the check is now
+  collective and every rank raises. `reduce_min`/`reduce_max` of an integer
+  array deadlocked when one rank was empty (its +-inf identity overflowed on
+  that rank alone). `sum` and `reduce_sum` dropped imaginary parts and rounded
+  integers beyond 2^53, and chose the MPI datatype of a scalar from its value,
+  so ranks could disagree on it; scalars are now reduced with the type of
+  their dtype
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

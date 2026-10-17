@@ -276,8 +276,7 @@ namespace muGrid {
         //! where 24 (=3*1+3*5+0*0+3*2) is the total number of elements on all
         //! cores. You should always have the same number of points in the row
         //! index (first index) except for 0 if there is nothing to be gathered
-        //! on the core, otherwise there could be wrong behaviour. This
-        //! condition is only checked in Debug mode.
+        //! on the core; otherwise every rank raises a RuntimeError.
         template <typename T>
         DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             if (this->comm == MPI_COMM_NULL)
@@ -300,11 +299,30 @@ namespace muGrid {
             }
 
             // It is only allowed to have matrices with a fixed number of rows
-            // or empty matrices. Hence either nb_rows_loc == nb_rows_max or
-            // nb_rows_loc
-            // == 0. Otherwise you might have undefined behaviour because the
-            // output gathered matrix might have a wrong shape.
-            assert((nb_rows_loc == nb_rows_max) or (nb_rows_loc == 0));
+            // or empty matrices: either nb_rows_loc == nb_rows_max or
+            // nb_rows_loc == 0. Otherwise the result is laid out with the
+            // wrong number of rows and the data is scrambled or dropped. This
+            // used to be an assert, i.e. unchecked in release builds. The
+            // check is collective (a rank-local throw would leave the others
+            // blocked in MPI_Allgatherv), so every rank raises together.
+            int uneven_loc{(nb_rows_loc != nb_rows_max) and (nb_rows_loc != 0)};
+            int uneven{0};
+            message = MPI_Allreduce(&uneven_loc, &uneven, 1, mpi_type<int>(),
+                                    MPI_MAX, this->comm);
+            if (message != 0) {
+                std::stringstream error{};
+                error << "MPI_Allreduce MPI_MAX failed with " << message
+                      << " on rank " << this->rank();
+                throw RuntimeError(error.str());
+            }
+            if (uneven) {
+                std::stringstream error{};
+                error << "gather: every rank must contribute the same number "
+                         "of rows (or none), but the largest is "
+                      << nb_rows_max << " and this rank has " << nb_rows_loc
+                      << (uneven_loc ? "" : " (another rank differs)");
+                throw RuntimeError(error.str());
+            }
 
             // gather the number of elements on each core to define the output
             // shape (nb_cols = nb_entries/nb_rows_max) of the result. MPI
@@ -349,8 +367,12 @@ namespace muGrid {
             // check if by accident a vector was handed over, rows=0, cols!=0.
             // Thus nb_rows is zero everywhere and so nb_rows_max is zero.
             // However, there are columns != 0, which leads to nb_entries != 0
-            // and would lead in the following to a zero division.
-            assert(!((nb_rows_max == 0) and (nb_entries != 0)));
+            // and would lead in the following to a zero division. Both values
+            // are global, so every rank takes this branch together.
+            if ((nb_rows_max == 0) and (nb_entries != 0)) {
+                throw RuntimeError(
+                    "gather: the matrices have no rows but hold entries");
+            }
 
             // compute the offset at which the data from each processor is
             // written into the result
