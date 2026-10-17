@@ -424,9 +424,10 @@ namespace muGrid {
                                             this->nb_quad_pts_ * this->nb_output_components_;
 
         // First pass: count non-zero entries
+        const Real zero_threshold{this->zero_threshold()};
         Index_t nnz = 0;
         for (const Real& value: this->coefficients_) {
-            if (std::abs(value) > this->zero_tolerance) {
+            if (std::abs(value) > zero_threshold) {
                 nnz += nb_nodal_components;
             }
         }
@@ -454,7 +455,7 @@ namespace muGrid {
                                              * this->nb_output_components_ + i_operator};
                         const auto op_value{this->coefficients_[op_index]};
                         // If this is non-zero
-                        if(std::abs(op_value) > this->zero_tolerance) {
+                        if(std::abs(op_value) > zero_threshold) {
                             // For each component
                             for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to pixel (coordinate) offset
@@ -528,9 +529,10 @@ namespace muGrid {
                                             this->nb_quad_pts_ * this->nb_output_components_;
 
         // First pass: count non-zero entries
+        const Real zero_threshold{this->zero_threshold()};
         Index_t nnz = 0;
         for (const Real& value: this->coefficients_) {
-            if (std::abs(value) > this->zero_tolerance) {
+            if (std::abs(value) > zero_threshold) {
                 nnz += nb_nodal_components;
             }
         }
@@ -558,7 +560,7 @@ namespace muGrid {
                                              * this->nb_output_components_ + i_operator};
                         const auto op_value{this->coefficients_[op_index]};
                         // If this is non-zero
-                        if(std::abs(op_value) > this->zero_tolerance) {
+                        if(std::abs(op_value) > zero_threshold) {
                             // For each component
                             for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to coordinate offset

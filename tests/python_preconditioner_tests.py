@@ -1409,3 +1409,41 @@ def test_evaluated_symbol_rejects_a_malformed_stencil(comm):
     with pytest.raises(ValueError, match="stencil must have shape"):
         AnalyticReferencePreconditioner(engine, np.zeros((3, 3, 2)),
                                         name="bad-stencil")
+
+
+def test_stored_symbol_is_accurate_and_compact_in_single_precision(comm):
+    """The stored reference-stiffness symbol for a float32 solve is built and
+    inverted in double, and stored as its upper triangle (audit finding S6).
+
+    It used to be assembled in single precision, where the low-frequency
+    phase sum cancels to O(S q^2): on the lowest modes of a 4096^2 grid the
+    float32 preconditioner was off from the float64 one by 4e-2 (7e-4 at
+    1024^2). And because rounding made the inverse look non-Hermitian, the
+    float32 symbol was always stored as the dense block, twice the memory.
+    """
+    n, dim = 1024, 2
+    out, hermitian = {}, {}
+    for dtype in (np.float64, np.float32):
+        tag = np.dtype(dtype).name
+        engine = muGrid.FFTEngine((n,) * dim, comm)
+        prec = make_reference_stiffness_preconditioner(
+            engine, nb_components=dim, dtype=dtype,
+            element=muGrid.FEMElement.q1, grid_spacing=(1.0 / n,) * dim,
+            lambda_ref=1.3, mu_ref=0.7, evaluate_symbol=False,
+            name=f"s6-{tag}")
+        r = engine.real_space_field(f"r-s6-{tag}", components=(dim,),
+                                    dtype=dtype)
+        z = engine.real_space_field(f"z-s6-{tag}", components=(dim,),
+                                    dtype=dtype)
+        x = np.asarray(engine.coords)[0]
+        r.p[...] = 0
+        for k in (1, 2, 3):
+            r.p[0] += np.cos(2 * np.pi * k * x).astype(dtype)
+        prec(r, z)
+        out[dtype] = np.asarray(z.p, dtype=np.float64)
+        hermitian[dtype] = prec._hermitian
+    a, b = out[np.float64], out[np.float32]
+    error = comm.max(float(np.abs(a - b).max()) if a.size else 0.0)
+    scale = comm.max(float(np.abs(a).max()) if a.size else 0.0)
+    assert error / scale < 1e-5
+    assert hermitian[np.float32]

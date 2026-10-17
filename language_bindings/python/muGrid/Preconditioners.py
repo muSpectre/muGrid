@@ -458,7 +458,8 @@ class BlockFourierPreconditioner(Preconditioner):
         if comm is not None:
             herm_scale = float(comm.max(herm_scale))
             herm_asym = float(comm.max(herm_asym))
-        self._hermitian = herm_scale == 0.0 or herm_asym <= 1e-10 * herm_scale
+        self._hermitian = herm_scale == 0.0 or herm_asym <= (
+            _hermitian_tol(blocks.dtype) * herm_scale)
 
         # Store the symbol at the solve precision (real diagonals, complex
         # off-diagonals / dense block): it is the largest persistent buffer, and
@@ -952,13 +953,61 @@ class AnalyticReferencePreconditioner(Preconditioner):
                 # ravel is a contiguous *view*: components fastest, then modes
                 # with axis 0 fastest, exactly the layout the kernel indexes.
                 # Nothing is copied and the kernel writes back through it.
-                flat = np.asarray(self._work.s).ravel(order="F")
+                work = np.asarray(self._work.s)
+                flat = work.ravel(order="F")
+                # A copy here would take the result and leave the field
+                # unchanged without an error.
+                assert np.shares_memory(flat, work)
                 self._kernel(flat, self._stride_component, self._stride_mode,
                              self._stencil, self._q,
                              list(self._fourier_shape), self._normalisation)
         with self._timed("ifft"):
             engine.ifft(self._work, z)
         return z
+
+
+#: Relative asymmetry below which a symbol assembled and inverted in double
+#: is taken for Hermitian (and stored as its upper triangle).
+_HERMITIAN_TOL_DOUBLE = 1e-10
+
+
+def _hermitian_tol(cdtype):
+    """Relative asymmetry that counts as rounding for blocks of `cdtype`:
+    1e-10 in double (as before) and 100 eps in single precision, where the
+    rounding of the entries alone exceeds 1e-10."""
+    return max(_HERMITIAN_TOL_DOUBLE, 100 * float(np.finfo(cdtype).eps))
+
+
+def _invert_symbol_slab(blocks, singular, normalisation, hermitian_tol):
+    """Invert a slab ``[..., n, n]`` of the symbol in double, in place.
+
+    The inversion is batched over the slab, never the whole symbol: at once it
+    would hold the double copy, np.linalg.inv's output and the masked gather
+    and scatter together, four or five symbol-sized arrays (~40 GB at 512^3).
+    The singular (zero-mode) blocks are made the identity for the inversion
+    and zeroed afterwards, the pseudo-inverse of the rigid-body null space.
+
+    A slab Hermitian to within `hermitian_tol` is made exactly Hermitian: its
+    entries and their conjugate partners then round to the same values when
+    cast to the solve precision, so BlockFourierPreconditioner can store the
+    upper triangle -- in single precision the rounding of a slightly
+    asymmetric double inverse used to defeat that test and keep the dense
+    block.
+    """
+    n = blocks.shape[-1]
+    blocks[singular] = np.eye(n, dtype=blocks.dtype)
+    blocks = np.linalg.inv(blocks)
+    # Fold in the inverse-transform normalisation while the slab is hot,
+    # instead of scaling the whole symbol afterwards (another copy).
+    blocks *= normalisation
+    blocks[singular] = 0.0
+    adjoint = np.conj(np.swapaxes(blocks, -1, -2))
+    scale = float(np.abs(blocks).max()) if blocks.size else 0.0
+    if scale == 0.0 or float(np.abs(blocks - adjoint).max()) <= (
+            hermitian_tol * scale):
+        blocks += adjoint
+        blocks *= 0.5
+    return blocks
 
 
 def make_reference_stiffness_preconditioner(
@@ -1119,14 +1168,28 @@ def make_reference_stiffness_preconditioner(
     bytes_per_index = int(np.prod(fourier_shape[1:], dtype=np.int64)) * n * n * 16
     slab = max(1, SYMBOL_INVERSION_SLAB_BYTES // max(bytes_per_index, 1))
 
+    # The q = 0 block is singular: the reference operator has the rigid-body
+    # translations in its null space. Invert everything else and project it out.
+    zero_mode = np.ones(fourier_shape, dtype=bool)
+    for d in range(dim):
+        zero_mode &= fourier_q[d] == 0.0
+
     if analytic:
-        # Slab at a time: stencil_symbol builds one array of the mode shape per
-        # stencil offset, so evaluating the whole grid at once would allocate
-        # 3^dim transients the size of the symbol.
+        # Built *and inverted* a slab at a time, in double, whatever the solve
+        # precision; only the inverse is stored at it. The stencil's rows sum
+        # to zero, so at low frequency the phase sum cancels O(S) terms down to
+        # O(S q^2): assembled in single precision the lowest modes carried a
+        # relative error of about eps * N^2 (3e-4 at N = 256, 0.13 at 4096),
+        # and inverting that afterwards in double could not recover it. Slabs
+        # also bound stencil_symbol's 3^dim transients of the mode shape.
         for lo in range(0, fourier_shape[0], slab):
             hi = min(lo + slab, fourier_shape[0])
-            K_hat[lo:hi] = stencil_symbol(
-                S, [fq[lo:hi] for fq in fourier_q], cdtype=complex_dtype)
+            K_hat[lo:hi] = _invert_symbol_slab(
+                stencil_symbol(S, [fq[lo:hi] for fq in fourier_q],
+                               cdtype=np.complex128),
+                zero_mode[lo:hi], engine.normalisation,
+                hermitian_tol=_HERMITIAN_TOL_DOUBLE).astype(
+                    complex_dtype, copy=False)
     else:
         # Global-origin pixel(s) in this rank's interior: the nodal coordinate is
         # exactly 0 in every direction only at global index 0 (coord = index / N).
@@ -1165,32 +1228,16 @@ def make_reference_stiffness_preconditioner(
             ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
             K_hat[..., :, beta] = np.moveaxis(ch, 0, -1)
 
-    # The q = 0 block is singular: the reference operator has the rigid-body
-    # translations in its null space. Invert everything else and project it out.
-    zero_mode = np.ones(fourier_shape, dtype=bool)
-    for d in range(dim):
-        zero_mode &= fourier_q[d] == 0.0
-
-    # Invert in double for accuracy, a slab at a time, in place. Inverting the
-    # whole array at once would hold the double copy, np.linalg.inv's output
-    # and (in the mask-indexed form this replaces) the boolean gather and its
-    # scatter all at the same moment -- four or five arrays the size of the
-    # symbol, ~40 GB at 512^3. A slab bounded by SLAB_BYTES costs that many
-    # bytes instead, and the zero mode is handled by making its block the
-    # identity before the inversion and zeroing it after, so no mask-indexed
-    # copy of the *whole* symbol is ever built.
-    eye = np.eye(n, dtype=np.complex128)
-    for lo in range(0, fourier_shape[0], slab):
-        hi = min(lo + slab, fourier_shape[0])
-        double_slab = K_hat[lo:hi].astype(np.complex128)
-        singular = zero_mode[lo:hi]
-        double_slab[singular] = eye
-        double_slab = np.linalg.inv(double_slab)
-        # Fold in the inverse-transform normalisation while the slab is still
-        # hot, instead of scaling the whole symbol afterwards (another copy).
-        double_slab *= engine.normalisation
-        double_slab[singular] = 0.0
-        K_hat[lo:hi] = double_slab.astype(complex_dtype, copy=False)
+        # The impulse response is the operator's own output, so it carries
+        # the operator's precision; invert it in double, a slab at a time, in
+        # place. It is Hermitian only to within that precision.
+        for lo in range(0, fourier_shape[0], slab):
+            hi = min(lo + slab, fourier_shape[0])
+            K_hat[lo:hi] = _invert_symbol_slab(
+                K_hat[lo:hi].astype(np.complex128), zero_mode[lo:hi],
+                engine.normalisation,
+                hermitian_tol=_hermitian_tol(complex_dtype)).astype(
+                    complex_dtype, copy=False)
 
     # [n, n, *fourier], the layout BlockFourierPreconditioner expects. moveaxis
     # returns a view, so this costs nothing.

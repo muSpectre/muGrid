@@ -63,6 +63,31 @@ v1.5.0 (08Oct26)
   pipelined solver first restarts, since its recurrences drift).
   `JacobiPreconditioner` rejects negative and non-finite diagonal entries, not
   only zeros, and takes a `communicator` so that the check is collective
+- BUG: The stored reference-stiffness preconditioner
+  (`make_reference_stiffness_preconditioner(..., evaluate_symbol=False)`, the
+  default on the host) assembled its symbol in single precision for float32
+  solves, where the low-frequency phase sum cancels: on the lowest modes it
+  was off from the float64 preconditioner by 4e-2 at 4096^2 (7e-4 at 1024^2).
+  It is now built and inverted in double a slab at a time and only the inverse
+  is stored in float32 (error 2e-7), and symmetrised so that the float32
+  symbol is stored as its upper triangle instead of the dense block (half the
+  memory). The Hermitian test of `BlockFourierPreconditioner` allows
+  single-precision rounding
+- BUG: The in-place kernels `apply_green_symbol_*` and `block_thomas_*`
+  converted an output array of the wrong dtype or layout into a temporary,
+  wrote the result there and returned the caller's array unchanged without an
+  error. Their outputs are now taken without conversion (`TypeError` on a
+  mismatch) and must be writeable, and the remaining shapes and indices are
+  validated (an `exc_index` beyond `exc`, a mode reading an empty `head`, the
+  coupling blocks, strides beyond the field)
+- BUG: `GenericLinearOperator` dropped stencil coefficients below an absolute
+  1e-14, so an operator in SI units at the micrometre scale (or the identity
+  times 1e-15) applied as zero. The threshold is now relative to the largest
+  coefficient
+- BUG: Reading a NetCDF variable into a field of a narrower type -- double
+  into float32, float into an integer -- rounded or truncated the values
+  without an error. Such reads now raise `FileIOError`; widening reads (float
+  into double, smaller into larger integers) still convert exactly
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
