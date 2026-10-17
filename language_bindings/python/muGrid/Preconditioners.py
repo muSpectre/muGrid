@@ -112,14 +112,24 @@ class JacobiPreconditioner(Preconditioner):
         are copied, later modification of the source has no effect.
     name : str, optional
         Prefix for the field holding the inverse diagonal.
+    communicator : muGrid.Communicator, optional
+        Communicator of the parallel run. With it, the diagonal check below is
+        collective, so every rank raises together; without it, a rank whose
+        own entries fail raises alone and the others block in their next
+        collective operation. Pass it under MPI.
 
     Raises
     ------
     ValueError
-        If any diagonal entry is zero.
+        If any diagonal entry is zero, negative or not finite. CG needs a
+        positive definite preconditioner, and the diagonal of a positive
+        definite operator is positive: a negative entry means the operator is
+        not positive definite, and dividing by it makes the preconditioner
+        indefinite.
     """
 
-    def __init__(self, diagonal, name="jacobi-preconditioner"):
+    def __init__(self, diagonal, name="jacobi-preconditioner",
+                 communicator=None):
         self._name = name
         values = getattr(diagonal, "s", None)  # muGrid field?
         if values is not None:
@@ -127,10 +137,15 @@ class JacobiPreconditioner(Preconditioner):
             values = values.get() if hasattr(values, "get") else np.array(values)
         else:
             values = np.asarray(diagonal, dtype=float)
-        if not (np.abs(values) > 0).all():
+        nb_bad = int(np.count_nonzero(~(np.isfinite(values) & (values > 0))))
+        if communicator is not None:
+            from .Parallel import Communicator
+
+            nb_bad = int(Communicator(communicator).sum(nb_bad))
+        if nb_bad > 0:
             raise ValueError(
-                "Jacobi preconditioner requires a non-singular diagonal "
-                "(got entries equal to zero)"
+                "Jacobi preconditioner requires a positive, finite diagonal; "
+                f"{nb_bad} entries are zero, negative or not finite"
             )
         self._is_scalar = values.ndim == 0
         self._inverse_diagonal = (

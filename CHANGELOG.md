@@ -25,6 +25,44 @@ v1.5.0 (08Oct26)
   in single precision per mode and redone in double only where an a-posteriori
   test shows a relative error above 1e-4, so GPUs with 1:64 double throughput
   (L40S) keep the float32 speed instead of a 2x slower apply
+- BUG: `FEMGradientOperator.transpose` gave silently wrong results under the
+  ghost layout its own requirement reported. It claimed the scatter-and-reduce
+  layout of `apply` (ghosts on the right only), but its kernels summed every
+  element in the buffer into every node, so `communicate_ghosts` on the input
+  followed by `transpose` lost the element below each first owned node
+  (relative errors 5-30), while with two-sided ghosts `transpose` followed by
+  `reduce_ghosts` counted elements twice. The transpose now writes only the
+  owned nodes, never the output's ghosts, and requires one left ghost layer
+  (`transpose_ghost_requirement` is `(1, ..), (0, ..)`, so
+  `ghost_requirement` is two-sided): communicate the input's ghosts first and
+  do not reduce the output -- the protocol of every other muGrid operator. A
+  collection without left ghosts now raises instead of returning a wrong sum
+- BUG: `conjugate_gradients` and `conjugate_gradients_pipelined` kept their
+  work vectors as fixed-name fields of the caller's collection. A solve nested
+  inside another's `hessp`, `prec` or `callback` on the same collection
+  overwrote the outer solve's residual and search direction (the outer solve
+  could report convergence at a true residual of 1), and a float32 solve after
+  a float64 one raised `TypeError`. Each call now uses fields of its own and
+  removes them from the collection when it returns or raises, so they also no
+  longer stay allocated between solves
+- BUG: `real_field(..., dtype=np.float32)` and `complex_field(...,
+  dtype=np.complex64)` returned any existing field of the requested name,
+  whatever its precision, shape or sub-point. They now raise `ValueError` on a
+  mismatch, as the double-precision get-or-create already did
+- BUG: `conjugate_gradients` declared convergence on its recursive residual,
+  which drifts from `b - Ax` by rounding: in float32 it returned at a true
+  relative residual of 1.01e-5 when asked for 1e-5, and below the float32
+  accuracy floor at 6e-7 when asked for 1e-8. Convergence is now confirmed on
+  the true residual (one operator apply); on failure CG restarts from it, and
+  raises `ConvergenceError` once it stagnates. The float32-floor warning no
+  longer claims the solve will run to `maxiter`
+- BUG: Indefinite systems went undetected: both CG solvers only checked for an
+  exactly zero curvature, and `conjugate_gradients` ran 17,529 iterations on
+  an operator with negative eigenvalues without an error. They now raise
+  `ConvergenceError` when `p^T A p` or `r^T M r` is not positive (the
+  pipelined solver first restarts, since its recurrences drift).
+  `JacobiPreconditioner` rejects negative and non-finite diagonal entries, not
+  only zeros, and takes a `communicator` so that the check is collective
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

@@ -70,7 +70,7 @@ Known limitation: an unattainable tolerance can still run to `maxiter` before
 raising — slow, but no longer silent.
 
 Tests: `tests/python_solvers_tests.py::test_pipelined_cg_converges_in_the_true_residual`,
-`::test_pipelined_cg_without_replacement_fails_loudly_in_float32`.
+`::test_pipelined_cg_without_replacement_never_returns_a_drifted_iterate`.
 
 ### S2 — float32 evaluated Green symbol lost the long-wavelength modes (critical)
 
@@ -355,12 +355,12 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 | Location | Parameter | Value | Settable? | Abs/rel, assessment |
 |---|---|---|---|---|
-| S:168, S:407 | `rtol` | 1e-6 | kwarg | Relative to global ‖b‖₂, tested on recursive residual (fixed for pipelined by S1; standard CG still, see S3) |
+| S:168, S:407 | `rtol` | 1e-6 | kwarg | Relative to global ‖b‖₂, confirmed on the true residual (S1, S3 fixed) |
 | S:83, S:357 | `atol` | 0.0 | kwarg | Absolute; b=0, x₀≠0 → tolerance 0, runs to maxiter |
 | S:79, S:353 | `maxiter` | 1000 | kwarg | Raises `ConvergenceError` |
-| S:25 | `FLOAT32_RTOL_FLOOR` | 1e-6 | module const | Warning only; its text is wrong for standard CG (S3) |
-| S:264, S:278, S:523, S:531 | breakdown tests | `== 0.0` | hard-coded | Negative curvature not detected (S4) |
-| P:130 | Jacobi diagonal check | `abs > 0` | no | Accepts negative diagonals; rank-local |
+| S:25 | `FLOAT32_RTOL_FLOOR` | 1e-6 | module const | Warning only; text corrected (S3) |
+| S:264, S:278, S:523, S:531 | breakdown tests | `<= 0.0` | hard-coded | Negative curvature and indefinite preconditioners raise (S4 fixed) |
+| P:130 | Jacobi diagonal check | `> 0` and finite | `communicator=` | Collective with a communicator (S4 fixed) |
 | P:446 | Hermitian-symbol test | 1e-10·max\|B\| | no | Not dtype-aware → float32 always dense |
 | P:652, P:681 | `void_tol` | 0.0 | kwarg | Absolute (unit-dependent) |
 | P:1154 | per-block `np.linalg.inv` | – | – | No singularity/residual check |
@@ -389,23 +389,30 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 - **S1 — FIXED in this PR** (section 1).
 - **S2 — FIXED in this PR** (section 1).
-- **S3. Standard CG in float32 returns above the requested tolerance**
+- **S3 — FIXED** (follow-up PR): true-residual check on exit, restart,
+  stagnation error; warning text corrected.
+  ~~**S3. Standard CG in float32 returns above the requested tolerance**
   (significant, CONFIRMED). S:28–41, S:324: cond 1e3, rtol 1e-8 returned with
   true residual 6.2e-7; cond 1e4, rtol 1e-5 returned at 1.01e-5. The warning
   claims the solve "will run to maxiter". Fix: true-residual check before
-  return (one `hessp`), as in S1, or clamp rtol to the floor.
-- **S4. Indefiniteness not detected** (significant, CONFIRMED). Only `pAp == 0`
+  return (one `hessp`), as in S1, or clamp rtol to the floor.~~
+- **S4 — FIXED** (follow-up PR): `p^T A p <= 0` / `r^T M r <= 0` raise
+  (pipelined: after a restart on fresh vectors); Jacobi rejects
+  non-positive or non-finite entries, collectively with `communicator=`.
+  ~~**S4. Indefiniteness not detected** (significant, CONFIRMED). Only `pAp == 0`
   / `alpha == 0` checked; an operator with 1/7 negative eigenvalues ran 17,529
   iterations without error. Jacobi accepts negative diagonals and its check is
   rank-local (one rank raising deadlocks the others). Fix: raise on
-  `pAp <= 0`, `rz <= 0`; collective `diag <= 0` check.
-- **S5. Solver work fields are fixed-name get-or-create fields in the
+  `pAp <= 0`, `rz <= 0`; collective `diag <= 0` check.~~
+- **S5 — FIXED** (follow-up PR). Unique per-call work-field names, popped on
+  exit; float32 get-or-create checks the existing field.
+  ~~**S5. Solver work fields are fixed-name get-or-create fields in the
   caller's collection** (significant, CONFIRMED). S:197–211, S:424–450;
   `Wrappers.py:93–95`. A nested CG on the same collection corrupts the outer
   solve (reported convergence at true residual 1.0); float32 after float64 on
   the same collection raises TypeError; `real_field` ignores dtype/shape on
   re-get. Fix: unique per-call names + `pop_field` in `finally`, or a
-  workspace object; validate dtype/shape on re-get.
+  workspace object; validate dtype/shape on re-get.~~
 - **S6. Stored Green preconditioner in float32 assembled in single
   precision** (significant, CONFIRMED). P:983–986 claims double; `K_hat` is
   complex64 (P:1081). Lowest-mode inverse error 3e-4/7e-3/0.13 at N =
@@ -477,13 +484,18 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### Operators
 
-- **O1. FEM `transpose` correctness depends on ghost layout and call order**
+- **O1 — FIXED** (follow-up PR). The transpose writes owned nodes only and
+  requires one left ghost layer; protocol "communicate the input, never
+  reduce". Host and device computed the same thing before -- every element in
+  the buffer into every node -- so the defect was the protocol, not a
+  host/device split.
+  ~~**O1. FEM `transpose` correctness depends on ghost layout and call order**
   (significant, CONFIRMED). `fem_gradient.hh:498–507`; host divergence
   scatters from ghost elements too. With the operator's reported ghosts (0,1),
   "communicate then transpose" gives rel. error 5–30; with (1,1), "transpose
   then reduce" double-counts. Docs and C++ comment disagree. Fix: make the
   host divergence a gather onto owned nodes (as on the GPU), report {1,0},
-  document "communicate input, never reduce".
+  document "communicate input, never reduce".~~
 - **O2. Transpose `weights` length not validated** (significant, CONFIRMED):
   OOB read. `fem_gradient.hh:632/720`, `generic.cc:781`, `generic_gpu.cc:165`.
 - **O3. `GenericLinearOperator` drops |c| < 1e-14 (absolute)** (significant,
@@ -528,10 +540,11 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### Tests
 
-- **T1. Device tests hard-code `muGrid.Device.cuda()`** (minor, CONFIRMED on
-  MI300A). 31 tests in `python_convolution_operator_tests.py`,
+- **T1 — FIXED** (follow-up PR): `Device.gpu()`; the three files pass on
+  MI300A. ~~**T1. Device tests hard-code `muGrid.Device.cuda()`** (minor,
+  CONFIRMED on MI300A). 31 tests in `python_convolution_operator_tests.py`,
   `python_convolution_performance_tests.py` and `python_field_gpu_tests.py`
-  fail on every ROCm build; use `Device.gpu()` / `create_device("gpu")`.
+  fail on every ROCm build; use `Device.gpu()` / `create_device("gpu")`.~~
 
 ---
 
@@ -539,8 +552,9 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 1. ~~Low-frequency double path for the evaluated symbol~~ — done
    (section 3).
-2. O1 (FEM transpose protocol) and S5 (named solver work fields) — both give
-   wrong answers silently.
-3. S3 (same true-residual check for standard CG), S4 (indefiniteness).
+2. ~~O1 (FEM transpose protocol) and S5 (named solver work fields)~~ — done,
+   with T1.
+3. ~~S3 (same true-residual check for standard CG), S4 (indefiniteness)~~
+   — done.
 4. S6, S7, O3, M5 (silent precision/data loss at interfaces).
 5. L1–L3, O2, M2–M4 (input validation / out-of-bounds).

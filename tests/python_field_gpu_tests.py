@@ -126,7 +126,7 @@ class DeviceCollectionTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_device_collection_is_on_device(self):
@@ -183,7 +183,7 @@ class DeviceFieldFactoryTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_real_field_on_device_collection(self):
@@ -211,7 +211,7 @@ class CuPyIntegrationTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_device_field_returns_cupy_array(self):
@@ -287,7 +287,7 @@ class MixedHostDeviceTests(unittest.TestCase):
         # Create device collection
         self.fc_device = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_host_and_device_collections(self):

@@ -1152,7 +1152,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
         """Test that device collection has correct properties."""
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         self.assertTrue(fc.is_on_device)
@@ -1162,7 +1162,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
         """Test that device fields have correct properties."""
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         field = fc.real_field("test", (3,))
@@ -1179,7 +1179,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         nodal = fc.real_field("nodal", (2,))
@@ -1207,7 +1207,7 @@ class ConvolutionOperatorDeviceCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         nodal = fc.real_field("nodal", (2,))
@@ -1252,7 +1252,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         nodal = fc.real_field("nodal", (2,))
@@ -1304,7 +1304,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": self.nb_quad_pts},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", (2,))
         quad_device = fc_device.real_field("quad", (2, nb_operators), "quad")
@@ -1342,7 +1342,7 @@ class ConvolutionOperatorCuPyCheck(unittest.TestCase):
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": 1},
             nb_ghosts_right=(1, 1),
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", (1,))
         quad_device = fc_device.real_field("quad", (1,), "quad")
