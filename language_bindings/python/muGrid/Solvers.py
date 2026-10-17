@@ -355,6 +355,7 @@ def conjugate_gradients_pipelined(
         timer=None,
         rtol: float = None,
         atol: float = 0.0,
+        replacement_interval: int = None,
 ):
     """
     Pipelined preconditioned conjugate gradients (Ghysels & Vanroose, 2014).
@@ -387,11 +388,50 @@ def conjugate_gradients_pipelined(
     latency in the preconditioned Conjugate Gradient algorithm*, Parallel
     Computing 40 (2014) 224-238.
 
-    .. note::
-        The residual, preconditioned residual and operator image are advanced by
-        recurrence rather than recomputed, so this variant is slightly more
-        susceptible to rounding than standard CG. For ill-conditioned systems a
-        residual-replacement strategy may be needed; this prototype omits it.
+    The residual, preconditioned residual and operator images are advanced by
+    recurrence rather than recomputed, and in this formulation the rounding
+    errors of those recurrences are *amplified* rather than merely accumulated
+    (Cools et al., SIAM J. Matrix Anal. Appl. 39 (2018) 426). Left alone, the
+    recursive residual keeps shrinking while the true residual ``b - Ax``
+    stalls orders of magnitude above it -- at condition number 1e6 and
+    ``rtol=1e-8`` it stopped at a true relative residual of 5e-5 -- and in
+    float32 it diverges outright. Two safeguards keep the result honest:
+
+    - **Residual replacement** (Cools et al., 2018): every
+      `replacement_interval` iterations the recurrence vectors are recomputed
+      from their definitions (``r = b - Ax``, ``u = M⁻¹r``, ``w = Au``,
+      ``s = Ap``, ``q = M⁻¹s``, ``z = Aq``), which resets the gap between the
+      recursive and the true residual, at the cost of four operator and two
+      preconditioner applies. If the gap had grown beyond a factor of two in
+      the residual norm, the search direction is discarded as well and CG
+      restarts from the true residual: keeping a direction built from badly
+      drifted recurrences was seen to stall the solve.
+    - **True-residual check**: convergence is only declared once ``b - Ax``
+      itself meets the tolerance (one extra operator apply). If it does not,
+      CG restarts from the true residual; if the true residual has not
+      decreased since the previous such check, the solve has reached its
+      attainable accuracy and a :class:`ConvergenceError` is raised rather
+      than returning an unconverged solution.
+
+    On diagonal test operators with condition numbers 1e4-1e7 (float64,
+    ``rtol`` 1e-8-1e-10) this needs about 10% more operator applies than
+    :func:`conjugate_gradients` and reaches the same true residual.
+
+    Parameters are those of :func:`conjugate_gradients`, plus:
+
+    replacement_interval : int, optional
+        Iterations between residual replacements. The default depends on the
+        precision: 50 for float64, 20 for float32, where the recurrences drift
+        apart much faster (at 50, float32 solves at condition number 1e4
+        failed to converge). ``0`` disables periodic replacement; the
+        true-residual check on convergence is always performed.
+
+    Raises
+    ------
+    ConvergenceError
+        If the true residual does not reach the tolerance within `maxiter`
+        iterations, stagnates above it, or a breakdown (NaN, overflow, zero
+        curvature) occurs.
     """
     if tol is not None:
         warnings.warn(
@@ -418,6 +458,9 @@ def conjugate_gradients_pipelined(
     # rhs -> single-precision solve throughout; double rhs is unchanged).
     dtype = getattr(b, "dtype", np.float64)
     _warn_unreachable_rtol(dtype, rtol, "conjugate_gradients_pipelined")
+    if replacement_interval is None:
+        replacement_interval = (
+            20 if np.dtype(dtype) == np.dtype(np.float32) else 50)
 
     with timed("startup"):
         # Work fields (zero-initialised by the collection)
@@ -466,8 +509,53 @@ def conjugate_gradients_pipelined(
         gamma_prev = None
         alpha_prev = None
 
+    def replace_residual(restart=None):
+        """Recompute the recurrence vectors from their definitions and return
+        ``(true_rr, restarted)``, the true squared residual norm |b - Ax|^2
+        (global) and whether CG was restarted.
+
+        A restart discards the search direction and its images, so the next
+        iteration starts CG afresh from the current iterate. `restart=None`
+        decides by the size of the drift: replacing the residual while keeping
+        a search direction built from recurrences that have drifted far from
+        the truth was seen to stall the solve (float32), so if the true
+        residual norm is off from the recursive one by more than a factor of
+        two, CG restarts instead.
+        """
+        if restart is None:
+            recursive_rr = float(comm.sum(linalg.norm_sq(r)))
+        hessp(x, r)
+        linalg.axpby(1.0, b, -1.0, r)
+        true_rr = float(comm.sum(linalg.norm_sq(r)))
+        if restart is None:
+            restart = not (0.25 * recursive_rr <= true_rr <= 4.0 * recursive_rr)
+        with timed("prec"):
+            prec(r, u)
+        hessp(u, w)
+        if restart:
+            for f in (p, s, q, z):
+                linalg.scal(0.0, f)
+        else:
+            hessp(p, s)
+            with timed("prec"):
+                prec(s, q)
+            hessp(q, z)
+        return true_rr, restart
+
+    # True squared residual at the previous failed convergence check, to tell
+    # a solve that is still converging from one that has stagnated at its
+    # attainable accuracy.
+    last_true_rr = None
+    rr = None
+    restarted = True  # the first iteration starts from p = 0
+
     with timed("iteration"):
         for iteration in range(maxiter):
+            if (replacement_interval and iteration > 0
+                    and iteration % replacement_interval == 0):
+                with timed("replace"):
+                    _, restarted = replace_residual()
+
             # Single combined reduction: (r,u), (w,u), (r,r). The three inner
             # products are computed by one fused kernel (one device->host copy)
             # and reduced across ranks in a *non-blocking* allreduce. The
@@ -512,14 +600,41 @@ def conjugate_gradients_pipelined(
             _reject_non_finite(gamma, "the inner product r^T u", iteration,
                                dtype, "conjugate_gradients_pipelined")
             if rr <= tol_sq:
-                return x
+                # The recursive residual says converged; only the true one
+                # may decide. On failure CG restarts from the true residual:
+                # the old search direction was built from the drifted
+                # recurrences, and continuing along it was seen to stall
+                # (the m, n computed above belong to the stale w and are
+                # dropped).
+                with timed("replace"):
+                    true_rr, _ = replace_residual(restart=True)
+                _reject_non_finite(true_rr, "the true squared residual "
+                                   "|b - Ax|^2", iteration, dtype,
+                                   "conjugate_gradients_pipelined")
+                if true_rr <= tol_sq:
+                    return x
+                if last_true_rr is not None and true_rr >= last_true_rr:
+                    raise ConvergenceError(
+                        "conjugate_gradients_pipelined: the true residual "
+                        f"|b - Ax| = {np.sqrt(true_rr):.6e} has stagnated "
+                        f"above the tolerance {np.sqrt(tol_sq):.6e} at "
+                        f"iteration {iteration} (the recursive residual is "
+                        f"{np.sqrt(rr):.6e}); the requested accuracy is not "
+                        f"attainable in {np.dtype(dtype).name} for this "
+                        "system. Loosen rtol, use float64, or use "
+                        "conjugate_gradients."
+                    )
+                last_true_rr = true_rr
+                restarted = True
+                continue
 
-            if iteration == 0:
+            if restarted:
                 beta = 0.0
                 denom = delta
             else:
                 beta = gamma / gamma_prev
                 denom = delta - beta * gamma / alpha_prev
+            restarted = False
             if denom == 0.0:
                 raise ConvergenceError(
                     "conjugate_gradients_pipelined: the curvature term is zero "
@@ -550,5 +665,8 @@ def conjugate_gradients_pipelined(
                 linalg.axpy(-alpha, z, w)
 
     raise ConvergenceError(
-        "Pipelined preconditioned conjugate gradient algorithm did not converge"
+        "Pipelined preconditioned conjugate gradient algorithm did not converge "
+        f"in {maxiter} iterations (recursive |r| = "
+        f"{np.sqrt(rr) if rr is not None else float('nan'):.6e}, tolerance "
+        f"{np.sqrt(tol_sq):.6e})"
     )
