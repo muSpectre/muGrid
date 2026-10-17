@@ -437,16 +437,21 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### Linalg kernels and reductions
 
-- **L1. `cross` / `leray_project` read out of bounds on sub-point mismatch**
+- **L1 — FIXED** (follow-up PR): sub-points checked in `check_three_vector`.
+  ~~**L1. `cross` / `leray_project` read out of bounds on sub-point mismatch**
   (significant, CONFIRMED). `linalg_host.cc:709–795` + GPU: check equal
-  `get_nb_sub_pts()`.
-- **L2. `pipelined_cg_dots<Real32, HostSpace>` has no operand validation**
+  `get_nb_sub_pts()`.~~
+- **L2 — FIXED** (follow-up PR): shared `check_pipelined_cg_operands`.
+  ~~**L2. `pipelined_cg_dots<Real32, HostSpace>` has no operand validation**
   (significant, CONFIRMED). `linalg_host.cc:604–625`: returns garbage or reads
-  OOB where Real and GPU paths raise. Shared validation helper.
-- **L3. Kernels assume dense pixel buffers** (significant; CONFIRMED host,
+  OOB where Real and GPU paths raise. Shared validation helper.~~
+- **L3 — FIXED** (follow-up PR): shared `check_contiguous` in the flat-buffer
+  kernels (host tests only; the device check is compiled but not exercised
+  with padded device storage).
+  ~~**L3. Kernels assume dense pixel buffers** (significant; CONFIRMED host,
   SUSPECTED GPU). `scal(field, field)`, `cross`/`leray`, all GPU full-buffer
   ops (`linalg_gpu.cc:913, 949`): padded `pixels_strides` silently give wrong
-  results on GPU while host Eigen paths throw. Shared `check_contiguous`.
+  results on GPU while host Eigen paths throw. Shared `check_contiguous`.~~
 - **L4. GPU reduction scratch is process-global and kernels launch on the
   current device** (significant, SUSPECTED, multi-GPU per process).
   `linalg_gpu.cc:739–756`; same in `ghost_accumulate_gpu.cc:62–75`. RAII
@@ -500,8 +505,9 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   then reduce" double-counts. Docs and C++ comment disagree. Fix: make the
   host divergence a gather onto owned nodes (as on the GPU), report {1,0},
   document "communicate input, never reduce".~~
-- **O2. Transpose `weights` length not validated** (significant, CONFIRMED):
-  OOB read. `fem_gradient.hh:632/720`, `generic.cc:781`, `generic_gpu.cc:165`.
+- **O2 — FIXED** (follow-up PR): `LinearOperator::check_transpose_weights`.
+  ~~**O2. Transpose `weights` length not validated** (significant, CONFIRMED):
+  OOB read. `fem_gradient.hh:632/720`, `generic.cc:781`, `generic_gpu.cc:165`.~~
 - **O3 — FIXED** (follow-up PR): threshold relative to the largest coefficient.
   ~~**O3. `GenericLinearOperator` drops |c| < 1e-14 (absolute)** (significant,
   CONFIRMED). `generic.hh:382`: identity × 1e-15 → zero; SI-unit micro-scale
@@ -524,12 +530,16 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 - **M1. `.p`/`.pg` order the merged component×sub-point axis differently on
   host and device** (significant, CONFIRMED). `field.cc:283–310`,
   `Field.py:134–177`. Build `.p` from `.s` in one canonical order.
-- **M2. `Communicator.gather` drops data on uneven rows** (significant,
-  CONFIRMED). `communicator.hh:282–383`: row check is an `assert`.
-- **M3. Integer min/max on an empty rank deadlocks** (significant, CONFIRMED).
-  `Parallel.py:453–467`: ±inf identity overflows on one rank only.
-- **M4. `reduce_sum` / `Communicator.sum` lose data** (significant,
-  CONFIRMED): imaginary parts dropped, int64 > 2⁵³ rounded.
+- **M2 — FIXED** (follow-up PR): collective check, all ranks raise.
+  ~~**M2. `Communicator.gather` drops data on uneven rows** (significant,
+  CONFIRMED). `communicator.hh:282–383`: row check is an `assert`.~~
+- **M3 — FIXED** (follow-up PR): integer identities from `np.iinfo`.
+  ~~**M3. Integer min/max on an empty rank deadlocks** (significant, CONFIRMED).
+  `Parallel.py:453–467`: ±inf identity overflows on one rank only.~~
+- **M4 — FIXED** (follow-up PR): scalar reductions typed by dtype
+  (`_sum_int64`, `_sum_complex128`, ...).
+  ~~**M4. `reduce_sum` / `Communicator.sum` lose data** (significant,
+  CONFIRMED): imaginary parts dropped, int64 > 2⁵³ rounded.~~
 - **M5 — FIXED** (follow-up PR): narrowing reads raise; widening ones still convert.
   ~~**M5. NetCDF reads narrow dtype silently** (significant, CONFIRMED).
   `file_io_netcdf.cc:244, 971–994, 2307`: compare `nc_inq_vartype`.~~
@@ -563,4 +573,4 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 3. ~~S3 (same true-residual check for standard CG), S4 (indefiniteness)~~
    — done.
 4. ~~S6, S7, O3, M5 (silent precision/data loss at interfaces)~~ — done.
-5. L1–L3, O2, M2–M4 (input validation / out-of-bounds).
+5. ~~L1–L3, O2, M2–M4 (input validation / out-of-bounds)~~ — done.
