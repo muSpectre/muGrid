@@ -399,13 +399,15 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   iterations without error. Jacobi accepts negative diagonals and its check is
   rank-local (one rank raising deadlocks the others). Fix: raise on
   `pAp <= 0`, `rz <= 0`; collective `diag <= 0` check.
-- **S5. Solver work fields are fixed-name get-or-create fields in the
+- **S5 — FIXED** (follow-up PR). Unique per-call work-field names, popped on
+  exit; float32 get-or-create checks the existing field.
+  ~~**S5. Solver work fields are fixed-name get-or-create fields in the
   caller's collection** (significant, CONFIRMED). S:197–211, S:424–450;
   `Wrappers.py:93–95`. A nested CG on the same collection corrupts the outer
   solve (reported convergence at true residual 1.0); float32 after float64 on
   the same collection raises TypeError; `real_field` ignores dtype/shape on
   re-get. Fix: unique per-call names + `pop_field` in `finally`, or a
-  workspace object; validate dtype/shape on re-get.
+  workspace object; validate dtype/shape on re-get.~~
 - **S6. Stored Green preconditioner in float32 assembled in single
   precision** (significant, CONFIRMED). P:983–986 claims double; `K_hat` is
   complex64 (P:1081). Lowest-mode inverse error 3e-4/7e-3/0.13 at N =
@@ -477,13 +479,18 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### Operators
 
-- **O1. FEM `transpose` correctness depends on ghost layout and call order**
+- **O1 — FIXED** (follow-up PR). The transpose writes owned nodes only and
+  requires one left ghost layer; protocol "communicate the input, never
+  reduce". Host and device computed the same thing before -- every element in
+  the buffer into every node -- so the defect was the protocol, not a
+  host/device split.
+  ~~**O1. FEM `transpose` correctness depends on ghost layout and call order**
   (significant, CONFIRMED). `fem_gradient.hh:498–507`; host divergence
   scatters from ghost elements too. With the operator's reported ghosts (0,1),
   "communicate then transpose" gives rel. error 5–30; with (1,1), "transpose
   then reduce" double-counts. Docs and C++ comment disagree. Fix: make the
   host divergence a gather onto owned nodes (as on the GPU), report {1,0},
-  document "communicate input, never reduce".
+  document "communicate input, never reduce".~~
 - **O2. Transpose `weights` length not validated** (significant, CONFIRMED):
   OOB read. `fem_gradient.hh:632/720`, `generic.cc:781`, `generic_gpu.cc:165`.
 - **O3. `GenericLinearOperator` drops |c| < 1e-14 (absolute)** (significant,
@@ -528,10 +535,11 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### Tests
 
-- **T1. Device tests hard-code `muGrid.Device.cuda()`** (minor, CONFIRMED on
-  MI300A). 31 tests in `python_convolution_operator_tests.py`,
+- **T1 — FIXED** (follow-up PR): `Device.gpu()`; the three files pass on
+  MI300A. ~~**T1. Device tests hard-code `muGrid.Device.cuda()`** (minor,
+  CONFIRMED on MI300A). 31 tests in `python_convolution_operator_tests.py`,
   `python_convolution_performance_tests.py` and `python_field_gpu_tests.py`
-  fail on every ROCm build; use `Device.gpu()` / `create_device("gpu")`.
+  fail on every ROCm build; use `Device.gpu()` / `create_device("gpu")`.~~
 
 ---
 
@@ -539,8 +547,8 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 1. ~~Low-frequency double path for the evaluated symbol~~ — done
    (section 3).
-2. O1 (FEM transpose protocol) and S5 (named solver work fields) — both give
-   wrong answers silently.
+2. ~~O1 (FEM transpose protocol) and S5 (named solver work fields)~~ — done,
+   with T1.
 3. S3 (same true-residual check for standard CG), S4 (indefiniteness).
 4. S6, S7, O3, M5 (silent precision/data loss at interfaces).
 5. L1–L3, O2, M2–M4 (input validation / out-of-bounds).
