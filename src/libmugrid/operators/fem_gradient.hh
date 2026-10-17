@@ -669,6 +669,7 @@ namespace muGrid {
             const auto & nb_ghosts_left = collection.get_nb_ghosts_left();
             const T * gradient = gradient_field.data();
             T * nodal = nodal_field.data();
+            this->check_transpose_weights(weights, operator_name());
             const std::vector<Real> quad_weights_real =
                 weights.empty() ? this->get_quadrature_weights() : weights;
             // Quadrature weights are stored/​passed in double; convert to the
@@ -762,6 +763,7 @@ namespace muGrid {
             const auto & nb_ghosts_left = collection.get_nb_ghosts_left();
             const T * gradient = gradient_field.view().data();
             T * nodal = nodal_field.view().data();
+            this->check_transpose_weights(weights, operator_name());
             const std::vector<Real> quad_weights_real =
                 weights.empty() ? this->get_quadrature_weights() : weights;
             std::vector<T> quad_weights(quad_weights_real.size());

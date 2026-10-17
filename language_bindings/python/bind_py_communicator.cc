@@ -112,6 +112,29 @@ void add_communicator(py::module & mod) {
                      const Uint & arg) { return comm.min(arg); })
       .def("min", [](muGrid::Communicator & comm,
                      const Index_t & arg) { return comm.min(arg); })
+      // Scalar reductions with the MPI datatype fixed by the method name.
+      // The overloaded `sum`/`min`/`max` above are chosen by pybind11 from
+      // the *value*: an int beyond 32 bits falls through to the double
+      // overload (rounded above 2^53), a complex is cast to its real part,
+      // and two ranks whose values pick different overloads disagree on the
+      // datatype of one collective. The Python wrapper calls these with the
+      // type taken from the dtype instead.
+      .def("_sum_float64", [](muGrid::Communicator & comm,
+                              const Real & arg) { return comm.sum(arg); })
+      .def("_sum_int64", [](muGrid::Communicator & comm,
+                            const Index_t & arg) { return comm.sum(arg); })
+      .def("_sum_complex128",
+           [](muGrid::Communicator & comm, const Complex & arg) {
+             return comm.sum(arg);
+           })
+      .def("_max_float64", [](muGrid::Communicator & comm,
+                              const Real & arg) { return comm.max(arg); })
+      .def("_max_int64", [](muGrid::Communicator & comm,
+                            const Index_t & arg) { return comm.max(arg); })
+      .def("_min_float64", [](muGrid::Communicator & comm,
+                              const Real & arg) { return comm.min(arg); })
+      .def("_min_int64", [](muGrid::Communicator & comm,
+                            const Index_t & arg) { return comm.min(arg); })
       .def("all", [](muGrid::Communicator & comm,
                      const bool & arg) { return comm.all(arg); })
       .def("any", [](muGrid::Communicator & comm,

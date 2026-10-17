@@ -895,6 +895,8 @@ reduction_result_t<T> vecdot_device(const TypedField<T, DeviceSpace>& a,
     if (a.get_nb_sub_pts() != b.get_nb_sub_pts()) {
         throw FieldError("vecdot: fields must have the same number of sub-points");
     }
+    internal::check_contiguous("vecdot", a);
+    internal::check_contiguous("vecdot", b);
     using DS = DeviceScalar<T>;
 
     // For GlobalFieldCollection with ghosts, sum the interior directly;
@@ -918,6 +920,7 @@ reduction_result_t<T> vecdot_device(const TypedField<T, DeviceSpace>& a,
 
 template <typename T>
 reduction_result_t<T> norm_sq_device(const TypedField<T, DeviceSpace>& x) {
+    internal::check_contiguous("norm_sq", x);
     // norm_sq(x) == vecdot(x, x): conj_product(x, x) = |x|^2 for complex
     // (its imaginary part is exactly zero, x_r*x_i - x_i*x_r) and x^2 for real.
     using DS = DeviceScalar<T>;
@@ -943,6 +946,8 @@ void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy: fields must have the same number of entries");
     }
+    internal::check_contiguous("axpy", x);
+    internal::check_contiguous("axpy", y);
     using DS = DeviceScalar<T>;
     // Total scalar elements in the full buffer (get_nb_entries already counts
     // sub-points, so multiply only by the number of components)
@@ -962,6 +967,7 @@ void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
 
 template <typename T>
 void scal_device(T alpha, TypedField<T, DeviceSpace>& x) {
+    internal::check_contiguous("scal", x);
     using DS = DeviceScalar<T>;
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
     if (n <= 0) {
@@ -985,6 +991,8 @@ void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpby: fields must have the same number of entries");
     }
+    internal::check_contiguous("axpby", x);
+    internal::check_contiguous("axpby", y);
     using DS = DeviceScalar<T>;
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
     if (n <= 0) {
@@ -1009,6 +1017,8 @@ void copy_device(const TypedField<T, DeviceSpace>& src,
         src.get_nb_components() != dst.get_nb_components()) {
         throw FieldError("copy: fields must have the same number of entries");
     }
+    internal::check_contiguous("copy", src);
+    internal::check_contiguous("copy", dst);
     using DS = DeviceScalar<T>;
     const Index_t n = src.get_nb_entries() * src.get_nb_components();
     if (n <= 0) {
@@ -1033,6 +1043,8 @@ reduction_result_t<T> axpy_norm_sq_device(T alpha,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
+    internal::check_contiguous("axpy_norm_sq", x);
+    internal::check_contiguous("axpy_norm_sq", y);
     using DS = DeviceScalar<T>;
     const auto& coll = x.get_collection();
     // Total scalar elements in the full buffer (get_nb_entries already counts
@@ -1084,10 +1096,9 @@ template <typename T>
 void cross_device(const TypedField<T, DeviceSpace>& a,
                   const TypedField<T, DeviceSpace>& b,
                   TypedField<T, DeviceSpace>& out) {
-    const auto& coll = a.get_collection();
-    internal::check_three_vector("cross", a, coll);
-    internal::check_three_vector("cross", b, coll);
-    internal::check_three_vector("cross", out, coll);
+    internal::check_three_vector("cross", a, a);
+    internal::check_three_vector("cross", b, a);
+    internal::check_three_vector("cross", out, a);
     const Index_t npix = a.get_nb_entries();
     // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
     // compute. Skip it, including the aliasing check below: empty fields share a
@@ -1278,18 +1289,7 @@ std::array<reduction_result_t<RT>, 3> pipelined_cg_dots_device(
     const TypedField<RT, DeviceSpace>& u,
     const TypedField<RT, DeviceSpace>& w) {
     using Acc = reduction_result_t<RT>;
-    for (const auto* other : {&u, &w}) {
-        if (&other->get_collection() != &r.get_collection()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must belong to the same collection");
-        }
-        if (other->get_nb_components() != r.get_nb_components() ||
-            other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must have the same number of "
-                "components and sub-points");
-        }
-    }
+    internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
 
     // The pipelined CG fields live on a decomposition (Global collection). For
@@ -1444,11 +1444,10 @@ void leray_project_device(const TypedField<RT, DeviceSpace>& k,
                           const TypedField<RT, DeviceSpace>& invk,
                           const TypedField<CT, DeviceSpace>& N,
                           TypedField<CT, DeviceSpace>& out) {
-    const auto& coll = out.get_collection();
-    internal::check_three_vector("leray_project", k, coll);
-    internal::check_three_vector("leray_project", invk, coll);
-    internal::check_three_vector("leray_project", N, coll);
-    internal::check_three_vector("leray_project", out, coll);
+    internal::check_three_vector("leray_project", k, out);
+    internal::check_three_vector("leray_project", invk, out);
+    internal::check_three_vector("leray_project", N, out);
+    internal::check_three_vector("leray_project", out, out);
     const Index_t npix = out.get_nb_entries();
     if (npix <= 0) {
         // e.g. an MPI rank with no local pixels; a zero-block kernel launch

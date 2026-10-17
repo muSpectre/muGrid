@@ -114,7 +114,7 @@ namespace muGrid {
         const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
         TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
-        // set nodal field to zero
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1., nodal_field, weights);
     }
@@ -122,6 +122,7 @@ namespace muGrid {
         const TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field,
         TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1.f, nodal_field,
                                   weights);
@@ -133,6 +134,7 @@ namespace muGrid {
         const TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field,
         T alpha, TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         // Validate fields using generic version
         const auto & collection = this->validate_fields_generic(nodal_field,
                                                                 quadrature_point_field,
