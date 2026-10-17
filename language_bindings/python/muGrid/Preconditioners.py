@@ -781,13 +781,17 @@ class AnalyticReferencePreconditioner(Preconditioner):
     :func:`make_reference_stiffness_preconditioner` picks this class on a
     device and the stored symbol on the host.
 
-    The symbol is built and inverted in double for either field precision;
-    only the mode's components are read and written in the field's. In single
-    precision the low-frequency phase sum cancels O(S) terms to O(S q²) and
-    the lowest modes were lost (zeroed outright from N ≈ 2048). The float32
-    timings above predate that change and were taken with single-precision
-    symbol arithmetic; on GPUs with weak double throughput expect the
-    float32 apply to approach the float64 one.
+    In single precision the low-frequency phase sum cancels O(S) terms to
+    O(S q²), and a symbol built in float32 alone lost the lowest modes (zeroed
+    outright from N ≈ 2048). On the host the symbol is therefore built and
+    inverted in double for either field precision; only the mode's components
+    are read and written in the field's. On a device a float32 field is
+    finished in single precision per mode, and redone in double only where an
+    a-posteriori test on the block says the single-precision result is off by
+    more than about 1e-4 -- the long wavelengths, about 0.05% of the modes for
+    an isotropic medium. That keeps the float32 apply at single-precision speed
+    on GPUs with weak double throughput (L40S, 512³: 45 ms, against 87 ms with
+    the symbol in double throughout).
 
     The per-mode cost would be nine times higher done naively. Modes along the
     fastest axis share the frequencies of every other axis, so the kernel
@@ -833,10 +837,11 @@ class AnalyticReferencePreconditioner(Preconditioner):
                 f"3; got {stencil.shape}")
         self._dim = dim
         # Real, and 243 numbers at most -- this is the whole operator. Kept in
-        # double for either field precision: the kernel builds and inverts the
-        # symbol in double, because in single precision the low-frequency
-        # phase sum cancels to O(S q^2) and loses the long-wavelength modes
-        # this preconditioner exists for (relative error ~ eps * N^2).
+        # double for either field precision: the kernels build and invert the
+        # symbol in double wherever single precision is not enough, because
+        # there the low-frequency phase sum cancels to O(S q^2) and loses the
+        # long-wavelength modes this preconditioner exists for (relative error
+        # ~ eps * N^2).
         self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=np.float64)
 
         self._fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
@@ -1001,7 +1006,7 @@ def make_reference_stiffness_preconditioner(
         matching complex type) so the internal transforms pair with the solver's
         fields; ``apply_reference_stiffness`` is therefore invoked on fields of
         this precision too. The symbol itself is assembled and inverted in
-        double regardless, for accuracy.
+        double wherever single precision would lose accuracy.
     element, grid_spacing, lambda_ref, mu_ref : optional
         Name the reference operator instead of passing
         ``apply_reference_stiffness``: the symbol is then built from its

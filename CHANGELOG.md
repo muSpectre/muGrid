@@ -18,9 +18,13 @@ v1.5.0 (08Oct26)
   modes in float32: the low-frequency phase sum cancels to O(S q²), and
   `|det|²` underflowed, so from about N = 2048 (earlier for small moduli or
   grid spacings) such modes were taken for the null space and zeroed. The
-  symbol is now built and inverted in double for either field precision, with
-  the block scaled before inversion; the `apply_green_symbol_*` kernels take
-  the stencil, frequency tables and normalisation as float64
+  symbol is now built and inverted in double wherever single precision is not
+  enough, with the block scaled before inversion; the `apply_green_symbol_*`
+  kernels take the stencil, frequency tables and normalisation as float64. On
+  the host every mode is done in double. On a device a float32 field is done
+  in single precision per mode and redone in double only where an a-posteriori
+  test shows a relative error above 1e-4, so GPUs with 1:64 double throughput
+  (L40S) keep the float32 speed instead of a 2x slower apply
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

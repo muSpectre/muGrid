@@ -264,22 +264,69 @@ Reading:
   moving to double removed it.
 
 **Decision**: the cost is acceptable on FP64-capable GPUs but not on
-consumer/workstation cards. Implement the low-frequency-only double path
-below, keeping the pre-inversion scaling. Until then, `float32` on such cards
-gets correct but slower preconditioning; `evaluate_symbol=False` is the
-faster choice there at moderate N.
+consumer/workstation cards, so float32 now takes single precision with a
+double retry for the modes that need it (next subsection).
 
-### Cheaper alternative if the cost is too high
+### Implemented: single-precision attempt with a double retry
 
-The cancellation only matters at long wavelengths: relative error
-≈ eps₃₂ / (2π f)², so for 1e-4 accuracy only modes with |f| ≲ 0.005 along all
-axes need double. They form a tiny, contiguous set of axis-0 lines, so a
-kernel that computes in float32 and branches to double only for those modes
-would diverge in a handful of warps and recover almost all float32 throughput.
-Keep the pre-inversion scaling either way — it is what prevents the `|det|²`
-underflow. A further float32-only option is the cancellation-free form
-`K(q) = Σ_d S_d (e^{−iθ_d} − 1)` with `e^{−iθ} − 1 = −2 sin²(θ/2) − i sin θ`,
-which reduces the error to ≈ eps/q but complicates the hoisting.
+`green_symbol_gpu.cc`, float32 fields only (float64 fields and the host stay
+in double throughout):
+
+- Every mode is first finished in float32: hoisted sums, symbol, scaled
+  cofactor inverse.
+- **Acceptance test, a posteriori on that block.** Rounding the phase sum
+  leaves an absolute error of about `E = eps32 · max_ab Σ_d |S_d,ab|` in K. In
+  a numpy emulation over isotropic, λ/μ = 100 and anisotropic (h ratio 8–10)
+  stencils in 2D and 3D, the mode's relative error stayed below 0.4·E/b with
+  `b = det / e2` (`e2` = sum of the principal 2×2 minors, i.e. the diagonal
+  cofactors; the trace in 2D), which lower-bounds λ_min of a Hermitian
+  positive definite block within a factor of Dim. The float result is kept
+  iff the block is positive definite (Sylvester on the leading minors) and
+  `b ≥ 2·E / 1e-4`. The definiteness check is load-bearing. Without it, a
+  float K with two negative eigenvalues still has det > 0, and passed with
+  errors of 7e2 (λ/μ = 100) and 1.2 (anisotropic) on the lowest modes.
+- Rejected modes are redone in double. A block computes its double hoisted
+  sums only for the lines holding a rejected mode, behind `__syncthreads_or`,
+  so blocks without one pay nothing. Routed to double (emulation, 256³ modes):
+  0.05% for an isotropic medium, 3% at λ/μ = 100, 20% for strong anisotropy.
+- Tolerance 1e-4 rather than float32 resolution. A preconditioner this close
+  to exact changes the PCG iteration count by O(1e-4), and the attainable
+  accuracy is set by the operator. A tighter target is not cheap: the float
+  inversion alone is only good to about eps·κ ≈ 1e-5 at κ ≈ 100, and
+  δ = 1e-5 would send 50–100% of the modes of stiff or anisotropic media to
+  double.
+- The shared-memory and per-thread (short axis 0) paths are now separate
+  kernel instantiations, chosen at launch from n0. Sharing one register
+  allocation made the 3D float32 kernel take 217 VGPRs on gfx942 (occupancy 2).
+
+Measured (512³, ms, float32 symbol kernel / full apply):
+
+| GPU | `main` | double throughout | this |
+|---|---|---|---|
+| MI300A | 2.87 / 21.98 | 3.79 / 22.70 | 3.15 / 22.03 |
+| H200 | 2.34 / 9.28 | 3.79 / 10.73 | 2.33 / 9.28 |
+| L40S | 4.85 / 44.93 | 46.97 / 87.19 | 4.82 / 45.05 |
+
+At 256³ the float32 apply is 2.06 / 1.18 / 5.45 ms (MI300A / H200 / L40S),
+the same as `main`. The evaluated symbol again beats the stored one on all
+three GPUs (L40S 256³: 5.45 vs 7.13 ms). The float64 kernel moved by −15%
+(H200) to +9% (L40S, the pre-inversion scaling). Registers of the 3D shared
+kernel: sm_89 72 (float32) / 68 (float64); gfx942 84 VGPRs, occupancy 5, no
+scratch (float32), 78 VGPRs, occupancy 6 (float64).
+
+Accuracy, float32 device kernel against the float64 host kernel, max relative
+error per mode on the lowest modes of N = 4096 (3D) / 65536 (2D) and on full
+small grids: ≤ 1.5e-5 in every case, including λ/μ = 100 and h ratio 8. No
+mode is zeroed. `test_evaluated_symbol_on_device_is_accurate_in_single_precision`
+now covers the stiff and anisotropic cases at a 1e-4 tolerance, and the
+float32 tolerance of `..._matches_stored_on_host` is 1e-5 (measured 2e-6).
+
+Not done: the cancellation-free form `K(q) = Σ_d S_d (e^{−iθ·d} − 1)`
+(error ≈ eps/q instead of eps/q²) would shrink the double set further. It
+still hoists: `K = Σ_{d0} [φ0 P'[d0] + (φ0 − 1) R[d0]]` with
+`P'[d0] = Σ_{d12} S (φ12 − 1)` and the constant `R[d0] = Σ_{d12} S`. With
+0.05% of modes in double it is not worth the complexity for isotropic media,
+but it would help nearly incompressible or strongly anisotropic ones.
 
 ---
 
@@ -490,8 +537,8 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ## 5. Suggested order for the remaining work
 
-1. Low-frequency-only double path for the evaluated symbol (section 3) —
-   GPU validation done, decision taken.
+1. ~~Low-frequency double path for the evaluated symbol~~ — done
+   (section 3).
 2. O1 (FEM transpose protocol) and S5 (named solver work fields) — both give
    wrong answers silently.
 3. S3 (same true-residual check for standard CG), S4 (indefiniteness).

@@ -1238,14 +1238,28 @@ def test_evaluated_symbol_is_accurate_in_single_precision(dim, n, h, modulus):
     assert rel.max() < 1e-6
 
 
-@pytest.mark.parametrize("dim,n,h,modulus", [
-    (2, 65536, 1 / 65536, 1e-3), (3, 4096, 1 / 4096, 1.0),
-    (3, 256, 1e-2, 1e-3),
+@pytest.mark.parametrize("dim,n,h,lam,mu", [
+    (2, 65536, 1 / 65536, 1e-3, 1e-3), (3, 4096, 1 / 4096, 1.0, 1.0),
+    (3, 256, 1e-2, 1e-3, 1e-3),
+    # nearly incompressible, and an element eight times longer along axis 1:
+    # both make the block ill-conditioned, and both once let a float block
+    # with two negative eigenvalues pass the acceptance test (error 7e2)
+    (3, 4096, 1 / 4096, 100.0, 1.0), (3, 4096, (1 / 4096, 1 / 512, 1 / 4096),
+                                      1.3, 0.7),
+    (2, 4096, (1 / 4096, 1 / 512), 100.0, 1.0),
 ])
 def test_evaluated_symbol_on_device_is_accurate_in_single_precision(
-        dim, n, h, modulus):
+        dim, n, h, lam, mu):
     """Device counterpart of the single-precision accuracy test: the float32
-    device kernel against the float64 host kernel on the lowest modes."""
+    device kernel against the float64 host kernel on the lowest modes.
+
+    Unlike the host kernel, which works in double throughout, the device
+    kernel finishes each mode in single precision and redoes it in double only
+    where an a-posteriori test says the single-precision result is off by more
+    than 1e-4 -- double throughput is 1/64 of single on consumer GPUs. So the
+    tolerance is that design target, not float32 resolution. It still fails by
+    orders of magnitude on a kernel that builds the symbol in single precision
+    alone (errors of 1 and zeroed modes)."""
     skip_if_gpu_unavailable("gpu")
     import cupy
 
@@ -1255,8 +1269,8 @@ def test_evaluated_symbol_on_device_is_accurate_in_single_precision(
     kernel = getattr(linalg, f"apply_green_symbol_gpu_{dim}d_f32", None)
     if kernel is None:
         pytest.skip("muGrid built without the device symbol kernel")
-    stencil = reference_stencil(dim, (h,) * dim, muGrid.FEMElement.q1,
-                                modulus, modulus).ravel()
+    h = h if isinstance(h, tuple) else (h,) * dim
+    stencil = reference_stencil(dim, h, muGrid.FEMElement.q1, lam, mu).ravel()
     q, shape = _low_frequency_modes(dim, n)
     nb_modes = int(np.prod(shape))
     rng = np.random.default_rng(0)
@@ -1279,7 +1293,7 @@ def test_evaluated_symbol_on_device_is_accurate_in_single_precision(
     nonzero = scale > 0
     assert nonzero.sum() == nb_modes - 1
     rel = np.abs(got - ref).max(axis=0)[nonzero] / scale[nonzero]
-    assert rel.max() < 1e-6
+    assert rel.max() < 1e-4
 
 
 @pytest.mark.parametrize("dim,shape", [
@@ -1299,10 +1313,9 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     the hoisted sums over axes 1 and 2 per axis-0 line. The short-axis-0 grids
     take the path where a block spans too many lines to share them.
 
-    The host reference is stored in double for both precisions: the kernel
-    evaluates the symbol in double, while the stored symbol is assembled in
-    the field precision, which in single precision is the less accurate of
-    the two (2e-5 on the (2, 64) grid, against 1e-7 for the kernel).
+    The host reference is stored in double for both precisions: the stored
+    symbol is assembled in the field precision, which in single precision is
+    off by 2e-5 on the (2, 64) grid, against 2e-6 for the kernel.
     """
     skip_if_gpu_unavailable("gpu")
     import cupy
@@ -1344,7 +1357,7 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
 
     a = np.asarray(z_h.p).astype(np.float64)
     b = cupy.asnumpy(z_d.p).astype(np.float64)
-    tol = 1e-6 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
     assert np.abs(a - b).max() / np.abs(a).max() < tol
 
 
