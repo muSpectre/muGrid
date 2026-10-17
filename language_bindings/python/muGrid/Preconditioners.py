@@ -1769,6 +1769,21 @@ def _array_module(on_device):
     return np
 
 
+def _mpi_is_gpu_aware():
+    """Whether MPI may be handed device buffers directly.
+
+    ``MUGRID_GPU_AWARE_MPI`` decides when set, as it does for the C++ side
+    (``mpi/gpu_aware_mpi.hh``). Unset, Cray MPICH's own switch,
+    ``MPICH_GPU_SUPPORT_ENABLED=1``, counts as a yes: it is what makes that MPI
+    accept device memory, and the C++ probe, which asks through the OpenMPI
+    extension, cannot see it.
+    """
+    env = os.environ.get("MUGRID_GPU_AWARE_MPI", "")
+    if env:
+        return env[0] in "1yYtT"
+    return os.environ.get("MPICH_GPU_SUPPORT_ENABLED", "") == "1"
+
+
 #: Tolerance on ``|A A^-1 - I|``, in units of the working precision's eps. Both
 #: ends are measured: a healthy block lands within a few eps of zero (5.9e-16 in
 #: double, 4.6e-7 in single) and a singular one at 6e-4 and above, so this sits
@@ -1921,15 +1936,20 @@ def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
     operator along the distributed axis is
     ``(T v)[k] = A[0] v[k+1] + A[1] v[k] + A[2] v[k-1]``.
 
-    The frequencies match ``numpy.fft.rfftn`` over those axes: the last of them
-    is a real transform, the rest are complex.
+    The modes are laid out in *memory* order: the rank-local axes reversed,
+    ``(..., y, x)``, with the first of them, ``x``, the real (halved)
+    transform -- ``numpy.fft.rfftn`` over the reversed axes. ``x`` varies
+    fastest in both of muGrid's storage orders, so this is the order in which
+    the field already lies, and transforming in it needs no transposition of
+    the spatial axes (see `HybridFourierTridiagonalPreconditioner._layout`).
     """
     # The stencil probe is a tiny host computation whatever the target is; only
     # the per-mode blocks are big enough to want to live on the device.
     S = reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
-    qs = [2 * xp.pi * xp.fft.fftfreq(n) for n in local_shape[:-1]]
-    qs.append(2 * xp.pi * xp.fft.rfftfreq(local_shape[-1]))
-    grids = xp.meshgrid(*qs, indexing="ij")
+    qs = [2 * xp.pi * xp.fft.fftfreq(n) for n in local_shape]
+    qs[0] = 2 * xp.pi * xp.fft.rfftfreq(local_shape[0])
+    # Grids indexed (..., y, x), handed over in axis order (x, y, ...).
+    grids = xp.meshgrid(*reversed(qs), indexing="ij")[::-1]
     return stencil_symbol(S, grids, offset_axis=dim - 1, cdtype=cdtype, xp=xp,
                           angular=True)
 
@@ -1951,9 +1971,10 @@ def stencil_symbol(S, q, offset_axis=None, cdtype=complex, xp=np,
     The caller supplies the frequencies, because the two users of this
     function do not share a convention: muGrid's FFT engine makes **axis 0**
     the half-complex one (``engine.fftfreq``), while the hybrid preconditioner
-    transforms the rank-local axes with ``numpy.fft.rfftn`` semantics, which
-    halve the **last** of them. Owning the phase algebra here and the
-    convention at the call site keeps both honest.
+    transforms its rank-local axes in memory order with ``numpy.fft.rfftn``
+    semantics, which halve the **last** of them -- the fastest-varying axis,
+    ``x`` (see :func:`_z_coupling_blocks`). Owning the phase algebra here and
+    the convention at the call site keeps both honest.
 
     Parameters
     ----------
@@ -2032,6 +2053,64 @@ __device__ __forceinline__ cplx csub(cplx a, cplx b) {{
     return MAKE_CPLX(a.x - b.x, a.y - b.y);
 }}
 
+/* D_k = A1 - A2 D_{{k-1}}^-1 A0 is a fixed-point iteration, because the
+ * coupling blocks do not vary along the axis. Most modes reach it within a
+ * few steps, so only the first nb_head factors are stored and everything
+ * beyond reuses the last of them. The minority that converge too slowly --
+ * the near-singular low-q modes -- keep a full line in `exc`, found through
+ * `exc_index`, which is read once per thread rather than per step.
+ */
+__device__ __forceinline__ const cplx * dinv_at(
+    const cplx * __restrict__ head, const cplx * __restrict__ exc,
+    int slot, int k, int m, int nmodes, int nb_head, int nb_exc)
+{{
+    if (slot >= 0) return exc + ((size_t)k * nb_exc + slot) * DIM * DIM;
+    int kh = (k < nb_head) ? k : (nb_head - 1);
+    return head + ((size_t)kh * nmodes + m) * DIM * DIM;
+}}
+
+/* One forward step, y_k = rhs_k - A2 (Dinv_{{k-1}} y_{{k-1}}), from registers. */
+__device__ __forceinline__ void forward_step(
+    const cplx * r, const cplx * d, const cplx * a2, cplx * prev)
+{{
+    cplx tmp[DIM];
+    for (int i = 0; i < DIM; ++i) {{
+        cplx acc = MAKE_CPLX(0, 0);
+        for (int j = 0; j < DIM; ++j) {{
+            cplx t = cmul(d[i * DIM + j], prev[j]);
+            acc = MAKE_CPLX(acc.x + t.x, acc.y + t.y);
+        }}
+        tmp[i] = acc;
+    }}
+    for (int i = 0; i < DIM; ++i) {{
+        cplx acc = r[i];
+        for (int j = 0; j < DIM; ++j)
+            acc = csub(acc, cmul(a2[i * DIM + j], tmp[j]));
+        prev[i] = acc;
+    }}
+}}
+
+/* One backward step, out_k = Dinv_k (y_k - A0 out_{{k+1}}), from registers. */
+__device__ __forceinline__ void backward_step(
+    const cplx * yk, const cplx * d, const cplx * a0, cplx * prev)
+{{
+    cplx rk[DIM];
+    for (int i = 0; i < DIM; ++i) {{
+        cplx acc = yk[i];
+        for (int j = 0; j < DIM; ++j)
+            acc = csub(acc, cmul(a0[i * DIM + j], prev[j]));
+        rk[i] = acc;
+    }}
+    for (int i = 0; i < DIM; ++i) {{
+        cplx acc = MAKE_CPLX(0, 0);
+        for (int j = 0; j < DIM; ++j) {{
+            cplx t = cmul(d[i * DIM + j], rk[j]);
+            acc = MAKE_CPLX(acc.x + t.x, acc.y + t.y);
+        }}
+        prev[i] = acc;
+    }}
+}}
+
 /* Block-Thomas along the distributed axis: one thread per Fourier mode,
  * marching the whole axis with the two constant coupling blocks in registers.
  *
@@ -2041,10 +2120,26 @@ __device__ __forceinline__ cplx csub(cplx a, cplx b) {{
  * neighbouring threads would be nz*DIM elements apart, which is the trap
  * cuSPARSE's gtsv2StridedBatch documents.
  *
- * The sweep is serial in z by nature; the parallelism is the mode count, which
- * is nx * (ny/2 + 1) and therefore ample.
+ * The sweep is serial in z by nature; the parallelism is the mode count,
+ * nx * (ny/2 + 1). That is only 8320 threads at 128^3, so the block size
+ * decides how many compute units get any work at all: 256-thread blocks feed
+ * 33 of MI300A's 228, 64-thread blocks 130, which alone made the sweep 1.4x
+ * faster there (THREADS below).
+ *
+ * The loads of a plane do not depend on the recurrence, only the arithmetic
+ * does, so the sweep can run in chunks of CHUNK planes: issue every load of
+ * the chunk, then do its CHUNK steps from registers. The loops over the chunk
+ * are unrolled so the arrays stay registers; a tail of fewer than CHUNK planes
+ * goes step by step. Whether that pays depends on the registers the chunk
+ * needs actually existing -- see _BLOCK_THOMAS_CHUNK.
+ *
+ * __launch_bounds__ is what makes them exist. Without it the compiler must
+ * allow for 1024-thread blocks, which on CDNA3 caps a thread at 128 VGPRs:
+ * the original sweep used 123, and the chunked one spilled 52 B at CHUNK=1
+ * and 516 B at CHUNK=4, running 2x slower for it. Declaring the block size
+ * the kernel is launched with lifts the cap to what that size allows.
  */
-extern "C" __global__ void block_thomas(
+extern "C" __global__ void __launch_bounds__(THREADS) block_thomas(
     const cplx * __restrict__ rhs, const cplx * __restrict__ head,
     const cplx * __restrict__ exc, const int * __restrict__ exc_index,
     const cplx * __restrict__ A0, const cplx * __restrict__ A2,
@@ -2053,20 +2148,12 @@ extern "C" __global__ void block_thomas(
 {{
     int m = blockIdx.x * blockDim.x + threadIdx.x;
     if (m >= nmodes) return;
-
-    /* D_k = A1 - A2 D_{{k-1}}^-1 A0 is a fixed-point iteration, because the
-     * coupling blocks do not vary along the axis. Most modes reach it within a
-     * few steps, so only the first nb_head factors are stored and everything
-     * beyond reuses the last of them. The minority that converge too slowly --
-     * the near-singular low-q modes -- keep a full line in `exc`, found
-     * through `exc_index`, which is read once per thread rather than per step.
-     */
     int slot = exc_index[m];
 
-    cplx a0[DIM * DIM], a2[DIM * DIM], prev[DIM], cur[DIM];
+    cplx a0[DIM * DIM], a2[DIM * DIM], prev[DIM];
     for (int i = 0; i < DIM * DIM; ++i) {{
-        a0[i] = A0[m * DIM * DIM + i];
-        a2[i] = A2[m * DIM * DIM + i];
+        a0[i] = A0[(size_t)m * DIM * DIM + i];
+        a2[i] = A2[(size_t)m * DIM * DIM + i];
     }}
 
     /* forward: y_0 = rhs_0,  y_k = rhs_k - A2 (Dinv_{{k-1}} y_{{k-1}}) */
@@ -2075,59 +2162,94 @@ extern "C" __global__ void block_thomas(
         y[(size_t)m * DIM + i] = v;
         prev[i] = v;
     }}
-    for (int k = 1; k < nz; ++k) {{
-        int kh = (k - 1 < nb_head) ? (k - 1) : (nb_head - 1);
-        const cplx * Dinv = (slot >= 0)
-            ? exc + ((size_t)(k - 1) * nb_exc + slot) * DIM * DIM
-            : head + ((size_t)kh * nmodes + m) * DIM * DIM;
-        size_t dof = 0;
-        cplx tmp[DIM];
-        for (int i = 0; i < DIM; ++i) {{
-            cplx acc = MAKE_CPLX(0, 0);
-            for (int j = 0; j < DIM; ++j)
-                acc = csub(acc, cmul(Dinv[dof + i * DIM + j], prev[j]));
-            tmp[i] = MAKE_CPLX(-acc.x, -acc.y);
+    int k = 1;
+    for (; k + CHUNK <= nz; k += CHUNK) {{
+        cplx r[CHUNK][DIM], d[CHUNK][DIM * DIM];
+#pragma unroll
+        for (int c = 0; c < CHUNK; ++c) {{
+            const cplx * Dinv = dinv_at(head, exc, slot, k + c - 1, m, nmodes,
+                                        nb_head, nb_exc);
+            for (int i = 0; i < DIM * DIM; ++i) d[c][i] = Dinv[i];
+            size_t off = ((size_t)(k + c) * nmodes + m) * DIM;
+            for (int i = 0; i < DIM; ++i) r[c][i] = rhs[off + i];
         }}
+#pragma unroll
+        for (int c = 0; c < CHUNK; ++c) {{
+            forward_step(r[c], d[c], a2, prev);
+            size_t off = ((size_t)(k + c) * nmodes + m) * DIM;
+            for (int i = 0; i < DIM; ++i) y[off + i] = prev[i];
+        }}
+    }}
+    for (; k < nz; ++k) {{
+        cplx r[DIM], d[DIM * DIM];
+        const cplx * Dinv = dinv_at(head, exc, slot, k - 1, m, nmodes,
+                                    nb_head, nb_exc);
+        for (int i = 0; i < DIM * DIM; ++i) d[i] = Dinv[i];
         size_t off = ((size_t)k * nmodes + m) * DIM;
-        for (int i = 0; i < DIM; ++i) {{
-            cplx acc = rhs[off + i];
-            for (int j = 0; j < DIM; ++j)
-                acc = csub(acc, cmul(a2[i * DIM + j], tmp[j]));
-            cur[i] = acc;
-        }}
-        for (int i = 0; i < DIM; ++i) {{ y[off + i] = cur[i]; prev[i] = cur[i]; }}
+        for (int i = 0; i < DIM; ++i) r[i] = rhs[off + i];
+        forward_step(r, d, a2, prev);
+        for (int i = 0; i < DIM; ++i) y[off + i] = prev[i];
     }}
 
-    /* backward: out_k = Dinv_k (y_k - A0 out_{{k+1}}) */
-    for (int k = nz - 1; k >= 0; --k) {{
+    /* backward: out_k = Dinv_k (y_k - A0 out_{{k+1}}); the last plane has no
+     * out_{{k+1}}, which a zero `prev` expresses without a branch per step. */
+    for (int i = 0; i < DIM; ++i) prev[i] = MAKE_CPLX(0, 0);
+    k = nz - 1;
+    for (; k + 1 - CHUNK >= 0; k -= CHUNK) {{
+        cplx yk[CHUNK][DIM], d[CHUNK][DIM * DIM];
+#pragma unroll
+        for (int c = 0; c < CHUNK; ++c) {{
+            const cplx * Dinv = dinv_at(head, exc, slot, k - c, m, nmodes,
+                                        nb_head, nb_exc);
+            for (int i = 0; i < DIM * DIM; ++i) d[c][i] = Dinv[i];
+            size_t off = ((size_t)(k - c) * nmodes + m) * DIM;
+            for (int i = 0; i < DIM; ++i) yk[c][i] = y[off + i];
+        }}
+#pragma unroll
+        for (int c = 0; c < CHUNK; ++c) {{
+            backward_step(yk[c], d[c], a0, prev);
+            size_t off = ((size_t)(k - c) * nmodes + m) * DIM;
+            for (int i = 0; i < DIM; ++i) out[off + i] = prev[i];
+        }}
+    }}
+    for (; k >= 0; --k) {{
+        cplx yk[DIM], d[DIM * DIM];
+        const cplx * Dinv = dinv_at(head, exc, slot, k, m, nmodes,
+                                    nb_head, nb_exc);
+        for (int i = 0; i < DIM * DIM; ++i) d[i] = Dinv[i];
         size_t off = ((size_t)k * nmodes + m) * DIM;
-        int kh = (k < nb_head) ? k : (nb_head - 1);
-        const cplx * Dinv = (slot >= 0)
-            ? exc + ((size_t)k * nb_exc + slot) * DIM * DIM
-            : head + ((size_t)kh * nmodes + m) * DIM * DIM;
-        size_t dof = 0;
-        cplx rhs_k[DIM];
-        for (int i = 0; i < DIM; ++i) {{
-            cplx acc = y[off + i];
-            if (k < nz - 1)
-                for (int j = 0; j < DIM; ++j)
-                    acc = csub(acc, cmul(a0[i * DIM + j], prev[j]));
-            rhs_k[i] = acc;
-        }}
-        for (int i = 0; i < DIM; ++i) {{
-            cplx acc = MAKE_CPLX(0, 0);
-            for (int j = 0; j < DIM; ++j) {{
-                cplx t = cmul(Dinv[dof + i * DIM + j], rhs_k[j]);
-                acc = MAKE_CPLX(acc.x + t.x, acc.y + t.y);
-            }}
-            cur[i] = acc;
-        }}
-        for (int i = 0; i < DIM; ++i) {{ out[off + i] = cur[i]; prev[i] = cur[i]; }}
+        for (int i = 0; i < DIM; ++i) yk[i] = y[off + i];
+        backward_step(yk, d, a0, prev);
+        for (int i = 0; i < DIM; ++i) out[off + i] = prev[i];
     }}
 }}
 """
 
+#: Planes per prefetch chunk of the device sweep. Each one holds a factor
+#: block and a right-hand side in registers. Measured on MI300A, 3D, double,
+#: 64-thread blocks with __launch_bounds__ (no spills at any chunk), ms per
+#: sweep at 128^3 / 256^3: chunk 1 0.179 / 0.946, chunk 2 0.167 / 0.907,
+#: chunk 4 0.169 / 0.918, chunk 8 0.185 / 0.909; the original single-step
+#: kernel at 256-thread blocks 0.398 / 1.292. Past 2 the extra registers buy
+#: nothing, and 2 needs 200 -- within NVIDIA's 255 as well.
+_BLOCK_THOMAS_CHUNK = 2
+
+#: Threads per block of the device sweep, also its __launch_bounds__. Small,
+#: because the mode count is: at 128^3, 64 put work on 130 compute units of
+#: MI300A where 256 reached 33 (0.307 vs 0.423 ms per sweep, same kernel).
+_BLOCK_THOMAS_THREADS = 64
+
 _BLOCK_THOMAS_CACHE = {}
+
+
+def _block_thomas_source(dim, cdtype, chunk=None, threads=None):
+    """The device sweep's source for one dim, precision, chunk and block."""
+    chunk = _BLOCK_THOMAS_CHUNK if chunk is None else chunk
+    threads = _BLOCK_THOMAS_THREADS if threads is None else threads
+    scalar = "float" if np.dtype(cdtype) == np.dtype(np.complex64) \
+        else "double"
+    return (f"#define CHUNK {int(chunk)}\n#define THREADS {int(threads)}\n"
+            + _BLOCK_THOMAS_SOURCE.format(scalar=scalar, dim=dim))
 
 
 def _block_thomas_kernel(dim, cdtype):
@@ -2136,9 +2258,7 @@ def _block_thomas_kernel(dim, cdtype):
     if key not in _BLOCK_THOMAS_CACHE:
         import cupy
 
-        scalar = "float" if np.dtype(cdtype) == np.dtype(np.complex64) \
-            else "double"
-        source = _BLOCK_THOMAS_SOURCE.format(scalar=scalar, dim=dim)
+        source = _block_thomas_source(dim, cdtype)
         _BLOCK_THOMAS_CACHE[key] = cupy.RawKernel(
             source, "block_thomas",
             backend="hiprtc" if cupy.cuda.runtime.is_hip else "nvrtc")
@@ -2182,8 +2302,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
     Host and device are the same code: the array module follows the
     decomposition, so ``numpy`` and ``cupy`` take the identical path. Only the
-    interface exchange differs, and only in staging the buffers through the host
-    so that a non-GPU-aware MPI build still works.
+    interface exchange can differ: device buffers go to MPI directly when it is
+    GPU-aware (``MUGRID_GPU_AWARE_MPI=1``, or ``MPICH_GPU_SUPPORT_ENABLED=1`` on
+    Cray MPICH) and are staged through the host otherwise, so that any MPI build
+    works.
 
     Parameters
     ----------
@@ -2240,6 +2362,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         self._on_device = not decomposition.device.is_host
         xp = _array_module(self._on_device)
         self._xp = xp
+        # Whether the interface exchange hands its buffers to MPI as they are.
+        # Host arrays always; device arrays only to a GPU-aware MPI -- staging
+        # those through pageable host memory cost 5 ms per apply on two MI300A
+        # and 17 ms on four at 256^3, for a few MB of interface planes.
+        self._mpi_direct = (not self._on_device) or _mpi_is_gpu_aware()
 
         dim = len(tuple(decomposition.nb_domain_grid_pts))
         self.dim = dim
@@ -2302,6 +2429,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             self._build_pcr()
         else:
             self._build_reduced_system()
+        self._build_corrections()
         self._build_zero_mode()
 
     # -- setup -------------------------------------------------------------- #
@@ -2523,7 +2651,8 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
         scratch = xp.empty_like(flat)
         out = xp.empty_like(flat)
-        threads = 256
+        # Must match the kernel's __launch_bounds__, which is compiled in.
+        threads = _BLOCK_THOMAS_THREADS
         blocks = (nb_modes + threads - 1) // threads
         _block_thomas_kernel(dim, self._cdtype)(
             (blocks,), (threads,),
@@ -2654,55 +2783,96 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         self._pcr_final_inv = _batched_inverse(
             identity + A + C, xp, singular_mode=self._zero_index)
 
-    def _exchange(self, local, distance):
-        """Send ``local`` to the ranks at ``±distance`` and receive theirs.
+    def _build_corrections(self):
+        """Fold the end corrections into the interface operators.
 
-        Returns ``(from_left, from_right)``: the buffers of ranks ``p-distance``
-        and ``p+distance``, wrapping cyclically. Staged through the host for the
-        same reason :meth:`_allgather` is.
+        apply() never needs the neighbours' interface planes themselves, only
+        ``A2 left`` and ``A0 right`` -- what those planes contribute to this
+        slab's first and last plane. Both are linear in the values the
+        interface step starts from, through operators that do not change
+        between applies, so multiplying ``A2`` and ``A0`` through once here
+        leaves apply() one batched product per end where it had an einsum, a
+        reshape, two index selections and two products. On a GPU every one of
+        those is a kernel launch, and launches -- not arithmetic -- are what
+        the interface step costs there: 0.35 ms per apply at 32^3 and 0.42 ms
+        at 128^3 on one MI300A, with no MPI involved at all.
         """
+        xp, dim = self._xp, self.dim
+        A0, A2 = self.A[0], self.A[2]
+        if self._use_pcr:
+            # u_p = (L_p, R_p) = final_inv x_p on every rank, and rank p needs
+            # A2 R_{p-1} and A0 L_{p+1}. final_inv is the same on every rank
+            # (see _build_pcr), so each rank applies its *neighbours'* products
+            # to its own u and sends them the result: dim numbers per mode in
+            # each direction instead of 2*dim, and nothing left to do with them
+            # on arrival but subtract.
+            zero = xp.zeros_like(A0)
+            take_R = xp.concatenate([zero, A2], axis=-1)  # A2 [0 I]
+            take_L = xp.concatenate([A0, zero], axis=-1)  # A0 [I 0]
+            self._pcr_to_right = xp.matmul(take_R, self._pcr_final_inv)
+            self._pcr_to_left = xp.matmul(take_L, self._pcr_final_inv)
+        else:
+            # lambda = reduced_inv rhs, and the corrections read the right
+            # plane of the rank before and the left plane of the rank after.
+            m, P = 2 * dim, self.nb_ranks
+            prev_R = ((self.rank - 1) % P) * m + dim
+            next_L = ((self.rank + 1) % P) * m
+            self._corr_first = xp.matmul(
+                A2, self._reduced_inv[..., prev_R:prev_R + dim, :])
+            self._corr_last = xp.matmul(
+                A0, self._reduced_inv[..., next_L:next_L + dim, :])
+
+    def _exchange(self, to_high, distance, to_low=None):
+        """Send to the ranks at ``±distance`` and receive what they send back.
+
+        ``to_high`` goes to rank ``p+distance`` and ``to_low`` -- ``to_high``
+        again unless given -- to rank ``p-distance``. Returns
+        ``(from_low, from_high)``: what rank ``p-distance`` sent up and what
+        rank ``p+distance`` sent down, wrapping cyclically. Device buffers go
+        to MPI as they are when it is GPU-aware, else through the host (see
+        :meth:`_outgoing`).
+        """
+        if to_low is None:
+            to_low = to_high
         if self._mpi is None:
-            return local, local
+            return to_high, to_low
+
         P = self.nb_ranks
-        host = local.get() if self._on_device else local
-        host = np.ascontiguousarray(host)
-        left = np.empty_like(host)
-        right = np.empty_like(host)
+        send_high = self._outgoing(to_high)
+        send_low = send_high if to_low is to_high else self._outgoing(to_low)
+        from_low = self._incoming(send_high.shape, send_high.dtype)
+        from_high = self._incoming(send_low.shape, send_low.dtype)
         lo = (self.rank - distance) % P
         hi = (self.rank + distance) % P
+        self._before_mpi()
         # Receive from the low side while sending to the high side, then the
         # reverse; two Sendrecvs rather than four blocking calls.
-        self._mpi.Sendrecv(host, dest=hi, sendtag=0,
-                           recvbuf=left, source=lo, recvtag=0)
-        self._mpi.Sendrecv(host, dest=lo, sendtag=1,
-                           recvbuf=right, source=hi, recvtag=1)
-        to_xp = self._xp.asarray if self._on_device else (lambda a: a)
-        return to_xp(left), to_xp(right)
+        self._mpi.Sendrecv(send_high, dest=hi, sendtag=0,
+                           recvbuf=from_low, source=lo, recvtag=0)
+        self._mpi.Sendrecv(send_low, dest=lo, sendtag=1,
+                           recvbuf=from_high, source=hi, recvtag=1)
+        return self._arrived(from_low), self._arrived(from_high)
 
     def _solve_reduced_pcr(self, ends):
-        """The interface unknowns by parallel cyclic reduction.
+        """The interface solve by parallel cyclic reduction.
 
         ``ends`` is this rank's two interface planes; the return is the pair
-        ``(R_{p-1}, L_{p+1})`` the sweep correction needs.
+        ``(A2 R_{p-1}, A0 L_{p+1})`` -- the corrections to this slab's first and
+        last plane -- each ``(*modes, dim, 1)``.
         """
         xp = self._xp
-        dim = self.dim
         x = xp.ascontiguousarray(
-            ends.reshape(self._mode_shape + (2 * dim,)))
+            ends.reshape(self._mode_shape + (2 * self.dim, 1)))
 
-        matvec = (lambda M, v:
-                  xp.einsum("...ij,...j->...i", M, v))
+        matmul = xp.matmul
         for level, (A, C, D_inv) in enumerate(self._pcr_levels):
-            from_left, from_right = self._exchange(x, 1 << level)
-            x = matvec(D_inv,
-                       x - matvec(A, from_left) - matvec(C, from_right))
-        u = matvec(self._pcr_final_inv, x)
+            from_low, from_high = self._exchange(x, 1 << level)
+            x = matmul(D_inv, x - matmul(A, from_low) - matmul(C, from_high))
 
-        # One last neighbour exchange for the two blocks the correction reads.
-        u = xp.ascontiguousarray(u)
-        from_left, from_right = self._exchange(u, 1)
-        return (from_left.reshape(self._mode_shape + (2, dim))[..., 1, :],
-                from_right.reshape(self._mode_shape + (2, dim))[..., 0, :])
+        # The neighbours' products, computed here and sent to them (see
+        # _build_corrections); what arrives is this slab's two corrections.
+        return self._exchange(matmul(self._pcr_to_right, x), 1,
+                              to_low=matmul(self._pcr_to_left, x))
 
     def _build_zero_mode(self):
         """The all-zero mode, which the tridiagonal path cannot solve.
@@ -2716,8 +2886,8 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         The nullspace is *deflated* rather than discovered. ``T`` is Hermitian
         and its kernel is known exactly -- the ``dim`` constant-in-z
-        translations, which :meth:`_project_constants` already removes from both
-        ends -- so adding ``shift`` times the orthogonal projector onto them
+        translations, which the projection folded into ``_zero_op`` removes
+        from both ends -- so adding ``shift`` times the orthogonal projector onto them
         moves the kernel to ``shift`` and leaves the complement untouched. A
         plain inverse of that then reproduces ``T^+`` on every right-hand side
         this is given, and is better conditioned than ``T`` restricted to its
@@ -2750,57 +2920,83 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             projector[component::dim, component::dim] = 1.0 / nz
         self._zero_inv = xp.linalg.inv(T + xp.abs(T).max() * projector)
 
+        # What apply() uses: Q T^+ Q, with Q = I - projector the projection off
+        # the nullspace, and only this rank's rows of it. The projection is
+        # needed at both ends -- the right-hand side must be orthogonal to the
+        # nullspace for the system to be consistent, and the solution is only
+        # defined up to it -- and both ends are linear, so they fold into the
+        # matrix once here instead of costing two means and two subtractions
+        # per apply. Means are reductions, the slow case on a GPU (see the
+        # note above apply()), and on a mode this small every launch shows.
+        complement = xp.eye(nz * dim, dtype=self._cdtype) - projector
+        start = self.rank * self.nz_local * dim
+        self._zero_op = xp.ascontiguousarray(
+            (complement @ self._zero_inv @ complement)[
+                start:start + self.nz_local * dim])
+
     def _solve_zero_mode(self, v):
-        """``T^+ v`` for the all-zero mode, over the whole distributed axis."""
-        dim = self.dim
+        """``T^+ v`` for the all-zero mode, over the whole distributed axis.
+
+        Returns this rank's planes of the solution, ``(nz_local, dim)``.
+        """
         local = self._xp.ascontiguousarray(
             v[(slice(None),) + self._zero_index][..., 0])
-        full = self._allgather(local).reshape(-1, dim)
-        # Both ends of the projection: the right-hand side must be orthogonal
-        # to the nullspace for the system to be consistent, and the solution is
-        # only defined up to it.
-        full = self._project_constants(full)
-        solution = self._project_constants(
-            (self._zero_inv @ full.reshape(-1)).reshape(-1, dim))
-        start = self.rank * self.nz_local
-        return solution[start:start + self.nz_local]
+        full = self._allgather(local).reshape(-1)
+        return (self._zero_op @ full).reshape(self.nz_local, self.dim)
 
     # -- collectives -------------------------------------------------------- #
 
     def _allgather(self, local):
-        """Gather one array per rank along a new leading axis.
-
-        Device buffers are staged through the host rather than handed to MPI
-        directly, so this does not depend on the MPI build being GPU-aware. The
-        payload is the interface planes only -- a few MB even at 256**3 -- so
-        the round trip is cheap next to the all-to-all it replaces.
-        """
+        """Gather one array per rank along a new leading axis."""
         if self._mpi is None:
             return local[None]
-        host = local.get() if self._on_device else local
-        out = np.empty((self.nb_ranks,) + host.shape, dtype=host.dtype)
-        self._mpi.Allgather(np.ascontiguousarray(host), out)
-        return self._xp.asarray(out) if self._on_device else out
+        send = self._outgoing(local)
+        out = self._incoming((self.nb_ranks,) + send.shape, send.dtype)
+        self._before_mpi()
+        self._mpi.Allgather(send, out)
+        return self._arrived(out)
+
+    # Buffers for MPI. A host array, or a device array when MPI is GPU-aware
+    # (_mpi_direct), is handed over as it is. Otherwise the device buffer is
+    # staged through host memory, which works with any MPI build but costs a
+    # synchronising copy each way per message -- measured as the dominant
+    # cost of the whole apply on MI300A once there are two or more GPUs.
+
+    def _outgoing(self, a):
+        """``a`` as a contiguous buffer MPI can read."""
+        if self._mpi_direct:
+            return self._xp.ascontiguousarray(a)
+        return np.ascontiguousarray(a.get())
+
+    def _incoming(self, shape, dtype):
+        """A buffer MPI can write ``shape`` elements of ``dtype`` into."""
+        return (self._xp if self._mpi_direct else np).empty(shape, dtype=dtype)
+
+    def _arrived(self, buffer):
+        """A received buffer as an array of this preconditioner's module."""
+        return buffer if self._mpi_direct else self._xp.asarray(buffer)
+
+    def _before_mpi(self):
+        """Let the kernels that fill device send buffers finish.
+
+        MPI reads a device buffer outside the stream it was written on, so the
+        stream must be drained first; the staged path needs no such step,
+        because the copy to the host already synchronises.
+        """
+        if self._on_device and self._mpi_direct:
+            self._xp.cuda.get_current_stream().synchronize()
 
     def _timed(self, label):
         return self._timer(label) if self._timer is not None else nullcontext()
 
-    @staticmethod
-    def _project_constants(line):
-        """Remove the constant-along-z part of the all-zero mode.
-
-        This *is* the projection off the nullspace, done where it costs
-        nothing. The rigid translations are exactly the ``q = 0`` coefficient,
-        and under this transform that is the z-mean of the all-zero mode's
-        line -- ``nz * dim`` numbers rather than the whole field.
-
-        Doing it in real space instead needs a reduction over every point,
-        which is the one thing to avoid here: cupy reductions on this ROCm
-        build run at ~6 GB/s against ~3200 GB/s for elementwise work, so a
-        global mean of a 256**3 field costs more than the rest of the apply put
-        together.
-        """
-        return line - line.mean(axis=0, keepdims=True)
+    # Why the projection off the nullspace happens on the zero mode's z-line,
+    # folded into _zero_op, and not on the field: the rigid translations are
+    # exactly the ``q = 0`` coefficient, and under this transform that is the
+    # z-mean of the all-zero mode's line -- ``nz * dim`` numbers rather than the
+    # whole field. Doing it in real space instead needs a reduction over every
+    # point, which is the one thing to avoid here: cupy reductions on this ROCm
+    # build run at ~6 GB/s against ~3200 GB/s for elementwise work, so a global
+    # mean of a 256**3 field costs more than the rest of the apply put together.
 
     # -- the preconditioner ------------------------------------------------- #
 
@@ -2809,35 +3005,70 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         with self._on_own_device():
             self._apply(r, z)
 
+    def _layout(self, field):
+        """How to lay a ``(dim, *local, nz)`` field view out for the transforms.
+
+        Returns ``(perm, axes, components_first)``: ``field.transpose(perm)``
+        orders the axes as they lie in memory but with the distributed one
+        first, ``axes`` are the rank-local axes in that order (to transform,
+        the last of them ``x``, halved), and ``components_first`` says whether
+        the components sit *before* the local axes in it.
+
+        muGrid stores fields component-fastest on the host (``(nz, ..., y, x,
+        dim)`` in memory) and component-slowest on a device (``(dim, nz, ...,
+        y, x)``); either way ``x`` varies fastest of the spatial axes. The
+        transforms used to run in the logical ``(x, y)`` order instead, over
+        axes that were neither trailing nor contiguous, which no single batched
+        plan describes: on MI300A at 256^3 they cost twice the reference
+        preconditioner's full 3D transform. Following memory order, the copy
+        into the transform buffer moves at most whole planes (the device
+        layout's component and ``z`` blocks change places), and on the host
+        nothing at all but the ghost layers it drops.
+        """
+        dim = self.dim
+        local_reversed = tuple(range(dim - 1, 0, -1))
+        if field.strides[0] <= field.strides[1]:
+            # host: (nz, ..., y, x, dim); the result is already z-major
+            return ((dim,) + local_reversed + (0,),
+                    tuple(range(1, dim)), False)
+        # device: (nz, dim, ..., y, x)
+        return (dim, 0) + local_reversed, tuple(range(2, dim + 1)), True
+
     def _apply(self, r, z):
         xp = self._xp
         dim = self.dim
-        axes = tuple(range(1, dim))
+        source = xp.asarray(r.p)
+        perm, axes, components_first = self._layout(source)
 
         with self._timed("fft"):
-            hat = xp.fft.rfftn(xp.asarray(r.p), axes=axes).astype(
+            staged = xp.ascontiguousarray(source.transpose(perm))
+            hat = xp.fft.rfftn(staged, axes=axes).astype(
                 self._cdtype, copy=False)
-            # (dim, *modes, nz) -> (nz, *modes, dim); see _factorise_local for
-            # why the distributed axis leads. The permutation is materialised
-            # either way, so this choice is free.
-            v = xp.ascontiguousarray(
-                xp.moveaxis(hat, (0, -1), (-1, 0)))[..., None]
+            # -> (nz, *modes, dim); see _factorise_local for why the
+            # distributed axis leads. On the host the transform leaves it so.
+            if components_first:
+                hat = xp.ascontiguousarray(xp.moveaxis(hat, 1, -1))
+            v = hat[..., None]
 
         with self._timed("tridiag"):
             x = self._solve_local(v)
 
         with self._timed("interface"):
             ends = xp.stack([x[0, ..., 0], x[-1, ..., 0]], axis=-2)
+            # first = A2 left, last = A0 right: the neighbours' interface
+            # planes as they enter this slab's two end planes, each
+            # (*modes, dim, 1). See _build_corrections.
             if self._use_pcr:
-                left, right = self._solve_reduced_pcr(ends)
+                first, last = self._solve_reduced_pcr(ends)
             else:
-                gathered = self._allgather(xp.ascontiguousarray(ends))
-                rhs = xp.moveaxis(gathered, 0, -3).reshape(
-                    self._mode_shape + (2 * dim * self.nb_ranks,))
-                lam = xp.einsum("...ij,...j->...i", self._reduced_inv, rhs)
-                lam = lam.reshape(self._mode_shape + (self.nb_ranks, 2, dim))
-                left = lam[..., (self.rank - 1) % self.nb_ranks, 1, :]
-                right = lam[..., (self.rank + 1) % self.nb_ranks, 0, :]
+                if self.nb_ranks == 1:
+                    rhs = ends.reshape(self._mode_shape + (2 * dim, 1))
+                else:
+                    gathered = self._allgather(xp.ascontiguousarray(ends))
+                    rhs = xp.moveaxis(gathered, 0, -3).reshape(
+                        self._mode_shape + (2 * dim * self.nb_ranks, 1))
+                first = xp.matmul(self._corr_first, rhs)
+                last = xp.matmul(self._corr_last, rhs)
             # From the *uncorrected* right-hand side: the all-zero mode is
             # solved globally rather than through the interface system, so the
             # end corrections below would double-count it.
@@ -2848,14 +3079,24 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             # neighbours' interface planes enter as a correction to the two end
             # planes of the right-hand side, so the spikes never have to be
             # stored or re-read.
-            v[0] -= xp.matmul(self.A[2], left[..., None])
-            v[-1] -= xp.matmul(self.A[0], right[..., None])
+            v[0] -= first
+            v[-1] -= last
             sol = self._solve_local(v)[..., 0]
 
         with self._timed("ifft"):
             sol[(slice(None),) + self._zero_index] = zero_solution
-            out = xp.fft.irfftn(xp.moveaxis(sol, (0, -1), (-1, 0)),
-                                axes=axes, s=self.local_shape)
-
-        # irfftn already returns a real array, so no xp.real() copy is needed.
-        z.p[...] = out.astype(xp.asarray(z.p).dtype, copy=False)
+            # Back the same way: into the transform layout, the inverse over
+            # the same axes, and out through the inverse permutation, which
+            # again follows memory order on both sides of the assignment.
+            if components_first:
+                sol = xp.ascontiguousarray(xp.moveaxis(sol, -1, 1))
+            out = xp.fft.irfftn(sol, axes=axes,
+                                s=tuple(reversed(self.local_shape)))
+            # irfftn already returns a real array, so no xp.real() copy is
+            # needed; the assignment does any cast. It goes through z's view
+            # in the same memory order as `out`: an elementwise copy walks its
+            # output in logical order, and z's logical order (dim, x, y, z) is
+            # the opposite of its memory order, so `z.p[...] = out.transpose()`
+            # put neighbouring threads far apart on both sides -- 8 ms per
+            # apply at 256^3 on MI300A, three times the inverse FFT itself.
+            xp.asarray(z.p).transpose(perm)[...] = out

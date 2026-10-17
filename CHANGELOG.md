@@ -4,6 +4,28 @@ Change log for µGrid
 v1.5.0 (08Oct26)
 ----------------
 
+- PERF: `HybridFourierTridiagonalPreconditioner` on a GPU. The rank-local
+  FFTs run in the order the field lies in memory -- distributed axis first,
+  `x` fastest and halved -- instead of over interior axes of the field in
+  logical order, which no single batched plan describes (on MI300A at 256³
+  they cost twice the reference preconditioner's full 3D transform). The
+  device block-Thomas sweep launches 64-thread blocks instead of 256 -- with
+  one thread per Fourier mode, 256 left most compute units idle -- declares
+  them in `__launch_bounds__`, which lifts the 128-register cap the compiler
+  otherwise assumes, and issues the loads of two planes ahead of the
+  recurrence: 0.398 → 0.167 ms per sweep at 128³, 1.29 → 0.91 ms at 256³. The
+  result is written into the output field through a view in its memory order
+  (writing in logical order took 8 ms per apply at 256³). The interface
+  exchange hands device buffers to MPI directly when it is GPU-aware --
+  `MUGRID_GPU_AWARE_MPI=1`, or `MPICH_GPU_SUPPORT_ENABLED=1` on Cray MPICH --
+  instead of always staging them through pageable host memory, which cost
+  5 ms per apply on two MI300A and 17 ms on four at 256³. The interface step
+  folds `A2`/`A0` into
+  the reduced-system operators at setup -- one batched product per end per
+  apply instead of an einsum, a reshape, index selections and two products --
+  and under PCR each rank sends its neighbours `dim` numbers per mode instead
+  of `2 dim`. The zero mode's two nullspace projections are folded into its
+  stored inverse, so its solve is one matrix-vector product without reductions
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
