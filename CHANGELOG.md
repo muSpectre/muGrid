@@ -37,6 +37,18 @@ v1.5.0 (08Oct26)
   `ghost_requirement` is two-sided): communicate the input's ghosts first and
   do not reduce the output -- the protocol of every other muGrid operator. A
   collection without left ghosts now raises instead of returning a wrong sum
+- BUG: `conjugate_gradients` and `conjugate_gradients_pipelined` kept their
+  work vectors as fixed-name fields of the caller's collection. A solve nested
+  inside another's `hessp`, `prec` or `callback` on the same collection
+  overwrote the outer solve's residual and search direction (the outer solve
+  could report convergence at a true residual of 1), and a float32 solve after
+  a float64 one raised `TypeError`. Each call now uses fields of its own and
+  removes them from the collection when it returns or raises, so they also no
+  longer stay allocated between solves
+- BUG: `real_field(..., dtype=np.float32)` and `complex_field(...,
+  dtype=np.complex64)` returned any existing field of the requested name,
+  whatever its precision, shape or sub-point. They now raise `ValueError` on a
+  mismatch, as the double-precision get-or-create already did
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

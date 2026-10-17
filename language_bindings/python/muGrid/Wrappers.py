@@ -87,11 +87,27 @@ def _typed_field(collection: Any, name: str, components: Shape, sub_pt: str,
             f"{double_method} supports dtype {kinds}, got {dt}"
         )
     if method == double_method:
-        # Collection's own get-or-create convenience (handles existing names).
+        # Collection's own get-or-create convenience: it returns an existing
+        # field and raises if its type, shape or sub-point differ.
         return getattr(collection, double_method)(name, components, sub_pt)
-    # Single precision: emulate get-or-create around the register-only method.
+    # Single precision: emulate get-or-create around the register-only method,
+    # with the same checks -- returning whatever field has the name would hand
+    # a float32 caller a float64 field, or one of another shape.
     if collection.field_exists(name):
-        return collection.get_field(name)
+        field = collection.get_field(name)
+        found_dtype = Field(field).dtype
+        if isinstance(components, (int, np.integer)):
+            same_shape = field.nb_components == int(components)
+        else:
+            same_shape = tuple(field.components_shape) == tuple(components)
+        if (found_dtype != dt or not same_shape
+                or field.sub_division != sub_pt):
+            raise ValueError(
+                f"Field '{name}' already exists as {found_dtype} with "
+                f"components {tuple(field.components_shape)} on sub-point "
+                f"'{field.sub_division}'; requested {dt} with components "
+                f"{components} on '{sub_pt}'")
+        return field
     return getattr(collection, method)(name, components, sub_pt)
 
 

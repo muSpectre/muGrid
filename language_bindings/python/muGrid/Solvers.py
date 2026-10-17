@@ -2,6 +2,7 @@
 Collection of simple parallel solvers
 """
 
+import itertools
 import warnings
 
 import numpy as np
@@ -16,6 +17,47 @@ class ConvergenceError(RuntimeError):
     avoids masking unrelated runtime errors (e.g. out-of-memory) as
     non-convergence.
     """
+
+
+#: Source of the per-call suffix of work-field names (see _WorkFields).
+_work_field_ids = itertools.count()
+
+
+class _WorkFields:
+    """The work fields of one solver call, removed again when it ends.
+
+    Each field is named ``<solver>#<call>-<role>``, so no two calls share one:
+    a solve nested inside another's ``hessp``, ``prec`` or ``callback`` on the
+    same collection gets its own vectors instead of overwriting the caller's,
+    and a float32 solve after a float64 one is not handed the float64 fields.
+    The fields are popped from the collection on exit, however the solve ends
+    (return or exception), so repeated solves do not accumulate them. A
+    callback may keep a field it was given: popping only drops the
+    collection's reference.
+    """
+
+    def __init__(self, fc, solver):
+        self._fc = fc
+        self._prefix = f"{solver}#{next(_work_field_ids)}-"
+        self._names = []
+
+    def __enter__(self):
+        return self
+
+    def field(self, role, like, dtype):
+        """A zero-initialised field shaped like `like`, in `dtype`."""
+        name = self._prefix + role
+        field = self._fc.real_field(name, like.components_shape,
+                                    sub_pt=like.sub_division, dtype=dtype)
+        self._names.append(name)
+        return field
+
+    def __exit__(self, *exc):
+        collection = getattr(self._fc, "_get_field_collection", None)
+        collection = collection() if collection is not None else self._fc
+        for name in self._names:
+            collection.pop_field(name)
+        return False
 
 
 #: Relative tolerance below which a float32 solve cannot certify convergence.
@@ -188,158 +230,151 @@ def conjugate_gradients(
     dtype = getattr(b, "dtype", np.float64)
     _warn_unreachable_rtol(dtype, rtol, "conjugate_gradients")
 
-    with timed("startup"):
-        # Create temporary fields with matching component shape
-        # r: residual field
-        # p: search direction field
-        # z: preconditioned search direction field (aliased to r if no prec)
-        # Ap: Hessian product field
-        r = fc.real_field(
-            "cg-residual", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        p = fc.real_field(
-            "cg-search-direction", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        if unpreconditioned:
-            z = r
-        else:
-            z = fc.real_field(
-                "cg-preconditioned-residual", b.components_shape,
-                sub_pt=b.sub_division, dtype=dtype)
-        Ap = fc.real_field(
-            "cg-hessian-product", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
+    with _WorkFields(fc, "cg") as work:
+        with timed("startup"):
+            # Create temporary fields with matching component shape
+            # r: residual field
+            # p: search direction field
+            # z: preconditioned search direction field (aliased to r if no prec)
+            # Ap: Hessian product field
+            r = work.field("residual", b, dtype)
+            p = work.field("search-direction", b, dtype)
+            if unpreconditioned:
+                z = r
+            else:
+                z = work.field("preconditioned-residual", b, dtype)
+            Ap = work.field("hessian-product", b, dtype)
 
-        # Initial residual: r = b - A*x
-        hessp(x, Ap)
-        # r = b (copy)
-        linalg.copy(b, r)
-        # r = r - Ap = b - A*x (axpy with alpha=-1)
-        linalg.axpy(-1.0, Ap, r)
+            # Initial residual: r = b - A*x
+            hessp(x, Ap)
+            # r = b (copy)
+            linalg.copy(b, r)
+            # r = r - Ap = b - A*x (axpy with alpha=-1)
+            linalg.axpy(-1.0, Ap, r)
 
-        # preconditioner
-        with timed("prec"):
-            prec(r, z)
-
-        # Initial search direction: p = z
-        linalg.copy(z, p)
-
-        with timed("dot_rr"):
-            bb = comm.sum(linalg.norm_sq(b))
-            rr = comm.sum(linalg.norm_sq(r))
-            rz = comm.sum(linalg.vecdot(r, z))
-
-        # Convergence threshold on the squared residual norm:
-        # ||r|| <= max(rtol * ||b||, atol)
-        tol_sq = max(rtol * rtol * float(bb), atol * atol)
-
-        if callback:
-            callback(0, {"x": x, "r": r, "p": p, "z": z, "rr": rr, "rz": rz})
-
-        rr_val = float(rr)
-
-        if rr_val <= tol_sq:
-            if residual is not None:
-                linalg.copy(r, residual)
-            return x
-
-    with timed("iteration"):
-        for iteration in range(maxiter):
-            # Compute Hessian product: Ap = A * p
-            with timed("hessp"):
-                hessp(p, Ap)
-
-            # Compute pAp for step size
-            with timed("dot_pAp"):
-                pAp = comm.sum(linalg.vecdot(p, Ap))
-
-            # Guard the curvature term *before* dividing by it. A non-finite
-            # pAp silently gives alpha = 0, which leaves x untouched and rr
-            # unchanged for every remaining iteration -- a stall that looks
-            # exactly like slow convergence. A zero pAp means p lies in the
-            # operator's null space, so it is not positive definite.
-            pAp_val = float(pAp)
-            _reject_non_finite(pAp_val, "the curvature p^T A p", iteration,
-                               dtype, "conjugate_gradients")
-            if pAp_val == 0.0:
-                raise ConvergenceError(
-                    "conjugate_gradients: the curvature p^T A p is zero at "
-                    f"iteration {iteration}; the search direction lies in the "
-                    "null space of the operator, which is therefore not "
-                    "positive definite."
-                )
-
-            # Compute alpha
-            alpha = rz / pAp
-
-            # A zero step on a residual that has not converged cannot make
-            # progress; with pAp already checked this means rz = 0, i.e. an
-            # indefinite preconditioner.
-            if alpha == 0.0:
-                raise ConvergenceError(
-                    "conjugate_gradients: the step length is zero at "
-                    f"iteration {iteration} while |r|^2 = {rr_val:.6e} is "
-                    f"above the tolerance {tol_sq:.6e}; the preconditioned "
-                    "residual is orthogonal to the residual, which means the "
-                    "preconditioner is not positive definite."
-                )
-
-            # Update solution: x += alpha * p
-            with timed("update_x"):
-                linalg.axpy(alpha, p, x)
-
-            # Update residual: r -= alpha * Ap
-            with timed("update_r"):
-                next_rr = comm.sum(linalg.axpy_norm_sq(-alpha, Ap, r))
-
-            next_rr_val = float(next_rr)
-
-            # apply preconditioner z=P*r
+            # preconditioner
             with timed("prec"):
                 prec(r, z)
 
-            # Compute next_rz after applying preconditioner
-            with timed("dot_rz"):
-                next_rz = comm.sum(linalg.vecdot(r, z))
+            # Initial search direction: p = z
+            linalg.copy(z, p)
+
+            with timed("dot_rr"):
+                bb = comm.sum(linalg.norm_sq(b))
+                rr = comm.sum(linalg.norm_sq(r))
+                rz = comm.sum(linalg.vecdot(r, z))
+
+            # Convergence threshold on the squared residual norm:
+            # ||r|| <= max(rtol * ||b||, atol)
+            tol_sq = max(rtol * rtol * float(bb), atol * atol)
 
             if callback:
-                with timed("callback"):
-                    callback(
-                        iteration + 1,
-                        {
-                            "x": x,
-                            "r": r,
-                            "p": p,
-                            "z": z,
-                            "rr": next_rr,
-                            "rz": next_rz,
-                        },
-                    )
+                callback(0, {"x": x, "r": r, "p": p, "z": z, "rr": rr, "rz": rz})
 
-            # NaN means a non-positive-definite operator; an infinity means
-            # the iterate has outgrown the work fields' dynamic range.
-            _reject_non_finite(next_rr_val, "the squared residual |r|^2",
-                               iteration, dtype, "conjugate_gradients")
+            rr_val = float(rr)
 
-            if next_rr_val <= tol_sq:
+            if rr_val <= tol_sq:
                 if residual is not None:
                     linalg.copy(r, residual)
                 return x
 
-            # Compute beta
-            beta = next_rz / rz
-            # Carry the residual and its preconditioned inner product into the
-            # next iteration (rr_val is what the guards above report).
-            rz = next_rz
-            rr_val = next_rr_val
+        with timed("iteration"):
+            for iteration in range(maxiter):
+                # Compute Hessian product: Ap = A * p
+                with timed("hessp"):
+                    hessp(p, Ap)
 
-            # Update search direction: p = z + beta * p
-            with timed("update_p"):
-                linalg.axpby(1.0, z, beta, p)
+                # Compute pAp for step size
+                with timed("dot_pAp"):
+                    pAp = comm.sum(linalg.vecdot(p, Ap))
 
-    raise ConvergenceError(
-        "Preconditioned conjugate gradient algorithm did not converge"
-    )
+                # Guard the curvature term *before* dividing by it. A non-finite
+                # pAp silently gives alpha = 0, which leaves x untouched and rr
+                # unchanged for every remaining iteration -- a stall that looks
+                # exactly like slow convergence. A zero pAp means p lies in the
+                # operator's null space, so it is not positive definite.
+                pAp_val = float(pAp)
+                _reject_non_finite(pAp_val, "the curvature p^T A p", iteration,
+                                   dtype, "conjugate_gradients")
+                if pAp_val == 0.0:
+                    raise ConvergenceError(
+                        "conjugate_gradients: the curvature p^T A p is zero at "
+                        f"iteration {iteration}; the search direction lies in the "
+                        "null space of the operator, which is therefore not "
+                        "positive definite."
+                    )
+
+                # Compute alpha
+                alpha = rz / pAp
+
+                # A zero step on a residual that has not converged cannot make
+                # progress; with pAp already checked this means rz = 0, i.e. an
+                # indefinite preconditioner.
+                if alpha == 0.0:
+                    raise ConvergenceError(
+                        "conjugate_gradients: the step length is zero at "
+                        f"iteration {iteration} while |r|^2 = {rr_val:.6e} is "
+                        f"above the tolerance {tol_sq:.6e}; the preconditioned "
+                        "residual is orthogonal to the residual, which means the "
+                        "preconditioner is not positive definite."
+                    )
+
+                # Update solution: x += alpha * p
+                with timed("update_x"):
+                    linalg.axpy(alpha, p, x)
+
+                # Update residual: r -= alpha * Ap
+                with timed("update_r"):
+                    next_rr = comm.sum(linalg.axpy_norm_sq(-alpha, Ap, r))
+
+                next_rr_val = float(next_rr)
+
+                # apply preconditioner z=P*r
+                with timed("prec"):
+                    prec(r, z)
+
+                # Compute next_rz after applying preconditioner
+                with timed("dot_rz"):
+                    next_rz = comm.sum(linalg.vecdot(r, z))
+
+                if callback:
+                    with timed("callback"):
+                        callback(
+                            iteration + 1,
+                            {
+                                "x": x,
+                                "r": r,
+                                "p": p,
+                                "z": z,
+                                "rr": next_rr,
+                                "rz": next_rz,
+                            },
+                        )
+
+                # NaN means a non-positive-definite operator; an infinity means
+                # the iterate has outgrown the work fields' dynamic range.
+                _reject_non_finite(next_rr_val, "the squared residual |r|^2",
+                                   iteration, dtype, "conjugate_gradients")
+
+                if next_rr_val <= tol_sq:
+                    if residual is not None:
+                        linalg.copy(r, residual)
+                    return x
+
+                # Compute beta
+                beta = next_rz / rz
+                # Carry the residual and its preconditioned inner product into the
+                # next iteration (rr_val is what the guards above report).
+                rz = next_rz
+                rr_val = next_rr_val
+
+                # Update search direction: p = z + beta * p
+                with timed("update_p"):
+                    linalg.axpby(1.0, z, beta, p)
+
+        raise ConvergenceError(
+            "Preconditioned conjugate gradient algorithm did not converge"
+        )
 
 
 def conjugate_gradients_pipelined(
@@ -462,211 +497,194 @@ def conjugate_gradients_pipelined(
         replacement_interval = (
             20 if np.dtype(dtype) == np.dtype(np.float32) else 50)
 
-    with timed("startup"):
-        # Work fields (zero-initialised by the collection)
-        r = fc.real_field(
-            "pcg-residual", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        u = fc.real_field(
-            "pcg-prec-residual", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        w = fc.real_field(
-            "pcg-w", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        m = fc.real_field(
-            "pcg-m", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        n = fc.real_field(
-            "pcg-n", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        p = fc.real_field(
-            "pcg-p", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        s = fc.real_field(
-            "pcg-s", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        q = fc.real_field(
-            "pcg-q", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
-        z = fc.real_field(
-            "pcg-z", b.components_shape,
-            sub_pt=b.sub_division, dtype=dtype)
+    with _WorkFields(fc, "pcg") as work:
+        with timed("startup"):
+            # Work fields (zero-initialised by the collection)
+            r = work.field("residual", b, dtype)
+            u = work.field("prec-residual", b, dtype)
+            w = work.field("w", b, dtype)
+            m = work.field("m", b, dtype)
+            n = work.field("n", b, dtype)
+            p = work.field("p", b, dtype)
+            s = work.field("s", b, dtype)
+            q = work.field("q", b, dtype)
+            z = work.field("z", b, dtype)
 
-        # r = b - A x
-        hessp(x, r)
-        linalg.axpby(1.0, b, -1.0, r)
-        # u = M^{-1} r ; w = A u
-        with timed("prec"):
-            prec(r, u)
-        hessp(u, w)
-        # Recurrence accumulators start at zero
-        for f in (p, s, q, z):
-            linalg.scal(0.0, f)
-
-        bb = comm.sum(linalg.norm_sq(b))
-        tol_sq = max(rtol * rtol * float(bb), atol * atol)
-
-        gamma_prev = None
-        alpha_prev = None
-
-    def replace_residual(restart=None):
-        """Recompute the recurrence vectors from their definitions and return
-        ``(true_rr, restarted)``, the true squared residual norm |b - Ax|^2
-        (global) and whether CG was restarted.
-
-        A restart discards the search direction and its images, so the next
-        iteration starts CG afresh from the current iterate. `restart=None`
-        decides by the size of the drift: replacing the residual while keeping
-        a search direction built from recurrences that have drifted far from
-        the truth was seen to stall the solve (float32), so if the true
-        residual norm is off from the recursive one by more than a factor of
-        two, CG restarts instead.
-        """
-        if restart is None:
-            recursive_rr = float(comm.sum(linalg.norm_sq(r)))
-        hessp(x, r)
-        linalg.axpby(1.0, b, -1.0, r)
-        true_rr = float(comm.sum(linalg.norm_sq(r)))
-        if restart is None:
-            restart = not (0.25 * recursive_rr <= true_rr <= 4.0 * recursive_rr)
-        with timed("prec"):
-            prec(r, u)
-        hessp(u, w)
-        if restart:
+            # r = b - A x
+            hessp(x, r)
+            linalg.axpby(1.0, b, -1.0, r)
+            # u = M^{-1} r ; w = A u
+            with timed("prec"):
+                prec(r, u)
+            hessp(u, w)
+            # Recurrence accumulators start at zero
             for f in (p, s, q, z):
                 linalg.scal(0.0, f)
-        else:
-            hessp(p, s)
+
+            bb = comm.sum(linalg.norm_sq(b))
+            tol_sq = max(rtol * rtol * float(bb), atol * atol)
+
+            gamma_prev = None
+            alpha_prev = None
+
+        def replace_residual(restart=None):
+            """Recompute the recurrence vectors from their definitions and return
+            ``(true_rr, restarted)``, the true squared residual norm |b - Ax|^2
+            (global) and whether CG was restarted.
+
+            A restart discards the search direction and its images, so the next
+            iteration starts CG afresh from the current iterate. `restart=None`
+            decides by the size of the drift: replacing the residual while keeping
+            a search direction built from recurrences that have drifted far from
+            the truth was seen to stall the solve (float32), so if the true
+            residual norm is off from the recursive one by more than a factor of
+            two, CG restarts instead.
+            """
+            if restart is None:
+                recursive_rr = float(comm.sum(linalg.norm_sq(r)))
+            hessp(x, r)
+            linalg.axpby(1.0, b, -1.0, r)
+            true_rr = float(comm.sum(linalg.norm_sq(r)))
+            if restart is None:
+                restart = not (0.25 * recursive_rr <= true_rr <= 4.0 * recursive_rr)
             with timed("prec"):
-                prec(s, q)
-            hessp(q, z)
-        return true_rr, restart
-
-    # True squared residual at the previous failed convergence check, to tell
-    # a solve that is still converging from one that has stagnated at its
-    # attainable accuracy.
-    last_true_rr = None
-    rr = None
-    restarted = True  # the first iteration starts from p = 0
-
-    with timed("iteration"):
-        for iteration in range(maxiter):
-            if (replacement_interval and iteration > 0
-                    and iteration % replacement_interval == 0):
-                with timed("replace"):
-                    _, restarted = replace_residual()
-
-            # Single combined reduction: (r,u), (w,u), (r,r). The three inner
-            # products are computed by one fused kernel (one device->host copy)
-            # and reduced across ranks in a *non-blocking* allreduce. The
-            # preconditioner apply m = M^{-1} w and operator apply n = A m below
-            # do not depend on gamma/delta/rr, so they run while the reduction
-            # is in flight, hiding the global synchronisation latency (the
-            # multi-node payoff of the pipelined formulation).
-            with timed("reduce-begin"):
-                local = np.array(linalg.pipelined_cg_dots(r, u, w))
-                reduce_handle = comm.isum(local)
-
-            # Apply preconditioner and operator for this step (overlaps the
-            # in-flight reduction).
-            with timed("prec"):
-                prec(w, m)
-            with timed("hessp"):
-                hessp(m, n)
-
-            # Complete the overlapped reduction.
-            with timed("reduce-wait"):
-                gamma, delta, rr = (
-                    float(v) for v in comm.isum_wait(reduce_handle).ravel()
-                )
-
-            if callback:
-                with timed("callback"):
-                    callback(
-                        iteration,
-                        {"x": x, "r": r, "p": p, "rr": rr, "rz": gamma},
-                    )
-
-            # NaN means a non-positive-definite operator; an infinity means
-            # the iterate has outgrown the work fields' dynamic range. Both
-            # used to reach the recurrence below, where a non-finite delta
-            # gives alpha = 0 and the *next* iteration then divides by that
-            # zero alpha_prev -- a ZeroDivisionError raised from inside the
-            # recurrence, escaping this solver's own ConvergenceError contract.
-            _reject_non_finite(rr, "the squared residual |r|^2", iteration,
-                               dtype, "conjugate_gradients_pipelined")
-            _reject_non_finite(delta, "the curvature w^T u", iteration, dtype,
-                               "conjugate_gradients_pipelined")
-            _reject_non_finite(gamma, "the inner product r^T u", iteration,
-                               dtype, "conjugate_gradients_pipelined")
-            if rr <= tol_sq:
-                # The recursive residual says converged; only the true one
-                # may decide. On failure CG restarts from the true residual:
-                # the old search direction was built from the drifted
-                # recurrences, and continuing along it was seen to stall
-                # (the m, n computed above belong to the stale w and are
-                # dropped).
-                with timed("replace"):
-                    true_rr, _ = replace_residual(restart=True)
-                _reject_non_finite(true_rr, "the true squared residual "
-                                   "|b - Ax|^2", iteration, dtype,
-                                   "conjugate_gradients_pipelined")
-                if true_rr <= tol_sq:
-                    return x
-                if last_true_rr is not None and true_rr >= last_true_rr:
-                    raise ConvergenceError(
-                        "conjugate_gradients_pipelined: the true residual "
-                        f"|b - Ax| = {np.sqrt(true_rr):.6e} has stagnated "
-                        f"above the tolerance {np.sqrt(tol_sq):.6e} at "
-                        f"iteration {iteration} (the recursive residual is "
-                        f"{np.sqrt(rr):.6e}); the requested accuracy is not "
-                        f"attainable in {np.dtype(dtype).name} for this "
-                        "system. Loosen rtol, use float64, or use "
-                        "conjugate_gradients."
-                    )
-                last_true_rr = true_rr
-                restarted = True
-                continue
-
-            if restarted:
-                beta = 0.0
-                denom = delta
+                prec(r, u)
+            hessp(u, w)
+            if restart:
+                for f in (p, s, q, z):
+                    linalg.scal(0.0, f)
             else:
-                beta = gamma / gamma_prev
-                denom = delta - beta * gamma / alpha_prev
-            restarted = False
-            if denom == 0.0:
-                raise ConvergenceError(
-                    "conjugate_gradients_pipelined: the curvature term is zero "
-                    f"at iteration {iteration} while |r|^2 = {rr:.6e} is above "
-                    f"the tolerance {tol_sq:.6e}; the operator or the "
-                    "preconditioner is not positive definite."
-                )
-            alpha = gamma / denom
-            if alpha == 0.0:
-                raise ConvergenceError(
-                    "conjugate_gradients_pipelined: the step length is zero at "
-                    f"iteration {iteration} while |r|^2 = {rr:.6e} is above the "
-                    f"tolerance {tol_sq:.6e}; the solve cannot make progress."
-                )
-            gamma_prev = gamma
-            alpha_prev = alpha
+                hessp(p, s)
+                with timed("prec"):
+                    prec(s, q)
+                hessp(q, z)
+            return true_rr, restart
 
-            with timed("update"):
-                # z = n + beta z ; q = m + beta q ; s = w + beta s ; p = u + beta p
-                linalg.axpby(1.0, n, beta, z)
-                linalg.axpby(1.0, m, beta, q)
-                linalg.axpby(1.0, w, beta, s)
-                linalg.axpby(1.0, u, beta, p)
-                # x += alpha p ; r -= alpha s ; u -= alpha q ; w -= alpha z
-                linalg.axpy(alpha, p, x)
-                linalg.axpy(-alpha, s, r)
-                linalg.axpy(-alpha, q, u)
-                linalg.axpy(-alpha, z, w)
+        # True squared residual at the previous failed convergence check, to tell
+        # a solve that is still converging from one that has stagnated at its
+        # attainable accuracy.
+        last_true_rr = None
+        rr = None
+        restarted = True  # the first iteration starts from p = 0
 
-    raise ConvergenceError(
-        "Pipelined preconditioned conjugate gradient algorithm did not converge "
-        f"in {maxiter} iterations (recursive |r| = "
-        f"{np.sqrt(rr) if rr is not None else float('nan'):.6e}, tolerance "
-        f"{np.sqrt(tol_sq):.6e})"
-    )
+        with timed("iteration"):
+            for iteration in range(maxiter):
+                if (replacement_interval and iteration > 0
+                        and iteration % replacement_interval == 0):
+                    with timed("replace"):
+                        _, restarted = replace_residual()
+
+                # Single combined reduction: (r,u), (w,u), (r,r). The three inner
+                # products are computed by one fused kernel (one device->host copy)
+                # and reduced across ranks in a *non-blocking* allreduce. The
+                # preconditioner apply m = M^{-1} w and operator apply n = A m below
+                # do not depend on gamma/delta/rr, so they run while the reduction
+                # is in flight, hiding the global synchronisation latency (the
+                # multi-node payoff of the pipelined formulation).
+                with timed("reduce-begin"):
+                    local = np.array(linalg.pipelined_cg_dots(r, u, w))
+                    reduce_handle = comm.isum(local)
+
+                # Apply preconditioner and operator for this step (overlaps the
+                # in-flight reduction).
+                with timed("prec"):
+                    prec(w, m)
+                with timed("hessp"):
+                    hessp(m, n)
+
+                # Complete the overlapped reduction.
+                with timed("reduce-wait"):
+                    gamma, delta, rr = (
+                        float(v) for v in comm.isum_wait(reduce_handle).ravel()
+                    )
+
+                if callback:
+                    with timed("callback"):
+                        callback(
+                            iteration,
+                            {"x": x, "r": r, "p": p, "rr": rr, "rz": gamma},
+                        )
+
+                # NaN means a non-positive-definite operator; an infinity means
+                # the iterate has outgrown the work fields' dynamic range. Both
+                # used to reach the recurrence below, where a non-finite delta
+                # gives alpha = 0 and the *next* iteration then divides by that
+                # zero alpha_prev -- a ZeroDivisionError raised from inside the
+                # recurrence, escaping this solver's own ConvergenceError contract.
+                _reject_non_finite(rr, "the squared residual |r|^2", iteration,
+                                   dtype, "conjugate_gradients_pipelined")
+                _reject_non_finite(delta, "the curvature w^T u", iteration, dtype,
+                                   "conjugate_gradients_pipelined")
+                _reject_non_finite(gamma, "the inner product r^T u", iteration,
+                                   dtype, "conjugate_gradients_pipelined")
+                if rr <= tol_sq:
+                    # The recursive residual says converged; only the true one
+                    # may decide. On failure CG restarts from the true residual:
+                    # the old search direction was built from the drifted
+                    # recurrences, and continuing along it was seen to stall
+                    # (the m, n computed above belong to the stale w and are
+                    # dropped).
+                    with timed("replace"):
+                        true_rr, _ = replace_residual(restart=True)
+                    _reject_non_finite(true_rr, "the true squared residual "
+                                       "|b - Ax|^2", iteration, dtype,
+                                       "conjugate_gradients_pipelined")
+                    if true_rr <= tol_sq:
+                        return x
+                    if last_true_rr is not None and true_rr >= last_true_rr:
+                        raise ConvergenceError(
+                            "conjugate_gradients_pipelined: the true residual "
+                            f"|b - Ax| = {np.sqrt(true_rr):.6e} has stagnated "
+                            f"above the tolerance {np.sqrt(tol_sq):.6e} at "
+                            f"iteration {iteration} (the recursive residual is "
+                            f"{np.sqrt(rr):.6e}); the requested accuracy is not "
+                            f"attainable in {np.dtype(dtype).name} for this "
+                            "system. Loosen rtol, use float64, or use "
+                            "conjugate_gradients."
+                        )
+                    last_true_rr = true_rr
+                    restarted = True
+                    continue
+
+                if restarted:
+                    beta = 0.0
+                    denom = delta
+                else:
+                    beta = gamma / gamma_prev
+                    denom = delta - beta * gamma / alpha_prev
+                restarted = False
+                if denom == 0.0:
+                    raise ConvergenceError(
+                        "conjugate_gradients_pipelined: the curvature term is zero "
+                        f"at iteration {iteration} while |r|^2 = {rr:.6e} is above "
+                        f"the tolerance {tol_sq:.6e}; the operator or the "
+                        "preconditioner is not positive definite."
+                    )
+                alpha = gamma / denom
+                if alpha == 0.0:
+                    raise ConvergenceError(
+                        "conjugate_gradients_pipelined: the step length is zero at "
+                        f"iteration {iteration} while |r|^2 = {rr:.6e} is above the "
+                        f"tolerance {tol_sq:.6e}; the solve cannot make progress."
+                    )
+                gamma_prev = gamma
+                alpha_prev = alpha
+
+                with timed("update"):
+                    # z = n + beta z ; q = m + beta q ; s = w + beta s ; p = u + beta p
+                    linalg.axpby(1.0, n, beta, z)
+                    linalg.axpby(1.0, m, beta, q)
+                    linalg.axpby(1.0, w, beta, s)
+                    linalg.axpby(1.0, u, beta, p)
+                    # x += alpha p ; r -= alpha s ; u -= alpha q ; w -= alpha z
+                    linalg.axpy(alpha, p, x)
+                    linalg.axpy(-alpha, s, r)
+                    linalg.axpy(-alpha, q, u)
+                    linalg.axpy(-alpha, z, w)
+
+        raise ConvergenceError(
+            "Pipelined preconditioned conjugate gradient algorithm did not converge "
+            f"in {maxiter} iterations (recursive |r| = "
+            f"{np.sqrt(rr) if rr is not None else float('nan'):.6e}, tolerance "
+            f"{np.sqrt(tol_sq):.6e})"
+        )

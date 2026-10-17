@@ -265,3 +265,89 @@ def test_pipelined_cg_without_replacement_fails_loudly_in_float32():
         conjugate_gradients_pipelined(
             comm, fc, b, x, hessp=hessp, rtol=1e-5, maxiter=2000,
             replacement_interval=0)
+
+
+SOLVERS = [conjugate_gradients, conjugate_gradients_pipelined]
+
+
+@serial_only
+@pytest.mark.parametrize("outer", SOLVERS)
+@pytest.mark.parametrize("inner", SOLVERS)
+def test_solve_nested_in_the_preconditioner_keeps_its_own_vectors(outer,
+                                                                  inner):
+    """A preconditioner that runs CG on the solver's own collection must not
+    share the outer solve's work fields (audit finding S5).
+
+    The inner solve is on ``2 I``, so it converges in one step and the
+    preconditioner is the fixed linear map ``z = r / 2``: any failure of the
+    outer solve comes from shared state, not from a variable preconditioner.
+    With fixed work-field names the inner solve overwrote the outer residual
+    and search direction.
+    """
+    comm = Communicator()
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float64, 1e3, n=16)
+
+    def twice(src, dst):
+        dst.p[...] = 2 * src.p
+
+    def prec(r, z):
+        z.p[...] = 0
+        inner(comm, fc, r, z, hessp=twice, rtol=1e-12, maxiter=10)
+
+    outer(comm, fc, b, x, hessp=hessp, prec=prec, rtol=1e-8, maxiter=2000)
+    assert true_relative_residual() <= 1e-8
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_float32_solve_after_float64_on_the_same_collection(solver):
+    """The work fields of a float64 solve must not be handed to a later
+    float32 solve on the same collection (it raised TypeError)."""
+    comm = Communicator()
+    fc = GlobalFieldCollection((8, 8))
+
+    def twice(src, dst):
+        dst.p[...] = 2 * src.p
+
+    for dtype in (np.float64, np.float32):
+        name = np.dtype(dtype).name
+        b = fc.real_field(f"rhs-{name}", dtype=dtype)
+        x = fc.real_field(f"solution-{name}", dtype=dtype)
+        b.p[...] = 1
+        solver(comm, fc, b, x, hessp=twice, rtol=1e-6, maxiter=10)
+        np.testing.assert_allclose(np.asarray(x.p), 0.5, rtol=1e-6)
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_solver_leaves_no_work_fields_behind(solver):
+    """Work fields are removed when the solve ends, by return or by raising,
+    so repeated solves do not accumulate them in the collection."""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float64, 1e3)
+    before = sorted(fc.field_names)
+    solver(comm, fc, b, x, hessp=hessp, rtol=1e-6, maxiter=5000)
+    assert sorted(fc.field_names) == before
+    x.p[...] = 0
+    with pytest.raises(ConvergenceError):
+        solver(comm, fc, b, x, hessp=hessp, rtol=1e-12, maxiter=3)
+    assert sorted(fc.field_names) == before
+
+
+def test_single_precision_field_refuses_a_mismatched_existing_one():
+    """Get-or-create in float32 checks the existing field as the float64 path
+    does, instead of returning whatever field has the name."""
+    fc = GlobalFieldCollection((4, 4), sub_pts={"quad": 2})
+    fc.real_field("a")  # float64
+    with pytest.raises(ValueError, match="already exists"):
+        fc.real_field("a", dtype=np.float32)
+    b = fc.real_field("b", (3,), dtype=np.float32)
+    assert fc.real_field("b", (3,), dtype=np.float32).dtype == np.float32
+    with pytest.raises(ValueError, match="already exists"):
+        fc.real_field("b", (2,), dtype=np.float32)
+    with pytest.raises(ValueError, match="already exists"):
+        fc.real_field("b", (3,), "quad", dtype=np.float32)
+    del b
