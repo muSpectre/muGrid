@@ -37,6 +37,7 @@
 #define SRC_LIBMUGRID_FFT_FFT_ENGINE_HH_
 
 #include <array>
+#include <optional>
 #include <sstream>
 
 #include "fft_engine_base.hh"
@@ -44,6 +45,10 @@
 #include "memory/array.hh"
 #include "field/field_typed.hh"
 #include "core/exception.hh"
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/gpu_runtime.hh"
+#endif
 
 namespace muGrid {
 
@@ -190,6 +195,14 @@ class FFTEngine : public FFTEngineBase {
             "FFTEngine<HostSpace> requires fields on host memory");
       }
     }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    // Plans, work buffers and kernels belong to the device that is current;
+    // make it the fields' (see DeviceGuard).
+    std::optional<DeviceGuard> device_guard;
+    if constexpr (is_device_space_v<MemorySpace>) {
+      device_guard.emplace(input.get_device_id());
+    }
+#endif
 
     // Single-precision path (real input is Real32). The serial (non-decomposed)
     // layout uses the backend N-D transform when it has one (no work
@@ -248,6 +261,14 @@ class FFTEngine : public FFTEngineBase {
             "FFTEngine<HostSpace> requires fields on host memory");
       }
     }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    // Plans, work buffers and kernels belong to the device that is current;
+    // make it the fields' (see DeviceGuard).
+    std::optional<DeviceGuard> device_guard;
+    if constexpr (is_device_space_v<MemorySpace>) {
+      device_guard.emplace(input.get_device_id());
+    }
+#endif
 
     // Single-precision path (real output is Real32); see fft().
     if (output.get_type_descriptor() == TypeDescriptor::Real32) {

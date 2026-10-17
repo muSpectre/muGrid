@@ -52,6 +52,10 @@
 #include "memory/memory_space.hh"
 #include "operators/linear.hh"
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/gpu_runtime.hh"
+#endif
+
 #include <vector>
 
 namespace muGrid {
@@ -427,6 +431,7 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & input_field,
             TypedFieldBase<T, DefaultDeviceSpace> & output_field, T alpha,
             bool increment) const {
+            DeviceGuard device_guard{input_field.get_device_id()};
             const auto & collection =
                 this->validate_fields(input_field, output_field);
             const auto nb_grid_pts =

@@ -131,6 +131,7 @@ def test_generic_operator_keeps_coefficients_at_any_scale(scale):
 
 
 @serial_only
+@pytest.mark.skipif(not muGrid.has_netcdf, reason="built without NetCDF")
 def test_netcdf_read_refuses_a_different_stored_type(tmp_path):
     """A float64 variable read into a float32 field came back rounded
     without an error. Widening reads (float32 into float64) stay allowed;

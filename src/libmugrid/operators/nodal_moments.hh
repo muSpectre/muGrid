@@ -80,6 +80,10 @@
 #include "operators/fem_element.hh"
 #include "operators/solids/isotropic_stiffness.hh"
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/gpu_runtime.hh"
+#endif
+
 namespace muGrid {
 
     //! Moments computed by NodalMomentOperator: k = 2, 3, 4, the powers the
@@ -375,6 +379,7 @@ namespace muGrid {
         void compute_impl(const TypedFieldBase<T, DefaultDeviceSpace> & rho,
                           TypedFieldBase<T, DefaultDeviceSpace> & moments,
                           TypedFieldBase<T, DefaultDeviceSpace> & grads) const {
+            DeviceGuard device_guard{rho.get_device_id()};
             std::array<Index_t, Dim> ng{};
             const auto n = this->validate(rho, moments, grads, ng);
             // Device buffers are structure-of-arrays; see strides_of().

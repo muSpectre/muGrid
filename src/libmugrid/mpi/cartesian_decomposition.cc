@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstring>
 #include <iterator>
+#include <optional>
 #include <vector>
 
 #ifdef WITH_MPI
@@ -214,6 +215,14 @@ namespace muGrid {
 
     void CartesianDecomposition::communicate_ghosts(const Field & field) const {
         this->check_field_is_of_this_collection(field, "communicate_ghosts");
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // The exchange launches pack/accumulate kernels and copies on the
+        // current device, which must be the field's (see DeviceGuard).
+        std::optional<DeviceGuard> device_guard;
+        if (field.is_on_device()) {
+            device_guard.emplace(field.get_device_id());
+        }
+#endif
 
         // Get spatial dimensions
         auto spatial_dims{this->get_spatial_dim()};
@@ -401,6 +410,14 @@ namespace muGrid {
 
     void CartesianDecomposition::reduce_ghosts(const Field & field) const {
         this->check_field_is_of_this_collection(field, "reduce_ghosts");
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        // The exchange launches pack/accumulate kernels and copies on the
+        // current device, which must be the field's (see DeviceGuard).
+        std::optional<DeviceGuard> device_guard;
+        if (field.is_on_device()) {
+            device_guard.emplace(field.get_device_id());
+        }
+#endif
 
         // Get spatial dimensions
         auto spatial_dims{this->get_spatial_dim()};

@@ -37,9 +37,26 @@
 #include "core/exception.hh"
 #include "memory/gpu_runtime.hh"
 
+#include <limits>
+#include <string>
 #include <sstream>
 
 namespace muGrid {
+
+namespace {
+//! A plan size, stride or distance as the `int` the 32-bit cuFFT plan API
+//! takes. They were cast unchecked, so a grid beyond the int range on one GPU
+//! (about 1291^3 complex elements per field) silently planned a wrapped size.
+template <typename I>
+int plan_int(I value) {
+  if (value < 0 || static_cast<long long>(value) >
+                       static_cast<long long>(std::numeric_limits<int>::max())) {
+    throw RuntimeError("cuFFT plan parameter " + std::to_string(value) +
+                       " exceeds the int range of the cuFFT plan API");
+  }
+  return static_cast<int>(value);
+}
+}  // namespace
 
 namespace {
 // cuFFT advanced-data-layout parameters for one side (input or output) of an
@@ -66,10 +83,10 @@ NdLayout derive_nd_layout(const std::vector<Index_t> & shape,
   L.embed.resize(rank);
   std::vector<Index_t> s(rank);
   for (std::size_t k{0}; k < rank; ++k) {
-    L.n[k] = static_cast<int>(shape[axes[k]]);
+    L.n[k] = plan_int(shape[axes[k]]);
     s[k] = strides[axes[k]];
   }
-  L.stride = static_cast<int>(s[rank - 1]);
+  L.stride = plan_int(s[rank - 1]);
   L.embed[0] = L.n[0];
   for (std::size_t j{1}; j < rank; ++j) {
     if (s[j] == 0 || s[j - 1] % s[j] != 0) {
@@ -78,9 +95,9 @@ NdLayout derive_nd_layout(const std::vector<Index_t> & shape,
           "the per-axis strides are not multiples of the inner stride. This "
           "should not happen for muGrid FFT-engine fields.");
     }
-    L.embed[j] = static_cast<int>(s[j - 1] / s[j]);
+    L.embed[j] = plan_int(s[j - 1] / s[j]);
   }
-  L.dist = static_cast<int>(strides[0]);
+  L.dist = plan_int(strides[0]);
   return L;
 }
 }  // namespace
@@ -170,28 +187,28 @@ cufftHandle cuFFTBackend::make_plan(const PlanKey & key) {
 
   cufftHandle plan;
   int rank = 1;
-  int n_arr[1] = {static_cast<int>(key.n)};
+  int n_arr[1] = {plan_int(key.n)};
   cufftResult result;
 
   // For batch=1 with non-unit stride but dist=0, use simplified plan.
   // cuFFT requires valid embed values (>= n) when embed is not NULL.
   if (key.batch == 1 && key.in_stride == 1 && key.out_stride == 1) {
     // Simple contiguous transform - use basic plan
-    result = cufftPlan1d(&plan, static_cast<int>(key.n), cufft_type, 1);
+    result = cufftPlan1d(&plan, plan_int(key.n), cufft_type, 1);
   } else if (key.batch == 1) {
     // Single transform with stride - use NULL embed (auto-calculated)
     result = cufftPlanMany(&plan, rank, n_arr, nullptr,
-                           static_cast<int>(key.in_stride), 0, nullptr,
-                           static_cast<int>(key.out_stride), 0, cufft_type, 1);
+                           plan_int(key.in_stride), 0, nullptr,
+                           plan_int(key.out_stride), 0, cufft_type, 1);
   } else {
     // Batched transform - embed must be >= n; use dist (storage size per batch)
-    int inembed[1] = {static_cast<int>(key.in_dist)};
-    int onembed[1] = {static_cast<int>(key.out_dist)};
+    int inembed[1] = {plan_int(key.in_dist)};
+    int onembed[1] = {plan_int(key.out_dist)};
     result = cufftPlanMany(
-        &plan, rank, n_arr, inembed, static_cast<int>(key.in_stride),
-        static_cast<int>(key.in_dist), onembed,
-        static_cast<int>(key.out_stride), static_cast<int>(key.out_dist),
-        cufft_type, static_cast<int>(key.batch));
+        &plan, rank, n_arr, inembed, plan_int(key.in_stride),
+        plan_int(key.in_dist), onembed,
+        plan_int(key.out_stride), plan_int(key.out_dist),
+        cufft_type, plan_int(key.batch));
   }
 
   check_cufft_result(result, "plan creation");
@@ -299,7 +316,7 @@ cufftHandle cuFFTBackend::get_nd_plan(cufftType type, const std::vector<int> & n
   return this->nd_plan_for(ss.str(), [&]() -> cufftHandle {
     cufftHandle plan;
     cufftResult result = cufftPlanMany(
-        &plan, static_cast<int>(n.size()), const_cast<int *>(n.data()),
+        &plan, plan_int(n.size()), const_cast<int *>(n.data()),
         const_cast<int *>(inembed.data()), istride, idist,
         const_cast<int *>(onembed.data()), ostride, odist, type, batch);
     check_cufft_result(result, "N-D plan creation");
@@ -329,7 +346,7 @@ void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
 
   cufftHandle plan =
       get_nd_plan(CUFFT_D2Z, in.n, in.embed, in.stride, in.dist, out.embed,
-                  out.stride, out.dist, static_cast<int>(shape[0]));
+                  out.stride, out.dist, plan_int(shape[0]));
   cufftResult result = cufftExecD2Z(
       plan, const_cast<cufftDoubleReal *>(input),
       reinterpret_cast<cufftDoubleComplex *>(output));
@@ -372,7 +389,7 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
 
   cufftHandle plan =
       get_nd_plan(CUFFT_Z2D, in.n, in.embed, in.stride, in.dist, out.embed,
-                  out.stride, out.dist, static_cast<int>(shape[0]));
+                  out.stride, out.dist, plan_int(shape[0]));
   cufftResult result = cufftExecZ2D(
       plan, scratch, reinterpret_cast<cufftDoubleReal *>(output));
   check_cufft_result(result, "Z2D (N-D) execution");
@@ -412,7 +429,7 @@ void cuFFTBackend::r2c_nd(const std::vector<Index_t> & shape,
 
   cufftHandle plan =
       get_nd_plan(CUFFT_R2C, in.n, in.embed, in.stride, in.dist, out.embed,
-                  out.stride, out.dist, static_cast<int>(shape[0]));
+                  out.stride, out.dist, plan_int(shape[0]));
   cufftResult result =
       cufftExecR2C(plan, const_cast<cufftReal *>(input),
                    reinterpret_cast<cufftComplex *>(output));
@@ -453,7 +470,7 @@ void cuFFTBackend::c2r_nd(const std::vector<Index_t> & shape,
 
   cufftHandle plan =
       get_nd_plan(CUFFT_C2R, in.n, in.embed, in.stride, in.dist, out.embed,
-                  out.stride, out.dist, static_cast<int>(shape[0]));
+                  out.stride, out.dist, plan_int(shape[0]));
   cufftResult result =
       cufftExecC2R(plan, scratch, reinterpret_cast<cufftReal *>(output));
   check_cufft_result(result, "C2R (N-D) execution");

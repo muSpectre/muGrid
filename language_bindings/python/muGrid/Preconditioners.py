@@ -945,9 +945,17 @@ class AnalyticReferencePreconditioner(Preconditioner):
             elif self._on_device:
                 # In place through the device address; strides as read off
                 # the view in __init__ (structure-of-arrays on a device).
-                self._kernel(self._work.s.data.ptr, self._stride_component,
-                             self._stride_mode, self._stencil, self._q_ptrs,
-                             list(self._fourier_shape), self._normalisation)
+                # The kernel takes raw addresses and runs on the current
+                # device, which muGrid's own calls restore to the caller's:
+                # select the buffer's.
+                import cupy
+
+                work = self._work.s
+                with cupy.cuda.Device(work.device.id):
+                    self._kernel(work.data.ptr, self._stride_component,
+                                 self._stride_mode, self._stencil,
+                                 self._q_ptrs, list(self._fourier_shape),
+                                 self._normalisation)
             else:
                 # The Fourier buffer is Fortran-ordered, so an order="F"
                 # ravel is a contiguous *view*: components fastest, then modes
@@ -2674,9 +2682,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         single = np.dtype(self._cdtype) == np.dtype(np.complex64)
         kernel = getattr(
             linalg, f"block_thomas_gpu_{dim}d" + ("_f32" if single else ""))
-        kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
-               a0.data.ptr, a2.data.ptr, scratch.data.ptr, out.data.ptr,
-               nz, nb_modes, self._head_length, nb_exc)
+        # Raw addresses: run on the buffers' device, not the current one.
+        with xp.cuda.Device(flat.device.id):
+            kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
+                   a0.data.ptr, a2.data.ptr, scratch.data.ptr, out.data.ptr,
+                   nz, nb_modes, self._head_length, nb_exc)
         return out.reshape(rhs.shape)
 
     def _build_pcr(self):

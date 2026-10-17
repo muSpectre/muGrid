@@ -116,6 +116,28 @@ v1.5.0 (08Oct26)
   It now raises on structure-of-arrays storage in that case; use `.s`/`.sg`,
   which are the same on host and device. Fields gain read-only `nb_sub_pts` and
   `storage_order` properties
+- BUG: Fields on several GPUs of one process: kernels and the reduction
+  scratch acted on whichever device was current -- the one whose field was
+  allocated last -- so an operation on a field of another GPU faulted (MI300A:
+  memory access fault in `vecdot`). Every entry point that launches work for a
+  field (linalg, operators, ghost exchange, FFT) now runs on the field's device
+  and restores the caller's afterwards, and the reduction scratch is kept per
+  device
+- BUG: The Python GPU reductions (`Communicator.sum`/`max` and `reduce_*` of
+  CuPy arrays) handed device pointers to MPI even when it is not GPU-aware;
+  they now stage through the host in that case, as the C++ ghost exchange
+  does, and synchronise the stream first. `Communicator.gpu_aware_mpi` reports
+  the detection
+- BUG: cuFFT plan sizes, strides and distances were cast to `int` unchecked; a
+  value beyond the int range now raises instead of planning a wrapped size
+- API: The boolean environment switches (`MUGRID_GPU_AWARE_MPI`,
+  `MUGRID_UNIFIED_MEMORY`, `MUGRID_FFT_NO_ND`, `MUGRID_STAGED_TRANSPOSE`,
+  `MUGRID_PROFILE_ALLOCATIONS`) share one parser: 1/0, yes/no, true/false and
+  on/off in any case; any other value raises. Some used to read only the first
+  character (`on` meant false) or accept only `1`
+- DOC: `GenericLinearOperator.transpose` defaults to unit weights (the bare
+  `Bᵀ`), `FEMGradientOperator.transpose` to the physical quadrature weights
+  (`Bᵀ W`); both docstrings now say so and how to get the other
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

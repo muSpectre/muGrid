@@ -1351,7 +1351,14 @@ class GenericLinearOperator:
         weights: Optional[Sequence[float]] = None,
     ) -> None:
         """
-        Apply transpose convolution to fields.
+        Apply the transpose of :meth:`apply` to fields.
+
+        Without ``weights`` every quadrature point counts once, i.e. this is
+        the bare matrix transpose ``Bᵀ``. Note that
+        :meth:`FEMGradientOperator.transpose` defaults to the
+        quadrature-weighted ``Bᵀ W`` instead (``W = Wfrac · cell_volume``):
+        this operator has a stencil but no grid spacing, so it cannot supply
+        ``W``. Pass ``weights=fem.quadrature_weights`` to get the FEM result.
 
         Parameters
         ----------
@@ -1360,7 +1367,7 @@ class GenericLinearOperator:
         nodal_field : Field
             Output field.
         weights : sequence of float, optional
-            Weights for the transpose operation.
+            One weight per quadrature point (default: all 1).
         """
         if weights is None:
             weights = []
@@ -1567,6 +1574,9 @@ class FEMGradientOperator:
 
         Assemble energies/forces via ``transpose(apply(...))`` directly; do **not**
         also multiply by the quadrature weights yourself (that applies ``W`` twice).
+        This default differs from :meth:`GenericLinearOperator.transpose`, which
+        uses unit weights (the bare ``Bᵀ``); ``weights=[1] * nb_quad_pts`` gives
+        that here.
 
         Only the owned nodes of ``nodal_field`` are written. Each collects the
         elements around it, one of which lies in the left ghost layer of

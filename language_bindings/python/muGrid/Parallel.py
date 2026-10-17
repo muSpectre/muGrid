@@ -231,13 +231,11 @@ class CommunicatorWrapper:
 
     def _sum_gpu(self, arg):
         """GPU-aware sum reduction."""
-        cp = _get_cupy()
-
         # Serial case: no reduction needed, return as-is
         if self.size == 1:
             return arg
 
-        # MPI case: use GPU-aware MPI
+        # MPI case (device buffers or host staging, see _allreduce_device)
         if self._mpi_comm is None:
             raise RuntimeError(
                 "MPI communicator not available for GPU reduction. "
@@ -250,17 +248,35 @@ class CommunicatorWrapper:
             # Convert to 1-D for MPI, then back to 0-D
             arg = arg.reshape(1)
 
-        # Allocate output buffer on GPU
-        result = cp.empty_like(arg)
-
-        # Use GPU-aware MPI Allreduce
-        self._mpi_comm.Allreduce(arg, result, op=MPI.SUM)
+        result = self._allreduce_device(arg, MPI.SUM)
 
         # Convert back to 0-D if input was scalar
         if is_scalar:
             result = result.reshape(())
 
         return result
+
+    def _allreduce_device(self, arr, mpi_op):
+        """Allreduce a CuPy array across ranks, returning a CuPy array.
+
+        Device pointers go to MPI only when it is GPU-aware
+        (`_muGrid.Communicator.gpu_aware_mpi`: MUGRID_GPU_AWARE_MPI, else the
+        MPI library's own report), as in the C++ ghost exchange; otherwise the
+        values are staged through the host. Handing device buffers to an MPI
+        that is not GPU-aware made it read them as host memory -- a crash, or
+        wrong sums. Either way the current stream is synchronised first: MPI
+        does not order itself after the kernel that produced `arr`.
+        """
+        cp = _get_cupy()
+        cp.cuda.get_current_stream().synchronize()
+        if _muGrid.Communicator.gpu_aware_mpi:
+            result = cp.empty_like(arr)
+            self._mpi_comm.Allreduce(arr, result, op=mpi_op)
+            return result
+        host = cp.asnumpy(arr)
+        result = np.empty_like(host)
+        self._mpi_comm.Allreduce(host, result, op=mpi_op)
+        return cp.asarray(result)
 
     def max(self, arg):
         """
@@ -298,13 +314,11 @@ class CommunicatorWrapper:
 
     def _max_gpu(self, arg):
         """GPU-aware max reduction."""
-        cp = _get_cupy()
-
         # Serial case: no reduction needed, return as-is
         if self.size == 1:
             return arg
 
-        # MPI case: use GPU-aware MPI
+        # MPI case (device buffers or host staging, see _allreduce_device)
         if self._mpi_comm is None:
             raise RuntimeError("MPI communicator not available for GPU reduction.")
 
@@ -313,11 +327,7 @@ class CommunicatorWrapper:
         if is_scalar:
             arg = arg.reshape(1)
 
-        # Allocate output buffer on GPU
-        result = cp.empty_like(arg)
-
-        # Use GPU-aware MPI Allreduce
-        self._mpi_comm.Allreduce(arg, result, op=MPI.MAX)
+        result = self._allreduce_device(arg, MPI.MAX)
 
         if is_scalar:
             result = result.reshape(())
@@ -505,9 +515,7 @@ class CommunicatorWrapper:
                 )
             mpi_op = {"sum": MPI.SUM, "min": MPI.MIN, "max": MPI.MAX}[op]
             buf = cp.asarray(local).reshape(1)
-            result = cp.empty_like(buf)
-            self._mpi_comm.Allreduce(buf, result, op=mpi_op)
-            return result.reshape(())
+            return self._allreduce_device(buf, mpi_op).reshape(())
 
         # CPU scalar: route through the C++ communicator (robust when
         # `_mpi_comm` is None but the C++ communicator is MPI-backed).
