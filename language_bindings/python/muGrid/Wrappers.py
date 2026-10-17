@@ -824,8 +824,10 @@ class CartesianDecomposition(FieldCollectionMixin):
         """
         Accumulate ghost buffer contributions back to the interior domain.
 
-        This is the adjoint operation of communicate_ghosts and is needed
-        for transpose operations (e.g., divergence) with periodic BCs.
+        This is the adjoint operation of communicate_ghosts, for code that
+        scatters into ghost buffers. muGrid's own operators do not: their
+        transposes gather from the communicated input ghosts and write only
+        owned points, so their results must not be reduced.
         After the operation, ghost buffers are zeroed.
 
         Parameters
@@ -1549,6 +1551,13 @@ class FEMGradientOperator:
 
         Assemble energies/forces via ``transpose(apply(...))`` directly; do **not**
         also multiply by the quadrature weights yourself (that applies ``W`` twice).
+
+        Only the owned nodes of ``nodal_field`` are written. Each collects the
+        elements around it, one of which lies in the left ghost layer of
+        ``quadrature_point_field``, so call ``communicate_ghosts`` on that field
+        first. Do **not** call ``reduce_ghosts`` on the result: its ghost nodes
+        are not written. The collection needs one left ghost layer for this and
+        one right ghost layer for :meth:`apply`.
 
         Parameters
         ----------

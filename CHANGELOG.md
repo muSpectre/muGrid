@@ -25,6 +25,18 @@ v1.5.0 (08Oct26)
   in single precision per mode and redone in double only where an a-posteriori
   test shows a relative error above 1e-4, so GPUs with 1:64 double throughput
   (L40S) keep the float32 speed instead of a 2x slower apply
+- BUG: `FEMGradientOperator.transpose` gave silently wrong results under the
+  ghost layout its own requirement reported. It claimed the scatter-and-reduce
+  layout of `apply` (ghosts on the right only), but its kernels summed every
+  element in the buffer into every node, so `communicate_ghosts` on the input
+  followed by `transpose` lost the element below each first owned node
+  (relative errors 5-30), while with two-sided ghosts `transpose` followed by
+  `reduce_ghosts` counted elements twice. The transpose now writes only the
+  owned nodes, never the output's ghosts, and requires one left ghost layer
+  (`transpose_ghost_requirement` is `(1, ..), (0, ..)`, so
+  `ghost_requirement` is two-sided): communicate the input's ghosts first and
+  do not reduce the output -- the protocol of every other muGrid operator. A
+  collection without left ghosts now raises instead of returning a wrong sum
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

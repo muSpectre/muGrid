@@ -313,12 +313,15 @@ namespace muGrid {
     BOOST_CHECK_EQUAL(laplace_req.right[0], 1);
     BOOST_CHECK_EQUAL(laplace_req.right[1], 1);
 
-    // The FEM gradient's scatter-style transpose shares the apply buffers,
-    // so the union requirement stays one-sided
+    // The FEM gradient's apply reads one right ghost layer, its gathering
+    // transpose one left ghost layer, so the union is two-sided
     const FEMGradientOperator2D fem{{1.0, 1.0}};
+    const auto fem_transpose_req{fem.get_transpose_ghost_requirement()};
+    BOOST_CHECK_EQUAL(fem_transpose_req.left[0], 1);
+    BOOST_CHECK_EQUAL(fem_transpose_req.right[0], 0);
     const auto fem_req{fem.get_ghost_requirement()};
-    BOOST_CHECK_EQUAL(fem_req.left[0], 0);
-    BOOST_CHECK_EQUAL(fem_req.left[1], 0);
+    BOOST_CHECK_EQUAL(fem_req.left[0], 1);
+    BOOST_CHECK_EQUAL(fem_req.left[1], 1);
     BOOST_CHECK_EQUAL(fem_req.right[0], 1);
     BOOST_CHECK_EQUAL(fem_req.right[1], 1);
 
