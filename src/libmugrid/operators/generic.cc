@@ -424,9 +424,10 @@ namespace muGrid {
                                             this->nb_quad_pts_ * this->nb_output_components_;
 
         // First pass: count non-zero entries
+        const Real zero_threshold{this->zero_threshold()};
         Index_t nnz = 0;
         for (const Real& value: this->coefficients_) {
-            if (std::abs(value) > this->zero_tolerance) {
+            if (std::abs(value) > zero_threshold) {
                 nnz += nb_nodal_components;
             }
         }
@@ -454,7 +455,7 @@ namespace muGrid {
                                              * this->nb_output_components_ + i_operator};
                         const auto op_value{this->coefficients_[op_index]};
                         // If this is non-zero
-                        if(std::abs(op_value) > this->zero_tolerance) {
+                        if(std::abs(op_value) > zero_threshold) {
                             // For each component
                             for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to pixel (coordinate) offset
@@ -528,9 +529,10 @@ namespace muGrid {
                                             this->nb_quad_pts_ * this->nb_output_components_;
 
         // First pass: count non-zero entries
+        const Real zero_threshold{this->zero_threshold()};
         Index_t nnz = 0;
         for (const Real& value: this->coefficients_) {
-            if (std::abs(value) > this->zero_tolerance) {
+            if (std::abs(value) > zero_threshold) {
                 nnz += nb_nodal_components;
             }
         }
@@ -558,7 +560,7 @@ namespace muGrid {
                                              * this->nb_output_components_ + i_operator};
                         const auto op_value{this->coefficients_[op_index]};
                         // If this is non-zero
-                        if(std::abs(op_value) > this->zero_tolerance) {
+                        if(std::abs(op_value) > zero_threshold) {
                             // For each component
                             for (Index_t i_component=0; i_component < nb_nodal_components; ++i_component) {
                                 // Convert from stencil index to coordinate offset
@@ -732,7 +734,7 @@ namespace muGrid {
         const TypedFieldBase<Real> & quadrature_point_field,
         TypedFieldBase<Real> & nodal_field,
         const std::vector<Real> & weights) const {
-        // set nodal field to zero
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1., nodal_field,
                                   weights);
@@ -741,6 +743,7 @@ namespace muGrid {
         const TypedFieldBase<Real32> & quadrature_point_field,
         TypedFieldBase<Real32> & nodal_field,
         const std::vector<Real> & weights) const {
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1.f, nodal_field,
                                   weights);
@@ -752,6 +755,7 @@ namespace muGrid {
         const TypedFieldBase<T> & quadrature_point_field, T alpha,
         TypedFieldBase<T> & nodal_field,
         const std::vector<Real> & weights) const {
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         // Validate fields and get collection (is_transpose=true for correct
         // ghost check; generic version works for any field scalar type)
         const auto & collection = this->validate_fields_generic(

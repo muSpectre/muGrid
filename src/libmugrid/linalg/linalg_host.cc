@@ -519,18 +519,7 @@ template <>
 std::array<Real, 3> pipelined_cg_dots<Real, HostSpace>(
     const TypedField<Real, HostSpace>& r, const TypedField<Real, HostSpace>& u,
     const TypedField<Real, HostSpace>& w) {
-    for (const auto* other : {&u, &w}) {
-        if (&other->get_collection() != &r.get_collection()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must belong to the same collection");
-        }
-        if (other->get_nb_components() != r.get_nb_components() ||
-            other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must have the same number of "
-                "components and sub-points");
-        }
-    }
+    internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
     const Index_t nb_components_per_pixel =
         r.get_nb_components() * r.get_nb_sub_pts();
@@ -606,6 +595,9 @@ std::array<Real, 3> pipelined_cg_dots<Real32, HostSpace>(
     const TypedField<Real32, HostSpace>& r,
     const TypedField<Real32, HostSpace>& u,
     const TypedField<Real32, HostSpace>& w) {
+    // The same operand checks as every other precision: without them a
+    // mismatched u or w was read past its end.
+    internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
     const Index_t nb_components_per_pixel =
         r.get_nb_components() * r.get_nb_sub_pts();
@@ -709,10 +701,9 @@ template <typename T>
 static void cross_host(const TypedField<T, HostSpace>& a,
                        const TypedField<T, HostSpace>& b,
                        TypedField<T, HostSpace>& out) {
-    const auto& coll = a.get_collection();
-    internal::check_three_vector("cross", a, coll);
-    internal::check_three_vector("cross", b, coll);
-    internal::check_three_vector("cross", out, coll);
+    internal::check_three_vector("cross", a, a);
+    internal::check_three_vector("cross", b, a);
+    internal::check_three_vector("cross", out, a);
     const Index_t npix = a.get_nb_entries();
     // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
     // compute. Skip it, including the aliasing check below: empty fields share a
@@ -764,11 +755,10 @@ void leray_project<HostSpace>(const TypedField<Real, HostSpace>& k,
                               const TypedField<Real, HostSpace>& invk,
                               const TypedField<Complex, HostSpace>& N,
                               TypedField<Complex, HostSpace>& out) {
-    const auto& coll = out.get_collection();
-    internal::check_three_vector("leray_project", k, coll);
-    internal::check_three_vector("leray_project", invk, coll);
-    internal::check_three_vector("leray_project", N, coll);
-    internal::check_three_vector("leray_project", out, coll);
+    internal::check_three_vector("leray_project", k, out);
+    internal::check_three_vector("leray_project", invk, out);
+    internal::check_three_vector("leray_project", N, out);
+    internal::check_three_vector("leray_project", out, out);
     // k, invk, N and out share a collection, hence a storage order.
     const Index_t npix = out.get_nb_entries();
     const bool soa =
@@ -782,11 +772,10 @@ void leray_project<HostSpace>(const TypedField<Real32, HostSpace>& k,
                               const TypedField<Real32, HostSpace>& invk,
                               const TypedField<Complex32, HostSpace>& N,
                               TypedField<Complex32, HostSpace>& out) {
-    const auto& coll = out.get_collection();
-    internal::check_three_vector("leray_project", k, coll);
-    internal::check_three_vector("leray_project", invk, coll);
-    internal::check_three_vector("leray_project", N, coll);
-    internal::check_three_vector("leray_project", out, coll);
+    internal::check_three_vector("leray_project", k, out);
+    internal::check_three_vector("leray_project", invk, out);
+    internal::check_three_vector("leray_project", N, out);
+    internal::check_three_vector("leray_project", out, out);
     const Index_t npix = out.get_nb_entries();
     const bool soa =
         (out.get_storage_order() == StorageOrder::StructureOfArrays);

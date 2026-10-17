@@ -42,6 +42,7 @@
 #define SRC_LIBMUGRID_LINALG_LINALG_HH_
 
 #include "field/field_typed.hh"
+#include "grid/strides.hh"
 
 #include <array>
 #include <string>
@@ -347,10 +348,53 @@ void leray_project(const TypedField<Real32, MemorySpace>& k,
 
 namespace internal {
 
+    //! Throw unless `f`'s pixels are stored densely. Every kernel that walks
+    //! a field's buffer as a flat array -- the device's full-buffer
+    //! operations, the field-valued scal, cross and leray_project -- takes
+    //! element i for pixel i; on a collection with padded pixel strides it
+    //! would silently read and write the padding. (The host's Eigen-based
+    //! operations refuse such fields through eigen_vec() already.)
+    template <typename AnyField>
+    void check_contiguous(const char* op, const AnyField& f) {
+        const auto& coll{f.get_collection()};
+        if (!CcoordOps::is_buffer_contiguous(coll.get_pixels_shape(),
+                                             coll.get_pixels_strides())) {
+            throw FieldError(std::string(op) + ": field '" + f.get_name() +
+                             "' does not have contiguous pixel storage, "
+                             "which this operation requires");
+        }
+    }
+
+    //! Validate the operands of pipelined_cg_dots against `r`: one
+    //! collection, the same components and sub-points, dense storage. Shared
+    //! by every precision and memory space, so none of them can skip it.
+    template <typename AnyField>
+    void check_pipelined_cg_operands(const AnyField& r, const AnyField& u,
+                                     const AnyField& w) {
+        for (const auto* other : {&u, &w}) {
+            if (&other->get_collection() != &r.get_collection()) {
+                throw FieldError(
+                    "pipelined_cg_dots: fields must belong to the same "
+                    "collection");
+            }
+            if (other->get_nb_components() != r.get_nb_components() ||
+                other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
+                throw FieldError(
+                    "pipelined_cg_dots: fields must have the same number of "
+                    "components and sub-points");
+            }
+        }
+        for (const auto* f : {&r, &u, &w}) {
+            check_contiguous("pipelined_cg_dots", *f);
+        }
+    }
+
     //! Validate a field-valued alpha for scal(): same collection, same
     //! number of entries, and one or x's number of components
     template <typename AlphaField, typename XField>
     void check_field_alpha(const AlphaField& alpha, const XField& x) {
+        check_contiguous("scal", alpha);
+        check_contiguous("scal", x);
         if (&x.get_collection() != &alpha.get_collection()) {
             throw FieldError(
                 "scal: fields must belong to the same collection");
@@ -367,12 +411,15 @@ namespace internal {
         }
     }
 
-    //! Validate that a field lives on `coll` and carries exactly three
-    //! components per pixel; used by cross() / leray_project().
-    template <typename AnyField>
+    //! Validate that a field lives on the collection of `ref`, carries
+    //! exactly three components and as many sub-points as `ref`, and is
+    //! stored densely; used by cross() / leray_project(). They take the
+    //! number of three-vectors from one operand, so a sub-point mismatch
+    //! would read and write past the end of the others.
+    template <typename AnyField, typename RefField>
     void check_three_vector(const char* op, const AnyField& f,
-                            const FieldCollection& coll) {
-        if (&f.get_collection() != &coll) {
+                            const RefField& ref) {
+        if (&f.get_collection() != &ref.get_collection()) {
             throw FieldError(std::string(op) +
                              ": fields must belong to the same collection");
         }
@@ -380,6 +427,12 @@ namespace internal {
             throw FieldError(std::string(op) +
                              ": fields must have exactly three components");
         }
+        if (f.get_nb_sub_pts() != ref.get_nb_sub_pts()) {
+            throw FieldError(std::string(op) +
+                             ": fields must have the same number of "
+                             "sub-points");
+        }
+        check_contiguous(op, f);
     }
 
 }  // namespace internal

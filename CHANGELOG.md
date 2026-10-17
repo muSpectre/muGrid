@@ -63,6 +63,49 @@ v1.5.0 (08Oct26)
   pipelined solver first restarts, since its recurrences drift).
   `JacobiPreconditioner` rejects negative and non-finite diagonal entries, not
   only zeros, and takes a `communicator` so that the check is collective
+- BUG: The stored reference-stiffness preconditioner
+  (`make_reference_stiffness_preconditioner(..., evaluate_symbol=False)`, the
+  default on the host) assembled its symbol in single precision for float32
+  solves, where the low-frequency phase sum cancels: on the lowest modes it
+  was off from the float64 preconditioner by 4e-2 at 4096^2 (7e-4 at 1024^2).
+  It is now built and inverted in double a slab at a time and only the inverse
+  is stored in float32 (error 2e-7), and symmetrised so that the float32
+  symbol is stored as its upper triangle instead of the dense block (half the
+  memory). The Hermitian test of `BlockFourierPreconditioner` allows
+  single-precision rounding
+- BUG: The in-place kernels `apply_green_symbol_*` and `block_thomas_*`
+  converted an output array of the wrong dtype or layout into a temporary,
+  wrote the result there and returned the caller's array unchanged without an
+  error. Their outputs are now taken without conversion (`TypeError` on a
+  mismatch) and must be writeable, and the remaining shapes and indices are
+  validated (an `exc_index` beyond `exc`, a mode reading an empty `head`, the
+  coupling blocks, strides beyond the field)
+- BUG: `GenericLinearOperator` dropped stencil coefficients below an absolute
+  1e-14, so an operator in SI units at the micrometre scale (or the identity
+  times 1e-15) applied as zero. The threshold is now relative to the largest
+  coefficient
+- BUG: Reading a NetCDF variable into a field of a narrower type -- double
+  into float32, float into an integer -- rounded or truncated the values
+  without an error. Such reads now raise `FileIOError`; widening reads (float
+  into double, smaller into larger integers) still convert exactly
+- BUG: Out-of-bounds reads and writes on unchecked inputs: `linalg.cross`
+  and `leray_project` did not compare sub-point counts (the number of
+  three-vectors is taken from one operand); the float32 host
+  `pipelined_cg_dots` did not validate its operands at all; and the
+  flat-buffer kernels (the device's `axpy`/`scal`/`axpby`/`copy`/reductions,
+  the field-valued `scal`, `cross`, `leray_project`) assumed dense pixel
+  storage and silently computed on padding for collections with custom pixel
+  strides. All now raise. The transposes of `FEMGradientOperator` and
+  `GenericLinearOperator` check that `weights` has one entry per quadrature
+  point instead of reading past its end
+- BUG: MPI reductions: `Communicator.gather` checked for uneven row counts only
+  with an `assert`, so release builds scrambled the result; the check is now
+  collective and every rank raises. `reduce_min`/`reduce_max` of an integer
+  array deadlocked when one rank was empty (its +-inf identity overflowed on
+  that rank alone). `sum` and `reduce_sum` dropped imaginary parts and rounded
+  integers beyond 2^53, and chose the MPI datatype of a scalar from its value,
+  so ranks could disagree on it; scalars are now reduced with the type of
+  their dtype
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
