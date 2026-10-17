@@ -781,6 +781,14 @@ class AnalyticReferencePreconditioner(Preconditioner):
     :func:`make_reference_stiffness_preconditioner` picks this class on a
     device and the stored symbol on the host.
 
+    The symbol is built and inverted in double for either field precision;
+    only the mode's components are read and written in the field's. In single
+    precision the low-frequency phase sum cancels O(S) terms to O(S q²) and
+    the lowest modes were lost (zeroed outright from N ≈ 2048). The float32
+    timings above predate that change and were taken with single-precision
+    symbol arithmetic; on GPUs with weak double throughput expect the
+    float32 apply to approach the float64 one.
+
     The per-mode cost would be nine times higher done naively. Modes along the
     fastest axis share the frequencies of every other axis, so the kernel
     hoists those sums out of that loop; without it the symbol build alone is
@@ -824,15 +832,21 @@ class AnalyticReferencePreconditioner(Preconditioner):
                 f"stencil must have shape (3,)*dim + (dim, dim) with dim 2 or "
                 f"3; got {stencil.shape}")
         self._dim = dim
-        # Real, and 243 numbers at most -- this is the whole operator.
-        self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=real_dtype)
+        # Real, and 243 numbers at most -- this is the whole operator. Kept in
+        # double for either field precision: the kernel builds and inverts the
+        # symbol in double, because in single precision the low-frequency
+        # phase sum cancels to O(S q^2) and loses the long-wavelength modes
+        # this preconditioner exists for (relative error ~ eps * N^2).
+        self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=np.float64)
 
         self._fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
         # One frequency table per axis rather than one frequency per mode: the
         # per-mode form would be 809 MB at 512³ in single precision, which is
         # most of what not storing the symbol saves. Read off the engine's own
         # meshgrid so the convention cannot drift -- muGrid makes axis 0 the
-        # half-complex one, unlike numpy.fft.rfftn.
+        # half-complex one, unlike numpy.fft.rfftn. Double, like the stencil;
+        # the device kernel reads these through raw addresses, so the dtype
+        # is load-bearing.
         #
         # A rank can own *no* Fourier modes -- more ranks than planes along the
         # split axis -- and then the meshgrid has a zero-length axis that
@@ -844,16 +858,16 @@ class AnalyticReferencePreconditioner(Preconditioner):
         for d in range(dim):
             if self._nb_modes == 0:
                 self._q.append(np.empty(self._fourier_shape[d],
-                                        dtype=real_dtype))
+                                        dtype=np.float64))
                 continue
             index = [0] * dim
             index[d] = slice(None)
             self._q.append(
-                np.ascontiguousarray(q[d][tuple(index)], dtype=real_dtype))
+                np.ascontiguousarray(q[d][tuple(index)], dtype=np.float64))
 
         self._work = engine.fourier_space_field(
             f"{name}-work", components=(dim,), dtype=complex_dtype)
-        self._normalisation = real_dtype.type(engine.normalisation)
+        self._normalisation = float(engine.normalisation)
 
         # The work field's view says where the transforms leave the data: a
         # cupy array means the device kernel, which takes device addresses.

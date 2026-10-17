@@ -158,14 +158,17 @@ namespace {
     void bind_green_symbol(py::module & mod, const char * name) {
         using Arr = py::array_t<std::complex<T>,
                                 py::array::c_style | py::array::forcecast>;
-        using RArr = py::array_t<T, py::array::c_style | py::array::forcecast>;
+        // The symbol is evaluated in double for either field precision, so
+        // its inputs are double too (see green_symbol.hh).
+        using RArr =
+            py::array_t<Real, py::array::c_style | py::array::forcecast>;
         mod.def(
             name,
             [](Arr field, muGrid::Index_t stride_component,
                muGrid::Index_t stride_mode, RArr stencil,
                std::vector<RArr> q,
                std::vector<muGrid::Index_t> nb_fourier_grid_pts,
-               T normalisation) {
+               Real normalisation) {
                 const auto f = field.request();
                 const auto st = stencil.request();
 
@@ -193,7 +196,7 @@ namespace {
                 }
 
                 std::vector<py::buffer_info> qb;
-                std::vector<const T *> qp;
+                std::vector<const Real *> qp;
                 qb.reserve(Dim);
                 qp.reserve(Dim);
                 for (muGrid::Dim_t d = 0; d < Dim; ++d) {
@@ -203,11 +206,11 @@ namespace {
                             "apply_green_symbol: frequency table length does "
                             "not match the mode count of its axis"};
                     }
-                    qp.push_back(static_cast<const T *>(qb.back().ptr));
+                    qp.push_back(static_cast<const Real *>(qb.back().ptr));
                 }
 
                 auto * field_p = static_cast<std::complex<T> *>(f.ptr);
-                const auto * stencil_p = static_cast<const T *>(st.ptr);
+                const auto * stencil_p = static_cast<const Real *>(st.ptr);
 
                 py::gil_scoped_release release{};
                 muGrid::green_symbol::apply_inverse<Dim, T>(
@@ -220,7 +223,9 @@ namespace {
             "Apply the inverse symbol of a uniform stencil operator to a "
             "Fourier field, in place, evaluating the symbol per mode instead "
             "of reading a stored one. The q = 0 block is the rigid-body null "
-            "space and is projected out.");
+            "space and is projected out. The symbol is built and inverted in "
+            "double for either field precision; stencil, q and normalisation "
+            "are taken in double.");
     }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -274,14 +279,15 @@ namespace {
      */
     template <muGrid::Dim_t Dim, typename T>
     void bind_green_symbol_gpu(py::module & mod, const char * name) {
-        using RArr = py::array_t<T, py::array::c_style | py::array::forcecast>;
+        using RArr =
+            py::array_t<Real, py::array::c_style | py::array::forcecast>;
         mod.def(
             name,
             [](std::uintptr_t field, muGrid::Index_t stride_component,
                muGrid::Index_t stride_mode, RArr stencil,
                std::vector<std::uintptr_t> q,
                std::vector<muGrid::Index_t> nb_fourier_grid_pts,
-               T normalisation) {
+               Real normalisation) {
                 const auto st = stencil.request();
                 if (static_cast<muGrid::Dim_t>(q.size()) != Dim ||
                     static_cast<muGrid::Dim_t>(nb_fourier_grid_pts.size()) !=
@@ -300,12 +306,12 @@ namespace {
                 for (auto n : nb_fourier_grid_pts) {
                     nb_modes *= n;
                 }
-                std::vector<const T *> qp;
+                std::vector<const Real *> qp;
                 qp.reserve(Dim);
                 for (auto p : q) {
-                    qp.push_back(reinterpret_cast<const T *>(p));
+                    qp.push_back(reinterpret_cast<const Real *>(p));
                 }
-                const auto * stencil_p = static_cast<const T *>(st.ptr);
+                const auto * stencil_p = static_cast<const Real *>(st.ptr);
                 py::gil_scoped_release release{};
                 muGrid::green_symbol::apply_inverse_gpu<Dim, T>(
                     reinterpret_cast<std::complex<T> *>(field),
@@ -316,7 +322,8 @@ namespace {
             "q"_a, "nb_fourier_grid_pts"_a, "normalisation"_a,
             "Device counterpart of apply_green_symbol. `field` and each entry "
             "of `q` are device addresses (CuPy `array.data.ptr`); the stencil "
-            "is a host array.");
+            "is a host array. The frequency tables must be float64 for every "
+            "field precision: the symbol is evaluated in double.");
     }
 #endif
 

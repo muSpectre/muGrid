@@ -1186,6 +1186,102 @@ def test_evaluated_symbol_stores_only_the_stencil(comm, dim):
     assert stored_scalars == 3 ** dim * dim * dim + sum(fourier_shape)
 
 
+def _low_frequency_modes(dim, n):
+    """Frequency tables for the longest wavelengths of an ``n^dim`` grid:
+    the half-complex axis 0 in full, the first eight modes of the others."""
+    q = [np.arange(n // 2 + 1) / n] + [np.fft.fftfreq(n)[:8]] * (dim - 1)
+    return q, [len(qd) for qd in q]
+
+
+@pytest.mark.parametrize("dim,n,h,modulus", [
+    (2, 4096, 1 / 4096, 1.0), (2, 65536, 1 / 65536, 1e-3),
+    (3, 2048, 1 / 2048, 1.0), (3, 4096, 1 / 4096, 1.0),
+    (3, 256, 1e-2, 1e-3),
+])
+def test_evaluated_symbol_is_accurate_in_single_precision(dim, n, h, modulus):
+    """The float32 kernel must invert the lowest modes as accurately as float32
+    can store the result.
+
+    The stencil's rows sum to zero, so at frequency q the phase sum cancels
+    O(S) terms down to O(S q^2): built in single precision that is a relative
+    error of about ``eps N^2``, order one at N = 4096, and ``|det|^2`` --
+    the Dim-th power of entries that small -- underflowed, so the kernel took
+    such modes for the q = 0 null space and zeroed them. Those are the
+    long-wavelength modes the preconditioner exists to treat. Only the lowest
+    modes of a large grid are evaluated, through the per-axis frequency tables,
+    so this stays cheap.
+    """
+    from muGrid import linalg
+    from muGrid.Preconditioners import reference_stencil
+
+    stencil = reference_stencil(dim, (h,) * dim, muGrid.FEMElement.q1,
+                                modulus, modulus).ravel()
+    q, shape = _low_frequency_modes(dim, n)
+    nb_modes = int(np.prod(shape))
+    rng = np.random.default_rng(0)
+    v = rng.standard_normal(nb_modes * dim) + 1j * rng.standard_normal(
+        nb_modes * dim)
+
+    ref = v.copy()
+    getattr(linalg, f"apply_green_symbol_{dim}d")(
+        ref, 1, dim, stencil, q, shape, 1.0)
+    got = v.astype(np.complex64)
+    getattr(linalg, f"apply_green_symbol_{dim}d_f32")(
+        got, 1, dim, stencil, q, shape, 1.0)
+
+    ref = ref.reshape(nb_modes, dim)
+    got = got.reshape(nb_modes, dim).astype(np.complex128)
+    scale = np.abs(ref).max(axis=1)
+    nonzero = scale > 0
+    assert nonzero.sum() == nb_modes - 1  # only q = 0 is projected out
+    rel = np.abs(got - ref).max(axis=1)[nonzero] / scale[nonzero]
+    assert rel.max() < 1e-6
+
+
+@pytest.mark.parametrize("dim,n,h,modulus", [
+    (2, 65536, 1 / 65536, 1e-3), (3, 4096, 1 / 4096, 1.0),
+    (3, 256, 1e-2, 1e-3),
+])
+def test_evaluated_symbol_on_device_is_accurate_in_single_precision(
+        dim, n, h, modulus):
+    """Device counterpart of the single-precision accuracy test: the float32
+    device kernel against the float64 host kernel on the lowest modes."""
+    skip_if_gpu_unavailable("gpu")
+    import cupy
+
+    from muGrid import linalg
+    from muGrid.Preconditioners import reference_stencil
+
+    kernel = getattr(linalg, f"apply_green_symbol_gpu_{dim}d_f32", None)
+    if kernel is None:
+        pytest.skip("muGrid built without the device symbol kernel")
+    stencil = reference_stencil(dim, (h,) * dim, muGrid.FEMElement.q1,
+                                modulus, modulus).ravel()
+    q, shape = _low_frequency_modes(dim, n)
+    nb_modes = int(np.prod(shape))
+    rng = np.random.default_rng(0)
+    v = rng.standard_normal((dim, nb_modes)) + 1j * rng.standard_normal(
+        (dim, nb_modes))
+
+    ref = np.ascontiguousarray(v.T).ravel()
+    getattr(linalg, f"apply_green_symbol_{dim}d")(
+        ref, 1, dim, stencil, q, shape, 1.0)
+    ref = ref.reshape(nb_modes, dim).T
+
+    # structure-of-arrays on the device: component stride nb_modes
+    got = cupy.asarray(v.astype(np.complex64))
+    q_device = [cupy.asarray(qd, dtype=np.float64) for qd in q]
+    kernel(got.data.ptr, nb_modes, 1, stencil,
+           [qd.data.ptr for qd in q_device], shape, 1.0)
+    got = cupy.asnumpy(got).astype(np.complex128)
+
+    scale = np.abs(ref).max(axis=0)
+    nonzero = scale > 0
+    assert nonzero.sum() == nb_modes - 1
+    rel = np.abs(got - ref).max(axis=0)[nonzero] / scale[nonzero]
+    assert rel.max() < 1e-6
+
+
 @pytest.mark.parametrize("dim,shape", [
     (2, (16, 16)), (3, (10, 10, 10)),
     # axis 0 halves to two modes, so a thread block spans more lines than it

@@ -53,6 +53,10 @@
  * Consecutive threads take consecutive modes, which is what keeps the field
  * access coalesced in the device's structure-of-arrays layout.
  *
+ * As on the host, the symbol is built and inverted in double whatever the
+ * field precision (see `green_symbol.hh`); only the load and store of the
+ * mode's components are in `T`.
+ *
  * When axis 0 is so short that a block would touch more than `MAX_LINES`
  * lines, each thread builds its own `P` instead. That is the naive per-mode
  * cost, but it only arises for lines a few modes long, where the hoist would
@@ -209,12 +213,13 @@ namespace muGrid {
             template <Dim_t Dim, typename T, class Get>
             __device__ __forceinline__ void
             finish_mode(DevCplx<T> * MUGRID_RESTRICT v,
-                        Index_t stride_component, DevCplx<T> p0, Get P,
-                        T normalisation) {
-                DevCplx<T> K[Dim][Dim];
+                        Index_t stride_component, DevCplx<Real> p0, Get P,
+                        Real normalisation) {
+                using C = Real;
+                DevCplx<C> K[Dim][Dim];
                 for (int a{0}; a < Dim; ++a) {
                     for (int b{0}; b < Dim; ++b) {
-                        DevCplx<T> acc{T(0), T(0)};
+                        DevCplx<C> acc{C(0), C(0)};
                         for (int d0{0}; d0 < 3; ++d0) {
                             cfma(acc, offset_phase(p0, d0), P(d0, a, b));
                         }
@@ -222,8 +227,34 @@ namespace muGrid {
                     }
                 }
 
-                // Cofactor inverse, as on the host.
-                DevCplx<T> det{T(0), T(0)};
+                // Cofactor inverse, as on the host: scale the block by its
+                // largest entry first, so |det|^2 cannot underflow at low
+                // frequency, where the entries are O(S q^2).
+                C kscale{0};
+                for (int a{0}; a < Dim; ++a) {
+                    for (int b{0}; b < Dim; ++b) {
+                        kscale = fmax(kscale, fmax(fabs(K[a][b].re),
+                                                   fabs(K[a][b].im)));
+                    }
+                }
+                DevCplx<T> in[Dim];
+                for (int a{0}; a < Dim; ++a) {
+                    in[a] = v[a * stride_component];
+                }
+                if (!(kscale > C(0))) {
+                    for (int a{0}; a < Dim; ++a) {
+                        v[a * stride_component] = DevCplx<T>{T(0), T(0)};
+                    }
+                    return;
+                }
+                const C inv_kscale{C(1) / kscale};
+                for (int a{0}; a < Dim; ++a) {
+                    for (int b{0}; b < Dim; ++b) {
+                        K[a][b].re *= inv_kscale;
+                        K[a][b].im *= inv_kscale;
+                    }
+                }
+                DevCplx<C> det{C(0), C(0)};
                 if constexpr (Dim == 2) {
                     det = csub(cmul(K[0][0], K[1][1]), cmul(K[0][1], K[1][0]));
                 } else {
@@ -234,26 +265,22 @@ namespace muGrid {
                                   cmul(K[1][j2], K[2][j1])));
                     }
                 }
-                const T mag{det.re * det.re + det.im * det.im};
-                DevCplx<T> in[Dim];
-                for (int a{0}; a < Dim; ++a) {
-                    in[a] = v[a * stride_component];
-                }
-                if (!(mag > T(0))) {
+                const C mag{det.re * det.re + det.im * det.im};
+                if (!(mag > C(0))) {
                     for (int a{0}; a < Dim; ++a) {
                         v[a * stride_component] = DevCplx<T>{T(0), T(0)};
                     }
                     return;
                 }
-                // normalisation / det, folded into one scale
-                const DevCplx<T> scale{normalisation * det.re / mag,
-                                       -normalisation * det.im / mag};
+                // normalisation / (kscale * det), folded into one scale
+                const C f{normalisation * inv_kscale / mag};
+                const DevCplx<C> scale{det.re * f, -det.im * f};
 
-                DevCplx<T> Kinv[Dim][Dim];
+                DevCplx<C> Kinv[Dim][Dim];
                 if constexpr (Dim == 2) {
                     Kinv[0][0] = K[1][1];
-                    Kinv[0][1] = DevCplx<T>{-K[0][1].re, -K[0][1].im};
-                    Kinv[1][0] = DevCplx<T>{-K[1][0].re, -K[1][0].im};
+                    Kinv[0][1] = DevCplx<C>{-K[0][1].re, -K[0][1].im};
+                    Kinv[1][0] = DevCplx<C>{-K[1][0].re, -K[1][0].im};
                     Kinv[1][1] = K[0][0];
                 } else {
                     for (int i{0}; i < 3; ++i) {
@@ -267,11 +294,15 @@ namespace muGrid {
                     }
                 }
                 for (int a{0}; a < Dim; ++a) {
-                    DevCplx<T> acc{T(0), T(0)};
+                    DevCplx<C> acc{C(0), C(0)};
                     for (int b{0}; b < Dim; ++b) {
-                        cfma(acc, Kinv[a][b], in[b]);
+                        cfma(acc, Kinv[a][b],
+                             DevCplx<C>{static_cast<C>(in[b].re),
+                                        static_cast<C>(in[b].im)});
                     }
-                    v[a * stride_component] = cmul(acc, scale);
+                    const DevCplx<C> out{cmul(acc, scale)};
+                    v[a * stride_component] = DevCplx<T>{
+                        static_cast<T>(out.re), static_cast<T>(out.im)};
                 }
             }
 
@@ -280,10 +311,12 @@ namespace muGrid {
                 green_symbol_kernel(DevCplx<T> * MUGRID_RESTRICT field,
                                     Index_t stride_component,
                                     Index_t stride_mode,
-                                    const Stencil<Dim, T> S, const Axes<T> ax,
-                                    T normalisation, Index_t nb_modes) {
+                                    const Stencil<Dim, Real> S,
+                                    const Axes<Real> ax, Real normalisation,
+                                    Index_t nb_modes) {
+                using C = Real;
                 constexpr int NP{3 * Dim * Dim};
-                __shared__ DevCplx<T> P_sh[MAX_LINES][NP];
+                __shared__ DevCplx<C> P_sh[MAX_LINES][NP];
                 __shared__ bool zero_12_sh[MAX_LINES];
 
                 // Line = flat index over axes 1 and 2. The host guarantees
@@ -308,13 +341,13 @@ namespace muGrid {
                         const int j{w / NP}, e{w % NP};
                         const int line{line_lo + j};
                         const int i1{line % n1}, i2{line / n1};
-                        const T f1{(Dim > 1) ? ax.q[1][i1] : T(0)};
-                        const T f2{(Dim > 2) ? ax.q[2][i2] : T(0)};
-                        P_sh[j][e] = hoisted_entry<Dim, T>(
+                        const C f1{(Dim > 1) ? ax.q[1][i1] : C(0)};
+                        const C f2{(Dim > 2) ? ax.q[2][i2] : C(0)};
+                        P_sh[j][e] = hoisted_entry<Dim, C>(
                             S, unit_phase(f1), unit_phase(f2), e / (Dim * Dim),
                             (e / Dim) % Dim, e % Dim);
                         if (e == 0) {
-                            zero_12_sh[j] = (f1 == T(0)) && (f2 == T(0));
+                            zero_12_sh[j] = (f1 == C(0)) && (f2 == C(0));
                         }
                     }
                     __syncthreads();
@@ -332,19 +365,19 @@ namespace muGrid {
                     static_cast<int>(threadIdx.x)};
                 const int j{off / n0};
                 const int i0{off - j * n0};
-                const T f0{ax.q[0][i0]};
-                const DevCplx<T> p0{unit_phase(f0)};
+                const C f0{ax.q[0][i0]};
+                const DevCplx<C> p0{unit_phase(f0)};
 
                 if (shared) {
                     // The q = 0 block is the rigid-body null space; its
                     // pseudo-inverse is zero, as in the assembled path.
-                    if (zero_12_sh[j] && f0 == T(0)) {
+                    if (zero_12_sh[j] && f0 == C(0)) {
                         for (int a{0}; a < Dim; ++a) {
                             v[a * stride_component] = DevCplx<T>{T(0), T(0)};
                         }
                         return;
                     }
-                    const DevCplx<T> * P{P_sh[j]};
+                    const DevCplx<C> * P{P_sh[j]};
                     finish_mode<Dim, T>(
                         v, stride_component, p0,
                         [P](int d0, int a, int b) {
@@ -354,18 +387,18 @@ namespace muGrid {
                 } else {
                     const int line{line_lo + j};
                     const int i1{line % n1}, i2{line / n1};
-                    const T f1{(Dim > 1) ? ax.q[1][i1] : T(0)};
-                    const T f2{(Dim > 2) ? ax.q[2][i2] : T(0)};
-                    if (f0 == T(0) && f1 == T(0) && f2 == T(0)) {
+                    const C f1{(Dim > 1) ? ax.q[1][i1] : C(0)};
+                    const C f2{(Dim > 2) ? ax.q[2][i2] : C(0)};
+                    if (f0 == C(0) && f1 == C(0) && f2 == C(0)) {
                         for (int a{0}; a < Dim; ++a) {
                             v[a * stride_component] = DevCplx<T>{T(0), T(0)};
                         }
                         return;
                     }
-                    const DevCplx<T> p1{unit_phase(f1)}, p2{unit_phase(f2)};
-                    DevCplx<T> P[NP];
+                    const DevCplx<C> p1{unit_phase(f1)}, p2{unit_phase(f2)};
+                    DevCplx<C> P[NP];
                     for (int e{0}; e < NP; ++e) {
-                        P[e] = hoisted_entry<Dim, T>(S, p1, p2, e / (Dim * Dim),
+                        P[e] = hoisted_entry<Dim, C>(S, p1, p2, e / (Dim * Dim),
                                                      (e / Dim) % Dim, e % Dim);
                     }
                     finish_mode<Dim, T>(
@@ -382,18 +415,18 @@ namespace muGrid {
         template <Dim_t Dim, typename T>
         void apply_inverse_gpu(std::complex<T> * field,
                                Index_t stride_component, Index_t stride_mode,
-                               const T * stencil, const T * const * q,
+                               const Real * stencil, const Real * const * q,
                                const Index_t * nb_fourier_grid_pts,
-                               T normalisation, Index_t nb_modes) {
+                               Real normalisation, Index_t nb_modes) {
             if (nb_modes == 0) {
                 return;
             }
-            Stencil<Dim, T> S;
-            for (Index_t i{0}; i < Stencil<Dim, T>::NB_OFFSETS * Dim * Dim;
+            Stencil<Dim, Real> S;
+            for (Index_t i{0}; i < Stencil<Dim, Real>::NB_OFFSETS * Dim * Dim;
                  ++i) {
                 S.s[i] = stencil[i];
             }
-            Axes<T> ax{};
+            Axes<Real> ax{};
             Index_t nb_lines{1};
             for (Dim_t d{0}; d < 3; ++d) {
                 const Index_t n{d < Dim ? nb_fourier_grid_pts[d] : 1};
@@ -432,15 +465,15 @@ namespace muGrid {
                                                  Index_t);
         template void apply_inverse_gpu<2, Real32>(std::complex<Real32> *,
                                                    Index_t, Index_t,
-                                                   const Real32 *,
-                                                   const Real32 * const *,
-                                                   const Index_t *, Real32,
+                                                   const Real *,
+                                                   const Real * const *,
+                                                   const Index_t *, Real,
                                                    Index_t);
         template void apply_inverse_gpu<3, Real32>(std::complex<Real32> *,
                                                    Index_t, Index_t,
-                                                   const Real32 *,
-                                                   const Real32 * const *,
-                                                   const Index_t *, Real32,
+                                                   const Real *,
+                                                   const Real * const *,
+                                                   const Index_t *, Real,
                                                    Index_t);
 
     }  // namespace green_symbol

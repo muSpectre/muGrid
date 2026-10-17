@@ -34,6 +34,7 @@
 
 #include "green_symbol.hh"
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 
@@ -87,12 +88,37 @@ namespace muGrid {
              * Dim is 2 or 3, so a closed form is both shorter and faster than
              * any factorisation, and it keeps the whole thing in registers --
              * which is the point of evaluating the symbol per mode rather than
-             * storing it. Returns false if the matrix is singular to working
-             * precision, which the caller treats as the q = 0 null space.
+             * storing it.
+             *
+             * The matrix is scaled by its largest entry before the determinant
+             * is formed. `|det|^2` is the Dim-th power of the squared entries,
+             * so at low frequencies -- where the symbol is O(S q^2) -- it
+             * underflows long before the inverse itself leaves the range;
+             * scaling makes the determinant O(1) for any well-conditioned
+             * block. Returns false only if the block is exactly singular,
+             * which the caller treats as the q = 0 null space.
              */
             template <Dim_t Dim, typename T>
-            inline bool invert(const Cplx<T> (&m)[Dim][Dim],
+            inline bool invert(const Cplx<T> (&m_in)[Dim][Dim],
                                Cplx<T> (&out)[Dim][Dim]) {
+                T scale{0};
+                for (Dim_t i = 0; i < Dim; ++i) {
+                    for (Dim_t j = 0; j < Dim; ++j) {
+                        scale = std::max({scale, std::abs(m_in[i][j].re),
+                                          std::abs(m_in[i][j].im)});
+                    }
+                }
+                if (!(scale > T(0))) {
+                    return false;
+                }
+                const T inv_scale{T(1) / scale};
+                Cplx<T> m[Dim][Dim];
+                for (Dim_t i = 0; i < Dim; ++i) {
+                    for (Dim_t j = 0; j < Dim; ++j) {
+                        m[i][j] = cscale(m_in[i][j], inv_scale);
+                    }
+                }
+
                 Cplx<T> det{};
                 if constexpr (Dim == 2) {
                     det = csub(cmul(m[0][0], m[1][1]), cmul(m[0][1], m[1][0]));
@@ -109,8 +135,11 @@ namespace muGrid {
                 if (!(mag > T(0))) {
                     return false;
                 }
-                // 1 / det, by the conjugate over the squared magnitude
-                const Cplx<T> inv_det{det.re / mag, -det.im / mag};
+                // 1 / det of the scaled block, by the conjugate over the
+                // squared magnitude; the trailing 1 / scale undoes the scaling
+                // (inv(m / s) = s inv(m), so inv(m) = inv(m / s) / s)
+                const T f{inv_scale / mag};
+                const Cplx<T> inv_det{det.re * f, -det.im * f};
 
                 if constexpr (Dim == 2) {
                     out[0][0] = cmul(m[1][1], inv_det);
@@ -146,19 +175,21 @@ namespace muGrid {
 
         template <Dim_t Dim, typename T>
         void apply_inverse(std::complex<T> * field, Index_t stride_component,
-                           Index_t stride_mode, const T * stencil,
-                           const T * const * q,
+                           Index_t stride_mode, const Real * stencil,
+                           const Real * const * q,
                            const Index_t * nb_fourier_grid_pts,
-                           T normalisation, Index_t nb_modes) {
-            constexpr Dim_t NB_OFF = (Dim == 2) ? 9 : 27;
-            (void)NB_OFF;
+                           Real normalisation, Index_t nb_modes) {
+            // The symbol is built and inverted in double whatever the field
+            // precision; see the header for why single precision is not
+            // enough. Only the load and store of the mode touch T.
+            using C = Real;
             const Index_t n0 = nb_fourier_grid_pts[0];
             const Index_t n1 = (Dim > 1) ? nb_fourier_grid_pts[1] : 1;
             const Index_t n2 = (Dim > 2) ? nb_fourier_grid_pts[2] : 1;
 
             // Stencil entry S[d0][d1][d2][a][b], C order, offsets slowest.
             auto S = [stencil](Dim_t d0, Dim_t d1, Dim_t d2, Dim_t a,
-                               Dim_t b) -> T {
+                               Dim_t b) -> C {
                 Index_t off = d0;
                 if constexpr (Dim > 1) off = off * 3 + d1;
                 if constexpr (Dim > 2) off = off * 3 + d2;
@@ -171,35 +202,35 @@ namespace muGrid {
             // 3 * Dim^2 -- a factor 9 in 3D, and the difference between this
             // kernel being competitive with reading a stored symbol and being
             // several times slower than it.
-            Cplx<T> P[3][Dim][Dim];
+            Cplx<C> P[3][Dim][Dim];
 
             for (Index_t i2 = 0; i2 < n2; ++i2) {
-                const T f2 = (Dim > 2) ? q[2][i2] : T(0);
-                const Cplx<T> p2 = unit_phase(f2);
+                const C f2 = (Dim > 2) ? q[2][i2] : C(0);
+                const Cplx<C> p2 = unit_phase(f2);
                 for (Index_t i1 = 0; i1 < n1; ++i1) {
-                    const T f1 = (Dim > 1) ? q[1][i1] : T(0);
-                    const Cplx<T> p1 = unit_phase(f1);
+                    const C f1 = (Dim > 1) ? q[1][i1] : C(0);
+                    const Cplx<C> p1 = unit_phase(f1);
 
                     // phases for d = -1, 0, +1 along each of the hoisted axes;
                     // d = 0 is unity and d = -1 is the conjugate of d = +1.
-                    const Cplx<T> ph1[3] = {{p1.re, -p1.im}, {T(1), T(0)}, p1};
-                    const Cplx<T> ph2[3] = {{p2.re, -p2.im}, {T(1), T(0)}, p2};
+                    const Cplx<C> ph1[3] = {{p1.re, -p1.im}, {C(1), C(0)}, p1};
+                    const Cplx<C> ph2[3] = {{p2.re, -p2.im}, {C(1), C(0)}, p2};
 
                     for (Dim_t d0 = 0; d0 < 3; ++d0) {
                         for (Dim_t a = 0; a < Dim; ++a) {
                             for (Dim_t b = 0; b < Dim; ++b) {
-                                P[d0][a][b] = Cplx<T>{};
+                                P[d0][a][b] = Cplx<C>{};
                             }
                         }
                         for (Dim_t d1 = 0; d1 < ((Dim > 1) ? 3 : 1); ++d1) {
                             for (Dim_t d2 = 0; d2 < ((Dim > 2) ? 3 : 1);
                                  ++d2) {
-                                Cplx<T> w{T(1), T(0)};
+                                Cplx<C> w{C(1), C(0)};
                                 if constexpr (Dim > 1) w = cmul(w, ph1[d1]);
                                 if constexpr (Dim > 2) w = cmul(w, ph2[d2]);
                                 for (Dim_t a = 0; a < Dim; ++a) {
                                     for (Dim_t b = 0; b < Dim; ++b) {
-                                        const T s = S(d0, d1, d2, a, b);
+                                        const C s = S(d0, d1, d2, a, b);
                                         P[d0][a][b].re += w.re * s;
                                         P[d0][a][b].im += w.im * s;
                                     }
@@ -208,12 +239,12 @@ namespace muGrid {
                         }
                     }
 
-                    const bool zero_12 = (f1 == T(0)) && (f2 == T(0));
+                    const bool zero_12 = (f1 == C(0)) && (f2 == C(0));
                     for (Index_t i0 = 0; i0 < n0; ++i0) {
-                        const T f0 = q[0][i0];
-                        const Cplx<T> p0 = unit_phase(f0);
-                        const Cplx<T> ph0[3] = {
-                            {p0.re, -p0.im}, {T(1), T(0)}, p0};
+                        const C f0 = q[0][i0];
+                        const Cplx<C> p0 = unit_phase(f0);
+                        const Cplx<C> ph0[3] = {
+                            {p0.re, -p0.im}, {C(1), C(0)}, p0};
 
                         const Index_t mode = i0 + n0 * (i1 + n1 * i2);
                         std::complex<T> * v = field + mode * stride_mode;
@@ -221,17 +252,17 @@ namespace muGrid {
                         // The q = 0 block is the operator's rigid-body null
                         // space; its pseudo-inverse is zero, matching what the
                         // assembled path stores.
-                        if (zero_12 && f0 == T(0)) {
+                        if (zero_12 && f0 == C(0)) {
                             for (Dim_t a = 0; a < Dim; ++a) {
                                 v[a * stride_component] = std::complex<T>{};
                             }
                             continue;
                         }
 
-                        Cplx<T> K[Dim][Dim];
+                        Cplx<C> K[Dim][Dim];
                         for (Dim_t a = 0; a < Dim; ++a) {
                             for (Dim_t b = 0; b < Dim; ++b) {
-                                Cplx<T> acc{};
+                                Cplx<C> acc{};
                                 for (Dim_t d0 = 0; d0 < 3; ++d0) {
                                     cfma(acc, ph0[d0], P[d0][a][b]);
                                 }
@@ -239,28 +270,29 @@ namespace muGrid {
                             }
                         }
 
-                        Cplx<T> Kinv[Dim][Dim];
-                        if (!invert<Dim, T>(K, Kinv)) {
+                        Cplx<C> Kinv[Dim][Dim];
+                        if (!invert<Dim, C>(K, Kinv)) {
                             for (Dim_t a = 0; a < Dim; ++a) {
                                 v[a * stride_component] = std::complex<T>{};
                             }
                             continue;
                         }
 
-                        Cplx<T> in[Dim];
+                        Cplx<C> in[Dim];
                         for (Dim_t a = 0; a < Dim; ++a) {
                             const std::complex<T> & z =
                                 v[a * stride_component];
-                            in[a] = Cplx<T>{z.real(), z.imag()};
+                            in[a] = Cplx<C>{static_cast<C>(z.real()),
+                                            static_cast<C>(z.imag())};
                         }
                         for (Dim_t a = 0; a < Dim; ++a) {
-                            Cplx<T> acc{};
+                            Cplx<C> acc{};
                             for (Dim_t b = 0; b < Dim; ++b) {
                                 cfma(acc, Kinv[a][b], in[b]);
                             }
                             acc = cscale(acc, normalisation);
-                            v[a * stride_component] =
-                                std::complex<T>{acc.re, acc.im};
+                            v[a * stride_component] = std::complex<T>{
+                                static_cast<T>(acc.re), static_cast<T>(acc.im)};
                         }
                     }
                 }
@@ -279,15 +311,13 @@ namespace muGrid {
                                              const Real * const *,
                                              const Index_t *, Real, Index_t);
         template void apply_inverse<2, Real32>(std::complex<Real32> *, Index_t,
-                                               Index_t, const Real32 *,
-                                               const Real32 * const *,
-                                               const Index_t *, Real32,
-                                               Index_t);
+                                               Index_t, const Real *,
+                                               const Real * const *,
+                                               const Index_t *, Real, Index_t);
         template void apply_inverse<3, Real32>(std::complex<Real32> *, Index_t,
-                                               Index_t, const Real32 *,
-                                               const Real32 * const *,
-                                               const Index_t *, Real32,
-                                               Index_t);
+                                               Index_t, const Real *,
+                                               const Real * const *,
+                                               const Index_t *, Real, Index_t);
 
     }  // namespace green_symbol
 

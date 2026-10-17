@@ -71,6 +71,17 @@ namespace muGrid {
          * self-adjoint operator satisfies `S[d] = S[-d]^T` exactly, so only its
          * upper triangle is formed.
          *
+         * **The symbol is built and inverted in double for every field
+         * precision**, and the stencil, the frequency tables and the
+         * normalisation are therefore passed in double. Only the mode's
+         * component vector is read and written in `T`. Single precision is
+         * not enough for the symbol: the stencil's rows sum to zero (the
+         * rigid-body null space), so at low frequency the phase sum cancels
+         * O(S) terms down to O(S q^2), a relative error of about `eps N^2`
+         * on the lowest modes -- order one in float32 at N = 4096. Those are
+         * exactly the modes this preconditioner exists to treat. In double the
+         * same error is about 4e-9 there.
+         *
          * **Frequencies are passed as per-axis tables, not per mode.** A
          * `(Dim, nb_modes)` array of frequencies would be 809 MB at 512^3 in
          * single precision, which would give back much of what evaluating the
@@ -91,13 +102,13 @@ namespace muGrid {
          * @param stride_mode  element stride between consecutive modes (`Dim`
          *                     for array-of-structures, 1 for
          *                     structure-of-arrays)
-         * @param stencil      `3^Dim * Dim * Dim` real stencil, indexed
-         *                     `S[d + 1]` with the offset axes slowest and the
-         *                     `Dim x Dim` block fastest (C order), as
+         * @param stencil      `3^Dim * Dim * Dim` real stencil, in double,
+         *                     indexed `S[d + 1]` with the offset axes slowest
+         *                     and the `Dim x Dim` block fastest (C order), as
          *                     `reference_stencil` returns it
          * @param q            `Dim` pointers to per-axis frequency tables, in
-         *                     cycles; entry `i` is the frequency of local mode
-         *                     index `i` along that axis
+         *                     double and in cycles; entry `i` is the frequency
+         *                     of local mode index `i` along that axis
          * @param nb_fourier_grid_pts  local mode count per axis; their product
          *                     is `nb_modes`
          * @param normalisation  the engine's inverse-transform normalisation,
@@ -106,10 +117,10 @@ namespace muGrid {
          */
         template <Dim_t Dim, typename T>
         void apply_inverse(std::complex<T> * field, Index_t stride_component,
-                           Index_t stride_mode, const T * stencil,
-                           const T * const * q,
+                           Index_t stride_mode, const Real * stencil,
+                           const Real * const * q,
                            const Index_t * nb_fourier_grid_pts,
-                           T normalisation, Index_t nb_modes);
+                           Real normalisation, Index_t nb_modes);
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
@@ -129,9 +140,9 @@ namespace muGrid {
         template <Dim_t Dim, typename T>
         void apply_inverse_gpu(std::complex<T> * field,
                                Index_t stride_component, Index_t stride_mode,
-                               const T * stencil, const T * const * q,
+                               const Real * stencil, const Real * const * q,
                                const Index_t * nb_fourier_grid_pts,
-                               T normalisation, Index_t nb_modes);
+                               Real normalisation, Index_t nb_modes);
 #endif
 
     }  // namespace green_symbol
