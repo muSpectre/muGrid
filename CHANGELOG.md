@@ -49,6 +49,20 @@ v1.5.0 (08Oct26)
   dtype=np.complex64)` returned any existing field of the requested name,
   whatever its precision, shape or sub-point. They now raise `ValueError` on a
   mismatch, as the double-precision get-or-create already did
+- BUG: `conjugate_gradients` declared convergence on its recursive residual,
+  which drifts from `b - Ax` by rounding: in float32 it returned at a true
+  relative residual of 1.01e-5 when asked for 1e-5, and below the float32
+  accuracy floor at 6e-7 when asked for 1e-8. Convergence is now confirmed on
+  the true residual (one operator apply); on failure CG restarts from it, and
+  raises `ConvergenceError` once it stagnates. The float32-floor warning no
+  longer claims the solve will run to `maxiter`
+- BUG: Indefinite systems went undetected: both CG solvers only checked for an
+  exactly zero curvature, and `conjugate_gradients` ran 17,529 iterations on
+  an operator with negative eigenvalues without an error. They now raise
+  `ConvergenceError` when `p^T A p` or `r^T M r` is not positive (the
+  pipelined solver first restarts, since its recurrences drift).
+  `JacobiPreconditioner` rejects negative and non-finite diagonal entries, not
+  only zeros, and takes a `communicator` so that the check is collective
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

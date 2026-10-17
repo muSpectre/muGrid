@@ -76,10 +76,24 @@ def _warn_unreachable_rtol(dtype, rtol, solver):
             f"{solver}: rtol={rtol:.1e} is below the float32 solve accuracy "
             f"floor (~{FLOAT32_RTOL_FLOOR:.0e}). The true residual b - Ax "
             "cannot reach it -- only the recursive residual can -- so the "
-            "solve will run to maxiter. Use a looser rtol or a float64 "
+            "solve will raise ConvergenceError once the true residual "
+            "stagnates (or at maxiter). Use a looser rtol or a float64 "
             "right-hand side.",
             RuntimeWarning,
             stacklevel=3,
+        )
+
+
+def _reject_indefinite_preconditioner(rz, rr, tol_sq, iteration,
+                                     solver="conjugate_gradients"):
+    """Raise if ``r^T M r`` is not positive for a residual above the
+    tolerance: the preconditioner M is then not positive definite, and the
+    step lengths CG derives from it are meaningless."""
+    if rz <= 0.0 and rr > tol_sq:
+        raise ConvergenceError(
+            f"{solver}: r^T M r = {rz:.6e} is not positive at iteration "
+            f"{iteration} while |r|^2 = {rr:.6e} is above the tolerance "
+            f"{tol_sq:.6e}; the preconditioner is not positive definite."
         )
 
 
@@ -193,8 +207,12 @@ def conjugate_gradients(
     Raises
     ------
     ConvergenceError
-        If the algorithm does not converge within maxiter iterations,
-        or if the residual becomes NaN (indicating numerical issues).
+        If the algorithm does not converge within maxiter iterations; if the
+        true residual ``b - Ax`` stagnates above the tolerance (convergence
+        is only declared on it, never on the recursive residual alone, at the
+        cost of one operator apply on success); if ``p^T A p`` or
+        ``r^T M r`` is not positive, i.e. the operator or the preconditioner
+        is not positive definite; or if the residual becomes NaN or infinite.
     """
     if tol is not None:
         warnings.warn(
@@ -277,6 +295,12 @@ def conjugate_gradients(
                 if residual is not None:
                     linalg.copy(r, residual)
                 return x
+            _reject_indefinite_preconditioner(float(rz), rr_val, tol_sq, 0)
+
+            # True squared residual at the previous failed convergence check,
+            # to tell a solve that is still converging from one that has
+            # stagnated at its attainable accuracy.
+            last_true_rr = None
 
         with timed("iteration"):
             for iteration in range(maxiter):
@@ -291,17 +315,20 @@ def conjugate_gradients(
                 # Guard the curvature term *before* dividing by it. A non-finite
                 # pAp silently gives alpha = 0, which leaves x untouched and rr
                 # unchanged for every remaining iteration -- a stall that looks
-                # exactly like slow convergence. A zero pAp means p lies in the
-                # operator's null space, so it is not positive definite.
+                # exactly like slow convergence. p^T A p is formed directly from
+                # p, so for a positive definite operator it is positive; zero or
+                # negative means the operator is singular along p or indefinite.
+                # CG on an indefinite operator does not converge to the solution
+                # (it ran 17,529 iterations without an error before this check).
                 pAp_val = float(pAp)
                 _reject_non_finite(pAp_val, "the curvature p^T A p", iteration,
                                    dtype, "conjugate_gradients")
-                if pAp_val == 0.0:
+                if pAp_val <= 0.0:
                     raise ConvergenceError(
-                        "conjugate_gradients: the curvature p^T A p is zero at "
-                        f"iteration {iteration}; the search direction lies in the "
-                        "null space of the operator, which is therefore not "
-                        "positive definite."
+                        "conjugate_gradients: the curvature p^T A p = "
+                        f"{pAp_val:.6e} is not positive at iteration "
+                        f"{iteration}; the operator is not positive definite "
+                        "(singular along the search direction or indefinite)."
                     )
 
                 # Compute alpha
@@ -357,9 +384,52 @@ def conjugate_gradients(
                                    iteration, dtype, "conjugate_gradients")
 
                 if next_rr_val <= tol_sq:
-                    if residual is not None:
-                        linalg.copy(r, residual)
-                    return x
+                    # The recursive residual says converged; only the true one
+                    # may decide. The recurrence drifts from b - Ax by rounding,
+                    # and in float32 the drift reaches the tolerance: asked for
+                    # 1e-5 it returned at a true residual of 1.01e-5. One
+                    # operator apply; on failure CG restarts from the true
+                    # residual, and raises once that stops decreasing.
+                    with timed("true_residual"):
+                        hessp(x, Ap)
+                        linalg.copy(b, r)
+                        linalg.axpy(-1.0, Ap, r)
+                        true_rr = float(comm.sum(linalg.norm_sq(r)))
+                    _reject_non_finite(true_rr, "the true squared residual "
+                                       "|b - Ax|^2", iteration, dtype,
+                                       "conjugate_gradients")
+                    if true_rr <= tol_sq:
+                        if residual is not None:
+                            linalg.copy(r, residual)
+                        return x
+                    if last_true_rr is not None and true_rr >= last_true_rr:
+                        raise ConvergenceError(
+                            "conjugate_gradients: the true residual |b - Ax| = "
+                            f"{np.sqrt(true_rr):.6e} has stagnated above the "
+                            f"tolerance {np.sqrt(tol_sq):.6e} at iteration "
+                            f"{iteration} (the recursive residual is "
+                            f"{np.sqrt(next_rr_val):.6e}); the requested "
+                            f"accuracy is not attainable in "
+                            f"{np.dtype(dtype).name} for this system. Loosen "
+                            "rtol or use float64."
+                        )
+                    last_true_rr = true_rr
+                    with timed("prec"):
+                        prec(r, z)
+                    with timed("dot_rz"):
+                        rz = comm.sum(linalg.vecdot(r, z))
+                    rr_val = true_rr
+                    _reject_indefinite_preconditioner(float(rz), rr_val, tol_sq,
+                                                      iteration)
+                    with timed("update_p"):
+                        linalg.copy(z, p)
+                    continue
+
+                # r^T M r is positive for a positive definite preconditioner M
+                # and r != 0; checked here, past the convergence test, where r
+                # is known not to be negligible.
+                _reject_indefinite_preconditioner(float(next_rz), next_rr_val,
+                                                  tol_sq, iteration)
 
                 # Compute beta
                 beta = next_rz / rz
@@ -373,7 +443,9 @@ def conjugate_gradients(
                     linalg.axpby(1.0, z, beta, p)
 
         raise ConvergenceError(
-            "Preconditioned conjugate gradient algorithm did not converge"
+            "Preconditioned conjugate gradient algorithm did not converge in "
+            f"{maxiter} iterations (recursive |r| = {np.sqrt(rr_val):.6e}, "
+            f"tolerance {np.sqrt(tol_sq):.6e})"
         )
 
 
@@ -465,8 +537,11 @@ def conjugate_gradients_pipelined(
     ------
     ConvergenceError
         If the true residual does not reach the tolerance within `maxiter`
-        iterations, stagnates above it, or a breakdown (NaN, overflow, zero
-        curvature) occurs.
+        iterations, stagnates above it, or a breakdown (NaN, overflow) occurs;
+        or if ``r^T M r`` or the curvature is not positive on freshly
+        recomputed vectors, i.e. the operator or the preconditioner is not
+        positive definite (on drifted recurrences a non-positive value first
+        restarts the iteration).
     """
     if tol is not None:
         warnings.warn(
@@ -652,14 +727,27 @@ def conjugate_gradients_pipelined(
                 else:
                     beta = gamma / gamma_prev
                     denom = delta - beta * gamma / alpha_prev
+                # gamma = r^T M r and denom = p^T A p are positive for positive
+                # definite A and M. Here they come from recurrences, which drift,
+                # so a non-positive value first restarts CG from vectors
+                # recomputed from their definitions (where gamma = r^T M r and
+                # denom = u^T A u exactly); only if it recurs on those is the
+                # operator or the preconditioner indefinite. CG on an indefinite
+                # system does not converge to its solution.
+                if gamma <= 0.0 or denom <= 0.0:
+                    if restarted:
+                        raise ConvergenceError(
+                            "conjugate_gradients_pipelined: r^T M r = "
+                            f"{gamma:.6e} and the curvature u^T A u = "
+                            f"{denom:.6e} must both be positive, at iteration "
+                            f"{iteration}; the operator or the preconditioner "
+                            "is not positive definite."
+                        )
+                    with timed("replace"):
+                        replace_residual(restart=True)
+                    restarted = True
+                    continue
                 restarted = False
-                if denom == 0.0:
-                    raise ConvergenceError(
-                        "conjugate_gradients_pipelined: the curvature term is zero "
-                        f"at iteration {iteration} while |r|^2 = {rr:.6e} is above "
-                        f"the tolerance {tol_sq:.6e}; the operator or the "
-                        "preconditioner is not positive definite."
-                    )
                 alpha = gamma / denom
                 if alpha == 0.0:
                     raise ConvergenceError(

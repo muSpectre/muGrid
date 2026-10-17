@@ -410,9 +410,21 @@ def test_jacobi_apply(comm):
     JacobiPreconditioner(2.0)(r, z)
     np.testing.assert_allclose(z.p, r.p / 2, atol=1e-15)
 
-    # Singular diagonal is rejected
-    with pytest.raises(ValueError, match="non-singular"):
-        JacobiPreconditioner(0.0)
+    # Singular, negative and non-finite diagonals are rejected
+    for bad in (0.0, -2.0, np.nan):
+        with pytest.raises(ValueError, match="positive, finite"):
+            JacobiPreconditioner(bad)
+
+
+def test_jacobi_rejects_a_bad_entry_on_any_rank_collectively(comm):
+    """With a communicator, a negative entry on one rank makes every rank
+    raise; a rank-local raise would leave the others blocked in their next
+    collective operation (audit finding S4)."""
+    values = np.ones((4, 4))
+    if comm.rank == 0:
+        values[1, 2] = -1.0
+    with pytest.raises(ValueError, match="1 entries"):
+        JacobiPreconditioner(values, communicator=comm)
 
 
 def screened_poisson_cg(comm, engine, prec, rtol=1e-8, maxiter=1000):

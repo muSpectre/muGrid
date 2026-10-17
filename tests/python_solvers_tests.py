@@ -253,18 +253,25 @@ def test_pipelined_cg_converges_in_the_true_residual(dtype, cond, rtol,
 
 
 @serial_only
-def test_pipelined_cg_without_replacement_fails_loudly_in_float32():
-    """Without residual replacement the float32 recurrences drift so far that
-    the solve cannot converge; it must then raise, not return the drifted
-    iterate as converged (as it did, at a true residual 20 times ``|b|``)."""
+def test_pipelined_cg_without_replacement_never_returns_a_drifted_iterate():
+    """Without residual replacement the float32 recurrences drift far from
+    the truth. The solve used to return the drifted iterate as converged, at
+    a true residual 20 times ``|b|``; it may now only return a true solution
+    or raise. (It currently converges: the drift drives the recurrence
+    curvature non-positive, which restarts the iteration from the true
+    residual -- the indefiniteness guard of audit finding S4.)"""
     from muGrid.Solvers import ConvergenceError
 
     comm = Communicator()
-    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float32, 1e3)
-    with pytest.raises(ConvergenceError):
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float32, 1e3)
+    try:
         conjugate_gradients_pipelined(
             comm, fc, b, x, hessp=hessp, rtol=1e-5, maxiter=2000,
             replacement_interval=0)
+    except ConvergenceError:
+        return
+    assert true_relative_residual() <= 1e-5
 
 
 SOLVERS = [conjugate_gradients, conjugate_gradients_pipelined]
@@ -351,3 +358,78 @@ def test_single_precision_field_refuses_a_mismatched_existing_one():
     with pytest.raises(ValueError, match="already exists"):
         fc.real_field("b", (3,), "quad", dtype=np.float32)
     del b
+
+
+@serial_only
+def test_cg_converges_in_the_true_residual_in_float32():
+    """conjugate_gradients may only return once ``b - Ax`` meets the
+    tolerance: in float32 at condition number 1e4 it returned at a true
+    relative residual of 1.01e-5 when asked for 1e-5 (audit finding S3)."""
+    comm = Communicator()
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float32, 1e4)
+    conjugate_gradients(comm, fc, b, x, hessp=hessp, rtol=1e-5, maxiter=20000)
+    assert true_relative_residual() <= 1e-5
+
+
+@serial_only
+def test_cg_below_the_float32_floor_raises_instead_of_returning():
+    """Asked for less than float32 can deliver, the solve used to return at
+    a true residual of 6e-7 for rtol=1e-8; it must warn and then raise."""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float32, 1e3)
+    with pytest.warns(RuntimeWarning, match="floor"):
+        with pytest.raises(ConvergenceError, match="stagnated|did not converge"):
+            conjugate_gradients(comm, fc, b, x, hessp=hessp, rtol=1e-8,
+                                maxiter=20000)
+
+
+def _indefinite_problem(n=16):
+    """``A = diag(d)`` with one entry in seven negative (audit finding S4:
+    conjugate_gradients ran 17,529 iterations on it without an error)."""
+    fc = GlobalFieldCollection((n, n))
+    rng = np.random.default_rng(2)
+    d = np.logspace(0, 2, n * n).reshape(n, n)
+    d.ravel()[::7] *= -1
+    b = fc.real_field("rhs")
+    x = fc.real_field("solution")
+    b.p[...] = rng.standard_normal(b.p.shape)
+
+    def hessp(src, dst):
+        dst.p[...] = d * src.p
+
+    return fc, b, x, hessp
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_indefinite_operator_raises(solver):
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp = _indefinite_problem()
+    with pytest.raises(ConvergenceError, match="not positive definite"):
+        solver(comm, fc, b, x, hessp=hessp, rtol=1e-8, maxiter=500)
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_indefinite_preconditioner_raises(solver):
+    """A preconditioner that flips the sign on part of the domain makes
+    ``r^T M r`` non-positive; CG must say so instead of iterating on."""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float64, 1e2,
+                                                           n=16)
+    sign = np.ones((16, 16))
+    sign[:8] = -1
+
+    def prec(r, z):
+        z.p[...] = sign * r.p
+
+    with pytest.raises(ConvergenceError, match="not positive definite"):
+        solver(comm, fc, b, x, hessp=hessp, prec=prec, rtol=1e-8,
+               maxiter=500)
