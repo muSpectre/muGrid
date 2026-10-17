@@ -336,8 +336,12 @@ class FieldCheck(unittest.TestCase):
         np.testing.assert_array_equal(pg, sg)
 
     def test_pixel_view_soa_host_multicomponent_subpts(self):
-        """Same as the AoS test for a host structure-of-arrays collection;
-        the SoA dof layout folds sub-point-fastest (v = c * nb_sub + s)."""
+        """A structure-of-arrays collection folds sub-point-fastest
+        (v = c * nb_sub + s), array-of-structures component-fastest, so the
+        same .p index named different entries in the two storage orders --
+        and the device's default storage order is SoA (audit finding M1).
+        Where the orders differ, .p/.pg refuse SoA storage; .sg/.s index
+        components and sub-points separately and keep working."""
         fc = muGrid.GlobalFieldCollection(
             list(self.nb_grid_pts),
             [],
@@ -349,15 +353,13 @@ class FieldCheck(unittest.TestCase):
         field = wrap_field(fc.register_real_field("vec", (3,), "quad"))
         sg = field.sg  # shape (3, 2, *grid)
         sg[...] = np.random.default_rng(7).standard_normal(sg.shape)
-
-        pg = field.pg  # shape (6, *grid)
-        self.assertTrue(np.shares_memory(pg, sg))
-        for c in range(3):
-            for s in range(2):
-                np.testing.assert_array_equal(pg[c * 2 + s], sg[c, s])
-        pg[...] = 0.0
-        self.assertTrue(np.all(sg == 0.0))
-
+        with self.assertRaises(ValueError):
+            field.pg
+        with self.assertRaises(ValueError):
+            field.p
+        # Where the orders coincide (a single component), .p stays a view
+        scalar = wrap_field(fc.register_real_field("scalar", (1,), "quad"))
+        self.assertTrue(np.shares_memory(scalar.pg, scalar.sg))
 
 if __name__ == "__main__":
     unittest.main()
