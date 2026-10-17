@@ -106,6 +106,9 @@ v1.5.0 (08Oct26)
   integers beyond 2^53, and chose the MPI datatype of a scalar from its value,
   so ranks could disagree on it; scalars are now reduced with the type of
   their dtype
+- BUG: Serial single-precision FFTs threw with a backend that has no
+  N-dimensional transform (e.g. under `MUGRID_FFT_NO_ND=1`); they now use the
+  per-axis path, as the MPI-decomposed float32 transforms already do
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

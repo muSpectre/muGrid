@@ -192,11 +192,16 @@ class FFTEngine : public FFTEngineBase {
     }
 
     // Single-precision path (real input is Real32). The serial (non-decomposed)
-    // layout uses the backend N-D transform (no work buffers/transpose); the
-    // MPI-decomposed layout uses the templated pencil/slab path.
+    // layout uses the backend N-D transform when it has one (no work
+    // buffers/transpose); otherwise -- a backend without N-D support, e.g.
+    // under MUGRID_FFT_NO_ND=1, which used to throw here -- and on the
+    // MPI-decomposed layout it uses the templated per-axis path.
     if (input.get_type_descriptor() == TypeDescriptor::Real32) {
-      if (!this->need_transpose_xy && !this->need_transpose_yz) {
+      if (!this->need_transpose_xy && !this->need_transpose_yz &&
+          this->backend->supports_nd()) {
         this->transform_serial_nd<Real32, Complex32>(input, output, true);
+      } else if (this->spatial_dim == 1) {
+        this->template fft_1d<Real32, Complex32>(input, output);
       } else if (this->spatial_dim == 2) {
         this->template fft_2d<Real32, Complex32>(input, output);
       } else {
@@ -244,10 +249,13 @@ class FFTEngine : public FFTEngineBase {
       }
     }
 
-    // Single-precision path (real output is Real32).
+    // Single-precision path (real output is Real32); see fft().
     if (output.get_type_descriptor() == TypeDescriptor::Real32) {
-      if (!this->need_transpose_xy && !this->need_transpose_yz) {
+      if (!this->need_transpose_xy && !this->need_transpose_yz &&
+          this->backend->supports_nd()) {
         this->transform_serial_nd<Real32, Complex32>(input, output, false);
+      } else if (this->spatial_dim == 1) {
+        this->template ifft_1d<Real32, Complex32>(input, output);
       } else if (this->spatial_dim == 2) {
         this->template ifft_2d<Real32, Complex32>(input, output);
       } else {
