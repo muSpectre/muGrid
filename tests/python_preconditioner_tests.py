@@ -1298,6 +1298,11 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     the host one is array-of-structures, and the kernel's thread blocks share
     the hoisted sums over axes 1 and 2 per axis-0 line. The short-axis-0 grids
     take the path where a block spans too many lines to share them.
+
+    The host reference is stored in double for both precisions: the kernel
+    evaluates the symbol in double, while the stored symbol is assembled in
+    the field precision, which in single precision is the less accurate of
+    the two (2e-5 on the (2, 64) grid, against 1e-7 for the kernel).
     """
     skip_if_gpu_unavailable("gpu")
     import cupy
@@ -1314,7 +1319,7 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     host = muGrid.FFTEngine(shape, comm)
     device = muGrid.FFTEngine(shape, comm, device=create_device("gpu"))
     stored = make_reference_stiffness_preconditioner(
-        host, nb_components=dim, dtype=dtype, element=element,
+        host, nb_components=dim, dtype=np.float64, element=element,
         grid_spacing=spacing, lambda_ref=lam, mu_ref=mu,
         evaluate_symbol=False, name=f"stored-{tag}")
     evaluated = make_reference_stiffness_preconditioner(
@@ -1324,8 +1329,10 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     assert isinstance(stored, BlockFourierPreconditioner)
     assert isinstance(evaluated, AnalyticReferencePreconditioner)
 
-    r_h = host.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
-    z_h = host.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
+    r_h = host.real_space_field(f"r-{tag}", components=(dim,),
+                                dtype=np.float64)
+    z_h = host.real_space_field(f"z-{tag}", components=(dim,),
+                                dtype=np.float64)
     r_d = device.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
     z_d = device.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
     x = np.random.default_rng(0).standard_normal(r_h.p.shape).astype(dtype)
@@ -1337,7 +1344,7 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
 
     a = np.asarray(z_h.p).astype(np.float64)
     b = cupy.asnumpy(z_d.p).astype(np.float64)
-    tol = 1e-5 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
+    tol = 1e-6 if np.dtype(dtype) == np.dtype(np.float32) else 1e-12
     assert np.abs(a - b).max() / np.abs(a).max() < tol
 
 

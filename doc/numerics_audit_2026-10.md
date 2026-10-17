@@ -1,14 +1,15 @@
 # Numerics audit of µGrid (October 2026) and GPU follow-up
 
 This note records a numerical audit of µGrid, the two critical fixes made in
-the PR that adds this file (S1, S2), and what remains to be done on a machine
-with a GPU. It is written so that the work can be picked up without the
-original session.
+the PR that adds this file (S1, S2), their validation on GPUs, and what
+remains to be done. It is written so that the work can be picked up without
+the original session.
 
 - Audited state: `origin/main` at `f83ce587` (Python and C++ line numbers below
   refer to that commit unless stated otherwise).
-- Machine used: macOS, CPU only, OpenMPI via `benchenv.sh`. **No GPU path was
-  compiled or run**; every GPU statement is from reading the code.
+- Machines used: macOS, CPU only, OpenMPI via `benchenv.sh` for the audit and
+  the fixes; MI300A, H200 and L40S nodes for the GPU validation (section 2).
+  GPU statements in section 4 are still from reading the code.
 - Method: five areas audited in parallel (solvers/preconditioners, linalg
   kernels, FFT, operators, MPI/fields/IO). Most findings were checked with
   small scripts against the build; those are marked CONFIRMED. SUSPECTED means
@@ -120,33 +121,34 @@ skipped without one).
 
 ---
 
-## 2. GPU to-do (resume here)
+## 2. GPU validation (done 2026-10-17)
 
-1. **Build with CUDA (or HIP)** — `green_symbol_gpu.cc` was edited but never
-   compiled:
+Built this branch and `main` (`f83ce587`, via a worktree) for HIP (MI300A,
+gfx942, ROCm 6.4.1) and CUDA (sm_89 + sm_90, CUDA 13.3), Release, no MPI.
+Run on one MI300A, one L40S and one H200.
 
-   ```bash
-   cmake -S . -B build-gpu -DCMAKE_BUILD_TYPE=Release -DMUGRID_ENABLE_CUDA=ON \
-         -DPython_EXECUTABLE=$(which python)
-   cmake --build build-gpu -j
-   ```
+- **Builds**: `green_symbol_gpu.cc` compiles cleanly for both back ends.
+- **C++ suite**: passes on all three GPUs.
+- **S2 device tests**: `test_evaluated_symbol_on_device_is_accurate_in_single_precision`
+  passes on all three, and `main` fails 3 of its cases (the 2048³/4096³ and
+  h = 0.01 rows of the table above).
+- **`test_evaluated_symbol_on_device_matches_stored_on_host[float32-2-shape2]`
+  failed on all three GPUs** — the reference was wrong, not the kernel.
+  Against a float64 stored reference the errors on the (2, 64) grid are:
+  host stored float32 2.4e-5 (finding S6), device evaluated float32 1.2e-7 on
+  this branch (1.7e-5 on `main`). The test now takes the host reference in
+  float64 for both precisions and its float32 tolerance is tightened from 1e-5
+  to 1e-6. It passes on this branch and fails on `main` for 3 of 4 float32
+  grids, so it guards S2 as well.
+- **Full Python suite on the branch**: CUDA (L40S, H200) 743 passed, 0 other
+  failures. HIP 748 passed, 31 failed — the same 31 fail on `main`. They are
+  the tests in `python_convolution_operator_tests.py`,
+  `python_convolution_performance_tests.py` and `python_field_gpu_tests.py`
+  that hard-code `muGrid.Device.cuda()`, which a ROCm build rejects. They are
+  unrelated to this PR (new finding T1 in section 4).
 
-2. **Run the GPU tests** that cover S2:
-
-   ```bash
-   cd build-gpu && ctest -R mugrid_python_binding_tests --output-on-failure
-   # or directly:
-   python -m pytest tests/python_preconditioner_tests.py -k "device" -v
-   ```
-
-   In particular `test_evaluated_symbol_on_device_matches_stored_on_host` and
-   `test_evaluated_symbol_on_device_is_accurate_in_single_precision`.
-
-3. **Measure the performance cost of S2** (section 3) with the script below,
-   on this branch and on `main` (`f83ce587`), for float32 and float64.
-
-4. **Decide** whether the cost is acceptable or whether to implement the
-   low-frequency-only double path (section 3).
+Benchmark script below; at 512³ the stored-symbol comparison is assembled on
+the host and needs a large `--mem` in Slurm, or the job is OOM-killed.
 
 ### Benchmark script
 
@@ -210,29 +212,62 @@ works unchanged on both.)
 
 ---
 
-## 3. Performance analysis of S2 on GPUs (estimate, not measured)
+## 3. Performance cost of S2 on GPUs (measured)
 
-- **Memory traffic is unchanged**: the kernel still reads and writes each mode
-  in the field precision (48 B/mode for three float32 components). Only the
-  ~630 flops/mode of symbol build, inversion and matvec moved to FP64; the
-  pre-inversion scaling adds a negligible amount.
-- **Register pressure** roughly doubles (K, K⁻¹, hoisted sums, phases in
-  double) and may lower occupancy or spill — the largest unknown; check
-  `-Xptxas -v` / Nsight Compute.
-- At 512³ there are ~67M Fourier modes, so ~42 GFLOP per kernel call.
+Times in ms from the benchmark script, 3 components, Q1, CUDA/HIP events,
+mean of 20. "apply" is FFT + symbol kernel + iFFT; "stored" is the
+`BlockFourierPreconditioner` that the factory picks when `evaluate_symbol=False`
+(unchanged by this PR).
 
-| GPU class | FP64 : FP32 | expected effect on the symbol kernel |
-|---|---|---|
-| H100 / H200 / A100 | 1 : 2 | up to ~2× slower; less if latency-bound |
-| MI250 / MI300 | 1 : 1 – 1 : 2 | similar or smaller |
-| consumer / most workstation (e.g. RTX 4090) | 1 : 64 | ≥ ~30 ms per call at 512³ (vs a few ms) — severe |
+float32:
 
-The docstring timings (H200, 512³, 3 components: float32 apply 9.3 ms,
-float64 16.1 ms, stored symbol 25.5 / 31.2 ms) include both FFTs, so the
-end-to-end effect is smaller than the kernel's: the float32 apply is expected
-to land between 9.3 and 16.1 ms on an H200, still ahead of the stored symbol.
-On consumer GPUs the evaluated symbol may become slower than the stored one,
-which would defeat the reason the factory picks it on a device.
+| GPU | N | kernel `main` → branch | apply `main` → branch | stored apply |
+|---|---|---|---|---|
+| MI300A | 256³ | 0.29 → 0.35 | 2.11 → 2.22 (+5%) | 3.65 |
+| MI300A | 512³ | 2.87 → 3.79 | 21.98 → 22.70 (+3%) | 58.3 |
+| H200 | 256³ | 0.32 → 0.49 | 1.18 → 1.35 (+14%) | 1.79 |
+| H200 | 512³ | 2.34 → 3.79 | 9.28 → 10.73 (+16%) | 25.6 |
+| L40S | 256³ | 0.46 → 5.92 | 5.42 → 10.92 (**2.0×**) | **7.13** |
+| L40S | 512³ | 4.85 → 46.97 | 44.93 → 87.19 (**1.9×**) | 129.8 |
+
+float64 (should be unchanged; the pre-inversion scaling costs a little):
+
+| GPU | N | kernel `main` → branch | apply `main` → branch |
+|---|---|---|---|
+| MI300A | 512³ | 3.59 → 3.70 | 29.87 → 29.81 |
+| H200 | 512³ | 3.67 → 3.86 | 16.16 → 16.34 |
+| L40S | 256³ | 5.37 → 5.83 | 16.78 → 17.24 |
+| L40S | 512³ | 41.82 → 45.62 | 134.95 → 138.91 |
+
+Register use of the 3D kernel (`-Xptxas -v`, `-Rpass-analysis=kernel-resource-usage`):
+
+| | float32 `main` | float32 branch | float64 `main` | float64 branch |
+|---|---|---|---|---|
+| sm_89 | 80 | 104 | 86 | 104 |
+| sm_90 | 80 | 98 | 84 | 98 |
+| gfx942 VGPRs (waves/SIMD) | 87 (5), 256 B scratch | 152 (3) | 152 (3) | 152 (3) |
+
+No spills anywhere. The 432 B stack frame is the per-thread `P[NP]` of the
+short-axis-0 fallback path; `main` already had it in float64.
+
+Reading:
+
+- **Datacenter GPUs (MI300A, H200)**: the estimate held. The float32 kernel
+  now costs the same as the float64 one, and the full apply is 3% (MI300A)
+  to 16% (H200) slower. It is still 1.3–2.6× faster than the stored symbol.
+- **L40S (FP64 : FP32 = 1 : 64)**: the predicted severe case. The kernel is
+  10–13× slower, the apply about 2×, and at 256³ the evaluated symbol is now
+  **slower than the stored one** (10.9 vs 7.1 ms). That defeats the reason the
+  factory picks it on a device. At 512³ it still wins, because the stored
+  symbol is memory-bound.
+- On `main` the float32 kernel on MI300A used 256 B of scratch per lane;
+  moving to double removed it.
+
+**Decision**: the cost is acceptable on FP64-capable GPUs but not on
+consumer/workstation cards. Implement the low-frequency-only double path
+below, keeping the pre-inversion scaling. Until then, `float32` on such cards
+gets correct but slower preconditioning; `evaluate_symbol=False` is the
+faster choice there at moderate N.
 
 ### Cheaper alternative if the cost is too high
 
@@ -444,12 +479,19 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   global naming; NetCDF local write narrows `num_requests`; `import muGrid`
   always initialises MPI in MPI builds.
 
+### Tests
+
+- **T1. Device tests hard-code `muGrid.Device.cuda()`** (minor, CONFIRMED on
+  MI300A). 31 tests in `python_convolution_operator_tests.py`,
+  `python_convolution_performance_tests.py` and `python_field_gpu_tests.py`
+  fail on every ROCm build; use `Device.gpu()` / `create_device("gpu")`.
+
 ---
 
 ## 5. Suggested order for the remaining work
 
-1. GPU validation and benchmark of S2 (section 2), then decide on the
-   low-frequency double path.
+1. Low-frequency-only double path for the evaluated symbol (section 3) —
+   GPU validation done, decision taken.
 2. O1 (FEM transpose protocol) and S5 (named solver work fields) — both give
    wrong answers silently.
 3. S3 (same true-residual check for standard CG), S4 (indefiniteness).
