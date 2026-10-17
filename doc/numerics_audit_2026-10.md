@@ -413,18 +413,22 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   the same collection raises TypeError; `real_field` ignores dtype/shape on
   re-get. Fix: unique per-call names + `pop_field` in `finally`, or a
   workspace object; validate dtype/shape on re-get.~~
-- **S6. Stored Green preconditioner in float32 assembled in single
+- **S6 — FIXED** (follow-up PR): built and inverted in double per slab, symmetrised,
+  stored as the upper triangle; float32 error on the lowest modes 4e-2 → 2e-7 at 4096².
+  ~~**S6. Stored Green preconditioner in float32 assembled in single
   precision** (significant, CONFIRMED). P:983–986 claims double; `K_hat` is
   complex64 (P:1081). Lowest-mode inverse error 3e-4/7e-3/0.13 at N =
   256/1024/4096; Hermitian test fails in float32 so storage is always dense.
   Fix: assemble in complex128 slab-wise, test Hermiticity before casting,
-  symmetrise and store the upper triangle.
-- **S7. In-place kernels write into a temporary on dtype/layout mismatch**
+  symmetrise and store the upper triangle.~~
+- **S7 — FIXED** (follow-up PR): outputs `noconvert` and writeable; shapes, slots and
+  strides validated.
+  ~~**S7. In-place kernels write into a temporary on dtype/layout mismatch**
   (significant, latent, CONFIRMED). `bind_py_linalg.cc` uses
   `py::array_t<…, c_style | forcecast>` for the *outputs* of
   `apply_green_symbol_*` and `block_thomas_*`; a strided or wrong-dtype output
   comes back unchanged without error. Fix: `.noconvert()`, require writeable,
-  check sizes (`nb_head == 0` indexes −1).
+  check sizes (`nb_head == 0` indexes −1).~~
 - **S8. Minor**: Jacobi `_inverse_diagonal_field` (P:154) always float64, so a
   float32 solve raises; `_build_pcr` docstring (P:2606) claims a check that
   does not exist; `MultigridReferencePreconditioner` (P:1612) guards MPI only
@@ -498,9 +502,10 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   document "communicate input, never reduce".~~
 - **O2. Transpose `weights` length not validated** (significant, CONFIRMED):
   OOB read. `fem_gradient.hh:632/720`, `generic.cc:781`, `generic_gpu.cc:165`.
-- **O3. `GenericLinearOperator` drops |c| < 1e-14 (absolute)** (significant,
+- **O3 — FIXED** (follow-up PR): threshold relative to the largest coefficient.
+  ~~**O3. `GenericLinearOperator` drops |c| < 1e-14 (absolute)** (significant,
   CONFIRMED). `generic.hh:382`: identity × 1e-15 → zero; SI-unit micro-scale
-  operators vanish. Drop exact zeros or use a relative tolerance.
+  operators vanish. Drop exact zeros or use a relative tolerance.~~
 - **O4.** Generic and FEM transposes default to different weights (ratio
   Wfrac·∏h). Significant (leaky API).
 - **O5.** 3D "P1 Kuhn" is a non-conforming, same-orientation 5-tet split
@@ -525,8 +530,9 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   `Parallel.py:453–467`: ±inf identity overflows on one rank only.
 - **M4. `reduce_sum` / `Communicator.sum` lose data** (significant,
   CONFIRMED): imaginary parts dropped, int64 > 2⁵³ rounded.
-- **M5. NetCDF reads narrow dtype silently** (significant, CONFIRMED).
-  `file_io_netcdf.cc:244, 971–994, 2307`: compare `nc_inq_vartype`.
+- **M5 — FIXED** (follow-up PR): narrowing reads raise; widening ones still convert.
+  ~~**M5. NetCDF reads narrow dtype silently** (significant, CONFIRMED).
+  `file_io_netcdf.cc:244, 971–994, 2307`: compare `nc_inq_vartype`.~~
 - **M6. Python GPU reductions ignore GPU-aware-MPI detection** (significant,
   SUSPECTED). `Parallel.py` `_sum_gpu`, `_max_gpu`, `_allreduce_scalar`.
 - **M7.** `compute_axes_order` mis-breaks stride ties for size-1 axes. Minor.
@@ -556,5 +562,5 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
    with T1.
 3. ~~S3 (same true-residual check for standard CG), S4 (indefiniteness)~~
    — done.
-4. S6, S7, O3, M5 (silent precision/data loss at interfaces).
+4. ~~S6, S7, O3, M5 (silent precision/data loss at interfaces)~~ — done.
 5. L1–L3, O2, M2–M4 (input validation / out-of-bounds).
