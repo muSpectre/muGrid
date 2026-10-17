@@ -4,6 +4,23 @@ Change log for µGrid
 v1.5.0 (08Oct26)
 ----------------
 
+- BUG: `conjugate_gradients_pipelined` declared convergence on its recursive
+  residual alone, which in the pipelined formulation drifts away from the true
+  one: asked for `rtol=1e-8` at condition number 1e6 it returned at a true
+  relative residual of 5e-5, and in float32 it could return a diverged
+  iterate. It now only returns once `b - Ax` meets the tolerance (restarting
+  if not, and raising `ConvergenceError` when the true residual stagnates),
+  and replaces the residual every `replacement_interval` iterations (new
+  keyword; default 50 in float64, 20 in float32), restarting when the drift
+  is large. About 10% more operator applies than `conjugate_gradients`
+- BUG: The evaluated Green-function symbol (`AnalyticReferencePreconditioner`,
+  the default reference preconditioner on GPUs) lost the long-wavelength
+  modes in float32: the low-frequency phase sum cancels to O(S q²), and
+  `|det|²` underflowed, so from about N = 2048 (earlier for small moduli or
+  grid spacings) such modes were taken for the null space and zeroed. The
+  symbol is now built and inverted in double for either field precision, with
+  the block scaled before inversion; the `apply_green_symbol_*` kernels take
+  the stencil, frequency tables and normalisation as float64
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
