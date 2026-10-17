@@ -70,7 +70,7 @@ Known limitation: an unattainable tolerance can still run to `maxiter` before
 raising — slow, but no longer silent.
 
 Tests: `tests/python_solvers_tests.py::test_pipelined_cg_converges_in_the_true_residual`,
-`::test_pipelined_cg_without_replacement_fails_loudly_in_float32`.
+`::test_pipelined_cg_without_replacement_never_returns_a_drifted_iterate`.
 
 ### S2 — float32 evaluated Green symbol lost the long-wavelength modes (critical)
 
@@ -355,12 +355,12 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 | Location | Parameter | Value | Settable? | Abs/rel, assessment |
 |---|---|---|---|---|
-| S:168, S:407 | `rtol` | 1e-6 | kwarg | Relative to global ‖b‖₂, tested on recursive residual (fixed for pipelined by S1; standard CG still, see S3) |
+| S:168, S:407 | `rtol` | 1e-6 | kwarg | Relative to global ‖b‖₂, confirmed on the true residual (S1, S3 fixed) |
 | S:83, S:357 | `atol` | 0.0 | kwarg | Absolute; b=0, x₀≠0 → tolerance 0, runs to maxiter |
 | S:79, S:353 | `maxiter` | 1000 | kwarg | Raises `ConvergenceError` |
-| S:25 | `FLOAT32_RTOL_FLOOR` | 1e-6 | module const | Warning only; its text is wrong for standard CG (S3) |
-| S:264, S:278, S:523, S:531 | breakdown tests | `== 0.0` | hard-coded | Negative curvature not detected (S4) |
-| P:130 | Jacobi diagonal check | `abs > 0` | no | Accepts negative diagonals; rank-local |
+| S:25 | `FLOAT32_RTOL_FLOOR` | 1e-6 | module const | Warning only; text corrected (S3) |
+| S:264, S:278, S:523, S:531 | breakdown tests | `<= 0.0` | hard-coded | Negative curvature and indefinite preconditioners raise (S4 fixed) |
+| P:130 | Jacobi diagonal check | `> 0` and finite | `communicator=` | Collective with a communicator (S4 fixed) |
 | P:446 | Hermitian-symbol test | 1e-10·max\|B\| | no | Not dtype-aware → float32 always dense |
 | P:652, P:681 | `void_tol` | 0.0 | kwarg | Absolute (unit-dependent) |
 | P:1154 | per-block `np.linalg.inv` | – | – | No singularity/residual check |
@@ -389,16 +389,21 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 - **S1 — FIXED in this PR** (section 1).
 - **S2 — FIXED in this PR** (section 1).
-- **S3. Standard CG in float32 returns above the requested tolerance**
+- **S3 — FIXED** (follow-up PR): true-residual check on exit, restart,
+  stagnation error; warning text corrected.
+  ~~**S3. Standard CG in float32 returns above the requested tolerance**
   (significant, CONFIRMED). S:28–41, S:324: cond 1e3, rtol 1e-8 returned with
   true residual 6.2e-7; cond 1e4, rtol 1e-5 returned at 1.01e-5. The warning
   claims the solve "will run to maxiter". Fix: true-residual check before
-  return (one `hessp`), as in S1, or clamp rtol to the floor.
-- **S4. Indefiniteness not detected** (significant, CONFIRMED). Only `pAp == 0`
+  return (one `hessp`), as in S1, or clamp rtol to the floor.~~
+- **S4 — FIXED** (follow-up PR): `p^T A p <= 0` / `r^T M r <= 0` raise
+  (pipelined: after a restart on fresh vectors); Jacobi rejects
+  non-positive or non-finite entries, collectively with `communicator=`.
+  ~~**S4. Indefiniteness not detected** (significant, CONFIRMED). Only `pAp == 0`
   / `alpha == 0` checked; an operator with 1/7 negative eigenvalues ran 17,529
   iterations without error. Jacobi accepts negative diagonals and its check is
   rank-local (one rank raising deadlocks the others). Fix: raise on
-  `pAp <= 0`, `rz <= 0`; collective `diag <= 0` check.
+  `pAp <= 0`, `rz <= 0`; collective `diag <= 0` check.~~
 - **S5 — FIXED** (follow-up PR). Unique per-call work-field names, popped on
   exit; float32 get-or-create checks the existing field.
   ~~**S5. Solver work fields are fixed-name get-or-create fields in the
@@ -549,6 +554,7 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
    (section 3).
 2. ~~O1 (FEM transpose protocol) and S5 (named solver work fields)~~ — done,
    with T1.
-3. S3 (same true-residual check for standard CG), S4 (indefiniteness).
+3. ~~S3 (same true-residual check for standard CG), S4 (indefiniteness)~~
+   — done.
 4. S6, S7, O3, M5 (silent precision/data loss at interfaces).
 5. L1–L3, O2, M2–M4 (input validation / out-of-bounds).
