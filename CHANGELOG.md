@@ -106,6 +106,16 @@ v1.5.0 (08Oct26)
   integers beyond 2^53, and chose the MPI datatype of a scalar from its value,
   so ranks could disagree on it; scalars are now reduced with the type of
   their dtype
+- BUG: Serial single-precision FFTs threw with a backend that has no
+  N-dimensional transform (e.g. under `MUGRID_FFT_NO_ND=1`); they now use the
+  per-axis path, as the MPI-decomposed float32 transforms already do
+- BUG: The Pixel layout (`.p`/`.pg`) of a field with several sub-points and a
+  last component axis longer than one ordered the folded axis differently on
+  the device (structure-of-arrays, sub-point fastest) than on the host
+  (component fastest), so the same code read and wrote different entries.
+  It now raises on structure-of-arrays storage in that case; use `.s`/`.sg`,
+  which are the same on host and device. Fields gain read-only `nb_sub_pts` and
+  `storage_order` properties
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

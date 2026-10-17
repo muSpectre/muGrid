@@ -36,6 +36,11 @@ Program grant you additional permission to convey the resulting work.
 
 import numpy as np
 
+try:
+    from . import _muGrid
+except ImportError:
+    import _muGrid
+
 # CuPy is optional - only imported when GPU fields are used
 _cupy = None
 
@@ -131,6 +136,35 @@ class Field:
         slices = self._make_slice(offsets, shape)
         return buf[slices]
 
+    def _check_pixel_layout_is_portable(self):
+        """Refuse the pixel layout where its order depends on storage.
+
+        The pixel layout folds the sub-points into the last component axis.
+        In array-of-structures storage (the host default) that axis runs
+        component-fastest, ``j = c + C * s``; in structure-of-arrays storage
+        (the device default) sub-point-fastest, ``j = c * S + s``. Each is a
+        zero-copy view only in its own storage order, so ``.p[j]`` named a
+        different (component, sub-point) pair on host and device for the same
+        data -- the same code silently read and wrote different entries.
+        A copy in one canonical order is not an option either: writes to
+        ``.p`` would go into the copy and be lost. The orders agree when the
+        last component axis or the sub-point count is 1, so only the other
+        case, in structure-of-arrays storage, is refused; ``.s``/``.sg``
+        index components and sub-points separately and are identical in both
+        storage orders.
+        """
+        components = tuple(self._cpp.components_shape)
+        if (self._cpp.storage_order == _muGrid.StorageOrder.StructureOfArrays
+                and self._cpp.nb_sub_pts > 1 and components
+                and components[-1] > 1):
+            raise ValueError(
+                f"The pixel layout (.p/.pg) of field '{self._cpp.name}' "
+                f"(components {components}, {self._cpp.nb_sub_pts} "
+                "sub-points) orders components and sub-points differently "
+                "in structure-of-arrays storage (the device default) than "
+                "on the host. Use .s/.sg, which index them separately and "
+                "are the same on host and device.")
+
     def _pixel_view(self):
         """
         Pixel-layout view of the full buffer (components and sub-points
@@ -142,6 +176,7 @@ class Field:
         axes of the (Fortran-ordered) buffer in C order would silently
         copy and permute elements whenever both counts exceed one.
         """
+        self._check_pixel_layout_is_portable()
         buf = self._get_buffer()
         shape = tuple(self._cpp.shape_pg)
         strides = tuple(s * buf.itemsize for s in self._cpp.strides_p)

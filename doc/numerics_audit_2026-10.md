@@ -471,9 +471,10 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### FFT
 
-- **F1. Serial float32 FFT throws under `MUGRID_FFT_NO_ND=1`** (significant,
+- **F1 — FIXED** (follow-up PR): falls back to the per-axis float32 path.
+  ~~**F1. Serial float32 FFT throws under `MUGRID_FFT_NO_ND=1`** (significant,
   CONFIRMED). `fft_engine.hh:196–203, 247–254`: fall through to the existing
-  `fft_{1,2,3}d<Real32>` paths when `!supports_nd()`.
+  `fft_{1,2,3}d<Real32>` paths when `!supports_nd()`.~~
 - **F2.** Serial float64 2D never uses the N-D transform, contrary to
   `docs/gpu.md:312`; on GPU ~2·nb_dof syncs + a copy. Minor.
 - **F3. cuFFT plan parameters cast to `int` without checks** (significant for
@@ -527,9 +528,13 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 
 ### MPI, fields and I/O
 
-- **M1. `.p`/`.pg` order the merged component×sub-point axis differently on
+- **M1 — FIXED** (follow-up PR): `.p`/`.pg` raise on structure-of-arrays storage where
+  the folded orders differ (sub-points > 1 and last component axis > 1). A
+  canonical order is a zero-copy view in only one storage order, and a copy
+  would lose writes, so refusing was chosen over reordering.
+  ~~**M1. `.p`/`.pg` order the merged component×sub-point axis differently on
   host and device** (significant, CONFIRMED). `field.cc:283–310`,
-  `Field.py:134–177`. Build `.p` from `.s` in one canonical order.
+  `Field.py:134–177`. Build `.p` from `.s` in one canonical order.~~
 - **M2 — FIXED** (follow-up PR): collective check, all ranks raise.
   ~~**M2. `Communicator.gather` drops data on uneven rows** (significant,
   CONFIRMED). `communicator.hh:282–383`: row check is an `assert`.~~

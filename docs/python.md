@@ -134,6 +134,14 @@ treating all sub-point values uniformly. The `g` variants include the ghost
 cells used with domain decomposition; for fields without ghosts, `s`/`sg` (and
 `p`/`pg`) return views of the same shape.
 
+The order of the folded Pixel axis depends on the storage order: component
+fastest in array-of-structures storage (the host default), sub-point fastest in
+structure-of-arrays storage (the device default). Each is a zero-copy view only
+in its own storage order, so where the two disagree -- more than one sub-point
+*and* a last component axis longer than one -- `p`/`pg` raise on
+structure-of-arrays storage instead of silently indexing other entries than on
+the host. Use `s`/`sg` for such fields; they are the same everywhere.
+
 Field quantities come first in the index order because numerical codes
 typically vectorize over the spatial domain. NumPy broadcasting then makes
 per-pixel operations natural:
