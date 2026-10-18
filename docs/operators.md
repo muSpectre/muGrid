@@ -4,7 +4,7 @@
 evaluated as stencils. This page defines each operator mathematically and
 documents its Python interface. Kernel-level design notes (iteration bounds,
 memory layout, gather patterns) are in the
-[operator kernel design notes](https://github.com/muSpectre/muGrid/blob/main/doc/KERNELS.md).
+[operator kernel design notes](kernel_design.md).
 
 | Operator | Maps | Defined by |
 |---|---|---|

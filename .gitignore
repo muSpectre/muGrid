@@ -5,12 +5,6 @@
 /build*
 /cmake-build-*
 
-/doc/build
-/doc/html
-/doc/xml
-/doc/doxygenxml
-/doc/source/doxygenxml
-/doc/source/html
 
 /venv
 /.venv*/

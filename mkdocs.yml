@@ -62,6 +62,9 @@ nav:
   - Benchmark (homogenization): benchmark_homogenization.md
   - Benchmark (preconditioner): benchmark_homogenization_preconditioner.md
   - Architecture: architecture.md
+  - Developer notes:
+      - FFT engine design: fft_design.md
+      - Operator kernel design: kernel_design.md
 
 exclude_docs: |
   requirements.txt
