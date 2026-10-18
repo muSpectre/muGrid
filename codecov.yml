@@ -5,6 +5,13 @@ ignore:
   - src/libmugrid/fft/rocfft_backend.cc
   - src/libmugrid/fft/rocfft_backend.hh
 
+# Every Coverage run uploads three reports (serial CPU, MPI CPU, GPU), and the
+# GPU leg finishes last. Without this, Codecov posts a patch status from the
+# CPU legs alone, which fails for changes only the GPU leg exercises.
+codecov:
+  notify:
+    after_n_builds: 3
+
 coverage:
   status:
     project:
