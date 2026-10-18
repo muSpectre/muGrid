@@ -61,6 +61,11 @@ Definitions used throughout:
 
 import numpy as np
 import pytest
+from conftest import (
+    create_device,
+    get_test_devices,
+    skip_if_gpu_unavailable,
+)
 
 import muGrid
 
@@ -397,3 +402,164 @@ def test_rejects_transpose_weights():
     op.transpose(inp, out)
     with pytest.raises(RuntimeError):
         op.transpose(inp, out, [1.0])
+
+
+# ===========================================================================
+# Anisotropic grid spacing
+# ===========================================================================
+
+
+def _anisotropic_stencil(grid_spacing, scale):
+    """Finite-difference Laplacian of an anisotropic grid as a 3^dim stencil:
+    scale / h_d^2 on the two neighbours along axis d, minus twice the sum of
+    those on the centre."""
+    dim = len(grid_spacing)
+    stencil = np.zeros((3,) * dim)
+    centre = (1,) * dim
+    for axis, h in enumerate(grid_spacing):
+        w = scale / h**2
+        for shift in (0, 2):
+            idx = list(centre)
+            idx[axis] = shift
+            stencil[tuple(idx)] = w
+        stencil[centre] -= 2.0 * w
+    return stencil
+
+
+@pytest.mark.parametrize("grid_spacing,scale", [
+    ((0.5, 2.0), -1.0), ((0.1, 0.1), 1.0), ((1.5, 0.25), 2.0),
+    ((0.5, 2.0, 0.25), -1.0), ((0.2, 0.2, 0.2), 1.0), ((3.0, 1.0, 0.5), -0.5),
+])
+def test_anisotropic_matches_generic_operator(grid_spacing, scale):
+    """With a grid spacing the hard-coded operator is the anisotropic
+    finite-difference Laplacian, which the generic operator built from the
+    per-axis stencil reproduces independently (it used to be unavailable:
+    one scale served every axis)."""
+    dim = len(grid_spacing)
+    nb_grid_pts = (7, 9, 5)[:dim]
+    rng = np.random.default_rng(42)
+    values = rng.standard_normal(nb_grid_pts)
+
+    fc_hard, nb_ghosts = _make_collection(nb_grid_pts)
+    op = muGrid.LaplaceOperator(dim, scale, grid_spacing=grid_spacing)
+    out_hard = _apply(op, fc_hard, nb_ghosts, values)
+
+    fc_gen, _ = _make_collection(nb_grid_pts)
+    gen = muGrid.GenericLinearOperator(
+        [-1] * dim, _anisotropic_stencil(grid_spacing, scale))
+    out_gen = _apply(gen, fc_gen, nb_ghosts, values)
+
+    scale_ref = np.abs(out_gen).max()
+    np.testing.assert_allclose(out_hard, out_gen, atol=1e-13 * scale_ref)
+    # the reported coefficients are the same stencil
+    np.testing.assert_allclose(
+        np.asarray(op.coefficients).reshape((3,) * dim),
+        _anisotropic_stencil(grid_spacing, scale), atol=1e-13 * scale_ref)
+    np.testing.assert_allclose(op.grid_spacing, grid_spacing)
+    assert op.scale == scale
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+def test_anisotropic_plane_wave_eigenvalue(dim):
+    """A discrete plane wave is an eigenfunction with eigenvalue
+    sum_d 2 (cos(2 pi p_d / N_d) - 1) / h_d^2."""
+    nb_grid_pts = (8, 6, 10)[:dim]
+    grid_spacing = (0.5, 1.5, 0.25)[:dim]
+    frequencies = (1, 2, 3)[:dim]
+    fc, nb_ghosts = _make_collection(nb_grid_pts)
+    field, _ = _plane_wave(nb_grid_pts, frequencies)
+    eigenvalue = sum(
+        2.0 * (np.cos(2.0 * np.pi * p / n) - 1.0) / h**2
+        for p, n, h in zip(frequencies, nb_grid_pts, grid_spacing))
+    op = muGrid.LaplaceOperator(dim, grid_spacing=grid_spacing)
+    out = _apply(op, fc, nb_ghosts, field)
+    np.testing.assert_allclose(out, eigenvalue * field,
+                               atol=1e-12 * abs(eigenvalue))
+
+
+def test_unit_spacing_equals_scale_only():
+    """grid_spacing=(1, ..., 1) is the scale-only operator, so existing
+    callers that fold 1/h^2 into the scale are unchanged."""
+    nb_grid_pts = (6, 5, 4)
+    rng = np.random.default_rng(3)
+    values = rng.standard_normal(nb_grid_pts)
+    fc_a, nb_ghosts = _make_collection(nb_grid_pts)
+    fc_b, _ = _make_collection(nb_grid_pts)
+    a = _apply(muGrid.LaplaceOperator(3, -2.5), fc_a, nb_ghosts, values)
+    b = _apply(muGrid.LaplaceOperator(3, -2.5, grid_spacing=(1.0,) * 3),
+               fc_b, nb_ghosts, values)
+    np.testing.assert_array_equal(a, b)
+    np.testing.assert_allclose(muGrid.LaplaceOperator(3, -2.5).grid_spacing,
+                               [1.0, 1.0, 1.0])
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+def test_anisotropic_is_self_adjoint(dim):
+    """<L u, v> == <u, L v> on the periodic grid, and transpose == apply."""
+    nb_grid_pts = (6, 7, 5)[:dim]
+    grid_spacing = (0.5, 2.0, 0.75)[:dim]
+    rng = np.random.default_rng(11)
+    u = rng.standard_normal(nb_grid_pts)
+    v = rng.standard_normal(nb_grid_pts)
+    op = muGrid.LaplaceOperator(dim, -1.0, grid_spacing=grid_spacing)
+    fc, nb_ghosts = _make_collection(nb_grid_pts)
+    Lu = _apply(op, fc, nb_ghosts, u)
+    fc2, _ = _make_collection(nb_grid_pts)
+    Lv = _apply(op, fc2, nb_ghosts, v)
+    assert np.isclose(np.vdot(Lu, v), np.vdot(u, Lv), rtol=1e-12)
+    fc3, _ = _make_collection(nb_grid_pts)
+    ifield = fc3.real_field("in")
+    ofield = fc3.real_field("out")
+    _set_periodic(ifield, u, nb_ghosts)
+    op.transpose(ifield, ofield)
+    np.testing.assert_array_equal(np.asarray(ofield.p), Lu)
+
+
+@pytest.mark.parametrize("dim", [2, 3])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+@pytest.mark.parametrize("device", get_test_devices())
+def test_anisotropic_on_device_and_in_single_precision(device, dtype, dim):
+    """The device kernels and the float32 instantiations take the per-axis
+    weights too; compared against the host float64 result."""
+    skip_if_gpu_unavailable(device)
+    nb_grid_pts = (12, 9, 7)[:dim]
+    grid_spacing = (0.5, 2.0, 0.25)[:dim]
+    rng = np.random.default_rng(5)
+    values = rng.standard_normal(nb_grid_pts)
+    fc_ref, nb_ghosts = _make_collection(nb_grid_pts)
+    op = muGrid.LaplaceOperator(dim, -1.0, grid_spacing=grid_spacing)
+    ref = _apply(op, fc_ref, nb_ghosts, values)
+
+    device_obj = create_device(device)
+    kwargs = {"device": device_obj} if device_obj else {}
+    fc = muGrid.GlobalFieldCollection(
+        list(nb_grid_pts), nb_ghosts_left=nb_ghosts,
+        nb_ghosts_right=nb_ghosts, **kwargs)
+    ifield = fc.real_field("in", dtype=dtype)
+    ofield = fc.real_field("out", dtype=dtype)
+    padded = np.pad(values, tuple(zip(nb_ghosts, nb_ghosts)), mode="wrap")
+    if device_obj:
+        import cupy
+
+        ifield.pg[...] = cupy.asarray(padded.astype(dtype))
+    else:
+        ifield.pg[...] = padded.astype(dtype)
+    op.apply(ifield, ofield)
+    out = ofield.p
+    out = out.get() if hasattr(out, "get") else np.asarray(out)
+    rtol = 1e-5 if dtype == np.float32 else 1e-13
+    np.testing.assert_allclose(out, ref, rtol=rtol, atol=rtol * np.abs(ref).max())
+    # increment adds alpha times the anisotropic Laplacian
+    op.apply_increment(ifield, 0.5, ofield)
+    out = ofield.p
+    out = out.get() if hasattr(out, "get") else np.asarray(out)
+    np.testing.assert_allclose(out, 1.5 * ref, rtol=rtol,
+                               atol=rtol * np.abs(ref).max())
+
+
+@pytest.mark.parametrize("bad", [(0.5,), (0.5, 1.0, 2.0), (0.5, 0.0),
+                                 (0.5, -1.0), (0.5, float("nan"))])
+def test_rejects_a_malformed_grid_spacing(bad):
+    """One positive spacing per axis, or the constructor raises."""
+    with pytest.raises(RuntimeError):
+        muGrid.LaplaceOperator(2, grid_spacing=bad)

@@ -94,10 +94,38 @@ namespace muGrid {
 
     /**
      * @struct P1Tet3D
-     * @brief 3D voxel split into 5 linear tetrahedra (Kuhn triangulation).
+     * @brief 3D voxel split into 5 linear tetrahedra.
      *
-     * Quadrature point 0 is the central tetrahedron (volume fraction 1/3); the
-     * four corner tetrahedra each have volume fraction 1/6.
+     * The split of R. Leute, PhD thesis (Univ. Freiburg, 2026), Sec. 3.5.3,
+     * Eqs. (3.63)-(3.65): one central tetrahedron on the odd-parity corners
+     * (1,0,0), (0,1,0), (0,0,1), (1,1,1), and four corner tetrahedra with
+     * their apex at (0,0,0), (1,1,0), (1,0,1) and (0,1,1), each spanned by
+     * the apex and its three axis neighbours. It is *not* the Kuhn
+     * (Freudenthal) triangulation, which has six tetrahedra sharing the
+     * (0,0,0)-(1,1,1) diagonal (thesis Sec. 3.5.1); the five-tetrahedra split
+     * has no preferred diagonal and was chosen there for its isotropy
+     * (thesis App. A.1). Note that the thesis' printed z-component of the
+     * fourth corner element, "f011 - f011", is a typo for f011 - f010, which
+     * is what B holds.
+     *
+     * The gradients are forward differences from the apex on the corner
+     * tetrahedra and half the four-corner differences on the central one
+     * (constant per tetrahedron, so one quadrature point each). Quadrature
+     * point 0 is the central tetrahedron (volume fraction 1/3); the four
+     * corner tetrahedra each have volume fraction 1/6. Each tetrahedron is the
+     * affine image of its unit-cube counterpart, so B / h_d is the physical
+     * gradient on anisotropic voxels as well.
+     *
+     * The same split is used in every voxel, as in the thesis, where the
+     * element gradient operators live in Fourier space and therefore have to
+     * be translation invariant. The face diagonals of neighbouring voxels
+     * then cross, so the P1 interpolant is discontinuous across voxel faces
+     * away from the nodes (the conforming alternative mirrors the split on
+     * every other voxel and has two sublattices). The assembled stiffness is
+     * nevertheless a single symmetric 19-point stencil equal to the
+     * sublattice average of the conforming one, with the same plane-wave
+     * spectrum; tests/python_fem_element_tests.py pins both the tables and
+     * that stencil.
      */
     struct P1Tet3D {
         static constexpr Dim_t SpatialDim = 3;

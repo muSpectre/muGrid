@@ -4,6 +4,19 @@ Change log for µGrid
 v1.5.0 (08Oct26)
 ----------------
 
+- ENH: `LaplaceOperator` takes a `grid_spacing`: the two neighbours along
+  axis `d` are then weighted by `scale / h_d^2`, the finite-difference
+  Laplacian of an anisotropic grid. Host, device and single-precision kernels
+  take the per-axis weights; `coefficients` reports the weighted stencil and
+  `grid_spacing` the spacing. Without it the operator is unchanged (every axis
+  weighted by `scale`). Also fixed on the way: the 3D `coefficients` property
+  had the x and z neighbours swapped (invisible while they were equal), and
+  `apply_increment` on float64 device fields was not bound
+- DOC: `P1Tet3D` is the five-tetrahedra voxel of Leute's thesis (Sec. 3.5.3),
+  not a Kuhn triangulation as its summary said; its tables, volume fractions
+  and the 19-point Laplacian stencil it assembles are now pinned by
+  `tests/python_fem_element_tests.py`, and the docstring records why the
+  split is the same in every voxel
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
