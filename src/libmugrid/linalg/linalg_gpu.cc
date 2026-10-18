@@ -12,8 +12,9 @@
  * runtime API differ, which are abstracted via macros.
  *
  * The Real and Complex paths share a single source. Each kernel is written
- * once as a template over a device scalar type — `Real` for real fields and
- * the lightweight `DeviceComplex` below for complex fields — and the
+ * once as a template over a device scalar type — `Real`/`float` for real
+ * fields and the lightweight `DeviceComplex`/`DeviceComplex32` below for
+ * complex fields — and the
  * sesquilinear-vs-bilinear difference is isolated in the `conj_product` trait
  * (mirroring internal::conj_product in linalg_host.cc). The public
  * <Real, DeviceSpace> / <Complex, DeviceSpace> entry points are thin
@@ -21,6 +22,15 @@
  * copy to keep in sync. `DeviceComplex` is a tiny `__host__ __device__`
  * aggregate (no thrust, no cuComplex) and is bit-compatible with
  * std::complex<Real>, so complex field buffers are reinterpret_cast to it.
+ *
+ * Reductions are two-pass: a grid-stride kernel in which every thread sums
+ * its elements in the accumulator type (double for single-precision
+ * fields), followed by a shared-memory tree reduction per block, writes one
+ * partial sum per block; a single-block kernel then reduces the partial
+ * sums, and one device->host copy returns the result. Work is O(N); the
+ * tree has depth log2(REDUCE_BLOCK_SIZE). Pairwise (tree) summation of the
+ * per-thread sums also keeps the rounding error lower than one long serial
+ * sum would.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -88,8 +98,9 @@ constexpr int REDUCE_BLOCK_SIZE = 256;
 // The cap is a plain constant rather than a device query: it only has to be
 // large enough to fill any GPU (several blocks per SM even on a
 // many-hundred-SM device) and small enough to amortise the tree, and the
-// measured optimum is broad. Below the cap the sizing is unchanged, so small
-// grids -- and MPI ranks with few local pixels -- behave exactly as before.
+// measured optimum is broad. Below the cap there is one block per
+// REDUCE_BLOCK_SIZE elements, so small grids -- and MPI ranks with few local
+// pixels -- launch only as many blocks as they have elements to fill.
 constexpr int REDUCE_MAX_BLOCKS = 1024;
 
 inline int reduction_blocks(Index_t n) {
@@ -170,12 +181,12 @@ __host__ __device__ inline RT sq_norm(DeviceComplexT<RT> x) {
 /**
  * Accumulator type for the dot reductions: single-precision partial sums are
  * promoted to double precision (float -> Real, DeviceComplex32 ->
- * DeviceComplex), mirroring internal::promoted in linalg_host.cc and the
- * double accumulation already used by axpy_norm_sq_kernel and
+ * DeviceComplex), mirroring internal::promoted_t in linalg_host.cc and the
+ * double accumulation used by axpy_norm_sq_kernel and
  * interior_three_dots_kernel. The launchers also *return* this type rather
  * than narrowing back to the device scalar: see linalg::reduction_result in
- * linalg.hh — the narrowing overflowed to infinity on large single-precision
- * solves, which stalled CG silently. This is the device-side mirror of that
+ * linalg.hh — narrowing would overflow to infinity on large single-precision
+ * solves and stall CG silently. This is the device-side mirror of that
  * trait (it maps the DeviceComplex* types, which the public one does not
  * know about).
  */
@@ -335,12 +346,12 @@ __global__ void dot_reduce_kernel(const T* a, const T* b,
 /**
  * Dot product over the interior (non-ghost) region only (1D/2D/3D).
  *
- * Sums the interior directly. Do NOT compute interior reductions as
- * full-buffer result minus ghost contribution: the ghost buffers hold large
- * stale data (stencil operators write results into ghost pixels), so the
- * subtraction cancels catastrophically once the interior values are small.
- * This destroyed converged CG residuals — the reported squared norm carried
- * an absolute error of order eps * ||ghosts||^2 and could even go negative.
+ * Sums the interior directly. Interior reductions must not be computed as
+ * full-buffer result minus ghost contribution: the ghost buffers can hold
+ * large stale data (stencil operators write results into ghost pixels), so
+ * the subtraction cancels catastrophically once the interior values are
+ * small, leaving an absolute error of order eps * ||ghosts||^2 that swamps
+ * a converged CG residual and can make a squared norm negative.
  * Mirrors internal::interior_vecdot in linalg_host.cc.
  *
  * The interior box has extents (nx, ny, nz) and starts at (x0, y0, z0);
@@ -437,12 +448,12 @@ __global__ void final_reduce_kernel(T* data, Index_t n) {
  * over the interior and writes three per-block partial sums into a single
  * buffer laid out as [ru(0..nb) | wu(nb..2nb) | rr(2nb..3nb)].
  *
- * Real-only (the pipelined CG fields are real); not templated over the scalar
- * type because there is no complex pipelined-CG instantiation.
+ * Real fields only (there is no complex pipelined-CG instantiation), so the
+ * products are plain bilinear ones. Templated on the field scalar type RT
+ * (Real or Real32); the reduction itself accumulates in Real (double)
+ * regardless, so a single-precision CG keeps a double-accurate inner
+ * product (only the field reads are fp32).
  */
-// Templated on the field scalar type RT (Real or Real32); the reduction itself
-// accumulates in Real (double) regardless, so a single-precision CG keeps a
-// double-accurate inner product (only the field reads are fp32).
 template <typename RT>
 __global__ void interior_three_dots_kernel(
     const RT* r, const RT* u, const RT* w, Real* partial,
@@ -584,7 +595,7 @@ __global__ void cross_kernel(const T* a, const T* b, T* out, Index_t npix,
 }
 
 // Fused Leray projection out[c] -= k[c] * sum_d(invk[d] * N[d]) on the complex
-// fields N/out (stored as interleaved re/im doubles) with real coefficient
+// fields N/out (stored as interleaved re/im RT values) with real coefficient
 // fields k/invk. Because the coefficients are real they scale the real and
 // imaginary parts identically, so the kernel does no complex arithmetic.
 // Templated on the field real type RT (Real or Real32). The contraction sums
@@ -621,9 +632,10 @@ using gpu_kernels::DeviceComplex32;
 /* ---------------------------------------------------------------------- */
 /* Public-type <-> device-scalar mapping                                   */
 /*                                                                         */
-/* The public API is templated on the field scalar (Real or Complex). On   */
-/* the device, Real maps to itself and Complex maps to the layout-          */
-/* compatible DeviceComplex; field buffers are reinterpret_cast to the      */
+/* The public API is templated on the field scalar (Real, Complex, Real32  */
+/* or Complex32). On the device, Real maps to itself, Real32 to float, and  */
+/* Complex/Complex32 to the layout-compatible DeviceComplex/DeviceComplex32; */
+/* field buffers are reinterpret_cast to the                                */
 /* device scalar. These helpers centralise the cast so the generic bodies   */
 /* below carry no per-type branch.                                          */
 /* ---------------------------------------------------------------------- */
@@ -717,10 +729,10 @@ bool has_ghosts(const GlobalFieldCollection& coll) {
 /**
  * Grow-only device scratch buffer for reduction partial sums.
  *
- * The reductions used to cudaMalloc/cudaFree a `d_partial` buffer on every
- * call. That allocation pair has a large fixed cost (~100 us measured) that
- * dominates the reduction itself for small/medium fields, and a CG solve issues
- * several reductions per iteration. The reductions are called serially from the
+ * A device allocation/free pair per call would have a large fixed cost
+ * (~100 us measured for cudaMalloc/cudaFree) that dominates the reduction
+ * itself for small/medium fields, and a CG solve issues several reductions
+ * per iteration. The reductions are called serially from the
  * host and each ends in a blocking device->host copy, so by the time one
  * reduction returns its scratch is free for the next to reuse: a single cached,
  * grow-only buffer per slot backs every reduction with no per-call allocation.
@@ -735,8 +747,8 @@ bool has_ghosts(const GlobalFieldCollection& coll) {
 Real* reduction_scratch(int slot, Index_t n_reals) {
     // One cache per device, for the current one (the callers hold a
     // DeviceGuard on their field's device): a single process-wide buffer
-    // lives on whichever GPU first allocated it, and a reduction on another
-    // GPU then wrote its partial sums into foreign memory.
+    // would live on whichever GPU first allocated it, and a reduction on
+    // another GPU would write its partial sums into foreign memory.
     struct Scratch {
         Real* ptr[2]{nullptr, nullptr};
         Index_t cap[2]{0, 0};
@@ -821,7 +833,8 @@ InteriorBox interior_box(const TypedField<T, DeviceSpace>& f,
 /* ---------------------------------------------------------------------- */
 /* Generic reduction launchers                                             */
 /*                                                                         */
-/* DS is the device scalar (Real or DeviceComplex). The conj_product trait */
+/* DS is the device scalar (Real, float, DeviceComplex or DeviceComplex32). */
+/* The conj_product trait                                                   */
 /* inside the kernels picks bilinear vs sesquilinear, so a single launcher  */
 /* serves both reductions.                                                  */
 /* ---------------------------------------------------------------------- */
@@ -889,7 +902,8 @@ gpu_kernels::ReduceAcc<DS> reduce_interior_dot(const DS* a, const DS* b,
 /* Generic operation bodies                                                */
 /*                                                                         */
 /* Each operation is written once as a function template over the field    */
-/* scalar type T (Real or Complex). The public <T, DeviceSpace> entry       */
+/* scalar type T (Real, Complex, Real32 or Complex32). The public          */
+/* <T, DeviceSpace> entry                                                   */
 /* points further down are thin delegators. This mirrors the *_host<T>      */
 /* pattern in linalg_host.cc.                                               */
 /* ---------------------------------------------------------------------- */

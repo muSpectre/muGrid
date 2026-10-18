@@ -61,7 +61,7 @@ namespace muGrid {
         const DynGridIndex & subdomain_locations_without_ghosts,
         const DynGridIndex & nb_ghosts_left, const DynGridIndex & nb_ghosts_right,
         const DynGridIndex & subdomain_strides) {
-        // Idiot checks
+        // Argument checks
         this->check_dimension(nb_domain_grid_pts, "nb_domain_grid_pts");
         this->check_dimension(nb_subdivisions, "nb_subdivisions");
         this->check_dimension(nb_subdomain_grid_pts_without_ghosts,
@@ -121,18 +121,20 @@ namespace muGrid {
             auto nb_ghosts_right{this->get_nb_ghosts_right()[direction]};
             auto nb_ghosts_left{this->get_nb_ghosts_left()[direction]};
 
-            // We can send this many slices to the right now; we need to fill
-            // the left ghost buffer of the right rank
+            // Slices sent to the right in the first step; they fill the left
+            // ghost buffer of the right rank
             auto nb_send_right{
                 std::min(nb_subdomain_grid_pts_without_ghosts[direction],
                          nb_ghosts_left)};
 
-            // We can send this many slices to the left now; we need to fill
-            // the right ghost buffer of the left rank
+            // Slices sent to the left in the first step; they fill the right
+            // ghost buffer of the left rank
             auto nb_send_left{
                 std::min(nb_subdomain_grid_pts_without_ghosts[direction],
                          nb_ghosts_right)};
 
+            // any() is a collective reduction, so all ranks run the same
+            // number of steps even where their own ghosts are already full
             int step{0};
             while (this->cart_comm->any(nb_cum_send_right < nb_ghosts_left ||
                                         nb_cum_send_left < nb_ghosts_right)) {
@@ -149,7 +151,8 @@ namespace muGrid {
                 nb_cum_send_right += nb_send_right;
                 nb_cum_send_left += nb_send_left;
 
-                // Determine how much additional data we can now send
+                // Slices for the next step: only what was just received can be
+                // relayed, capped by what the neighbour's ghost still lacks
                 nb_send_right =
                     std::min(nb_ghosts_left - nb_cum_send_right, nb_recv_left);
                 nb_send_left =
@@ -168,7 +171,7 @@ namespace muGrid {
                                        const DynGridIndex & nb_subdivisions,
                                        const DynGridIndex & nb_ghosts_left,
                                        const DynGridIndex & nb_ghosts_right) {
-        // Idiot checks
+        // Argument checks
         this->check_dimension(nb_domain_grid_pts, "nb_domain_grid_pts");
         this->check_dimension(nb_subdivisions, "nb_subdivisions");
         this->check_dimension(nb_ghosts_left, "nb_ghosts_left");
@@ -181,7 +184,9 @@ namespace muGrid {
         this->cart_comm = std::make_unique<CartesianCommunicator>(
             this->comm, nb_subdivisions);
 
-        // Compute bare domain decomposition without ghosts
+        // Compute bare domain decomposition without ghosts:
+        // n_a = floor(N_a / P_a) + [c_a < N_a mod P_a],
+        // s_a = c_a floor(N_a / P_a) + min(c_a, N_a mod P_a)
         auto nb_subdomain_grid_pts{nb_domain_grid_pts / nb_subdivisions};
         auto coordinates{this->cart_comm->get_coordinates()};
         auto subdomain_locations{coordinates * nb_subdomain_grid_pts};
@@ -261,10 +266,13 @@ namespace muGrid {
         auto nb_total_elements{static_cast<Index_t>(field.get_buffer_size())};
 
         // Get the begin address of the field data (cast into char * for pointer
-        // arithmetics). Pass false to allow device pointers for CUDA-aware MPI.
+        // arithmetics). Pass false to allow device pointers: device data is
+        // exchanged through device staging buffers (see
+        // CartesianCommunicator::sendrecv_staged).
         auto * data{static_cast<char *>(field.get_void_data_ptr(false))};
 
-        // Check if field is on device memory (needed for serial ghost comm)
+        // Check if field is on device memory (selects device copy kernels
+        // and staging in CartesianCommunicator)
         bool is_device_memory{field.is_on_device()};
 
         // Get element size (only useful for pointer arithmetic in finding the
@@ -294,9 +302,11 @@ namespace muGrid {
             // D-1 dimensional slice of the buffer. The slice has a normal
             // in `direction`.
 
-            // The block length equals the strides; this is also the stride
-            // between slices which means to send multiple consecutive slices
-            // we just send more blocks.
+            // The block length equals the pixel stride along `direction`;
+            // this is also the stride between slices, so k consecutive slices
+            // form one contiguous run of k * block_len elements per block.
+            // A slice normal to `direction` is then nb_blocks such runs with
+            // pitch block_stride.
             auto block_len{strides[strides.size() - spatial_dims + direction]};
 
             // Detect SoA (Structure of Arrays) layout vs AoS (Array of
@@ -333,17 +343,17 @@ namespace muGrid {
             Index_t nb_cum_send_right{0}, nb_cum_send_left{0};
             Index_t nb_cum_recv_right{0}, nb_cum_recv_left{0};
 
-            // We can send this many slices to the right now; we need to fill
-            // the left ghost buffer of the right rank
+            // Slices sent to the right in the first step; they fill the left
+            // ghost buffer of the right rank
             auto nb_send_right{
                 std::min(nb_subdomain_grid_pts_without_ghosts, nb_ghosts_left)};
 
-            // We can send this many slices to the left now; we need to fill
-            // the right ghost buffer of the left rank
+            // Slices sent to the left in the first step; they fill the right
+            // ghost buffer of the left rank
             auto nb_send_left{std::min(nb_subdomain_grid_pts_without_ghosts,
                                        nb_ghosts_right)};
 
-            // Loop until ghost buffers have been filled
+            // Replay the schedule negotiated in initialise()
             for (Index_t step{0}; step < this->nb_sendrecv_steps[direction];
                  ++step) {
                 // NB: do not validate the cached sequence here with collective
@@ -412,13 +422,14 @@ namespace muGrid {
                     // device memory flag for serial GPU memory copy
                     is_device_memory);
 
-                // Update how many blocks we have already sent to the right/left
+                // Update how many slices we have already sent to the right/left
                 nb_cum_send_right += nb_send_right;
                 nb_cum_send_left += nb_send_left;
                 nb_cum_recv_right += nb_recv_right;
                 nb_cum_recv_left += nb_recv_left;
 
-                // Determine how much additional data we can now send
+                // Slices for the next step: only what was just received can be
+                // relayed, capped by what the neighbour's ghost still lacks
                 nb_send_right =
                     std::min(nb_ghosts_left - nb_cum_send_right, nb_recv_left);
                 nb_send_left =
@@ -469,7 +480,10 @@ namespace muGrid {
         // Get type descriptor for communication
         TypeDescriptor type_desc{field.get_type_descriptor()};
 
-        // For each direction (in reverse order to handle corners correctly)
+        // For each direction in reverse order: G^T = G_0^T ... G_{d-1}^T, so
+        // ghost entries of the last axis (which include the corner and edge
+        // ghosts of the earlier axes) are accumulated first, into slices
+        // that the earlier axes then reduce further
         for (Dim_t direction{static_cast<int>(spatial_dims) - 1}; direction >= 0;
              --direction) {
             // Grid size

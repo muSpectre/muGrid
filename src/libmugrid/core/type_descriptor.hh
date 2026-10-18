@@ -102,8 +102,9 @@ namespace detail {
     struct is_complex_type<std::complex<U>> : std::true_type {};
 
     //! Per-type classification used to generate the constexpr predicates
-    //! below. Complex is treated as signed (matching the historical
-    //! behaviour); std::is_signed_v is false for std::complex.
+    //! below. Complex is treated as signed, since its real and imaginary
+    //! parts are signed floating-point numbers; std::is_signed_v is false
+    //! for std::complex and therefore cannot be used directly.
     template <typename T>
     inline constexpr bool td_is_signed =
         std::is_signed<T>::value || is_complex_type<T>::value;

@@ -505,8 +505,9 @@ namespace muGrid {
             case 4: {
                 return dim * dim;
             }
-            // old gcc fail to compile throw statements in constexpr, but new
-            // clang requires all paths of execution to either return or throw
+            // GCC <= 5 cannot compile throw statements in constexpr
+            // functions, while clang requires every path of execution to
+            // either return or throw
 #if defined(__llvm__) || __GNUC__ > 5
             default: {
                 throw RuntimeError("unknown rank");
@@ -533,8 +534,9 @@ namespace muGrid {
             case 4: {
                 return dim * dim;
             }
-            // old gcc fail to compile throw statements in constexpr, but new
-            // clang requires all paths of execution to either return or throw
+            // GCC <= 5 cannot compile throw statements in constexpr
+            // functions, while clang requires every path of execution to
+            // either return or throw
 #if defined(__llvm__) || __GNUC__ > 5
             default: {
                 throw RuntimeError("unknown rank");

@@ -45,8 +45,11 @@ namespace muGrid {
     /**
      * Tag type for host (CPU) memory space.
      *
-     * Uses ArrayOfStructures storage order for optimal CPU cache
-     * locality when iterating over components within a pixel.
+     * Uses ArrayOfStructures storage order (component index fastest:
+     * entry (c, p) of a field with C components per pixel sits at offset
+     * c + C p). All components of a pixel are contiguous, so a per-pixel
+     * kernel touches consecutive cache lines and a pixel's vector/tensor
+     * can be mapped in place (e.g. as an Eigen::Map) without gathering.
      */
     struct HostSpace {
         static constexpr const char * name = "Host";
@@ -58,8 +61,13 @@ namespace muGrid {
     /**
      * Tag type for CUDA device memory space.
      *
-     * Uses StructureOfArrays storage order for optimal GPU memory
-     * coalescence when threads in a warp access adjacent pixels.
+     * Uses StructureOfArrays storage order (pixel index fastest: entry
+     * (c, p) sits at offset p + N c for N pixels). Device kernels assign
+     * consecutive pixels to consecutive threads, so the threads of a warp
+     * reading one component access consecutive addresses, which the
+     * hardware coalesces into few memory transactions. Each component is
+     * also a unit-stride array, as required by the batched R2C transforms
+     * of the device FFT backend.
      */
     struct CUDASpace {
         static constexpr const char * name = "CUDA";
@@ -72,8 +80,9 @@ namespace muGrid {
     /**
      * Tag type for ROCm device memory space.
      *
-     * Uses StructureOfArrays storage order for optimal GPU memory
-     * coalescence when threads in a warp access adjacent pixels.
+     * Uses StructureOfArrays storage order for the same reasons as
+     * CUDASpace (coalesced access by the threads of a wavefront, unit-stride
+     * components for the device FFT backend).
      */
     struct ROCmSpace {
         static constexpr const char * name = "ROCm";

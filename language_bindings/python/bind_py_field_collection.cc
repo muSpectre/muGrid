@@ -295,7 +295,7 @@ void add_field_collection(py::module & mod) {
             "sub_division_tag"_a = muGrid::PixelTag,
             "unit"_a = muGrid::Unit::unitless(),
             py::return_value_policy::reference_internal)
-        // Deprecated misspelled alias, kept for backwards compatibility.
+        // Deprecated misspelled alias of the uint variant above.
         .def(
             "register_unint_state_field",
             [](FieldCollection & collection, const std::string & unique_prefix,
@@ -466,7 +466,7 @@ void add_field_collection(py::module & mod) {
             "sub_division_tag"_a = muGrid::PixelTag,
             "unit"_a = muGrid::Unit::unitless(),
             py::return_value_policy::reference_internal)
-        // Deprecated misspelled alias, kept for backwards compatibility.
+        // Deprecated misspelled alias of the uint variant above.
         .def(
             "unint_state_field",
             [](FieldCollection & collection, const std::string & unique_prefix,
@@ -609,13 +609,17 @@ void add_global_field_collection(py::module & mod) {
         nb_domain_grid_pts : tuple of int
             Global grid dimensions (Nx, Ny) or (Nx, Ny, Nz)
         nb_subdomain_grid_pts : tuple of int, optional
-            Local subdomain dimensions (for MPI decomposition)
+            Local subdomain dimensions including ghosts (for MPI
+            decomposition); empty means the whole domain plus ghosts
         subdomain_locations : tuple of int, optional
-            Starting indices of the local subdomain in the global grid
+            Starting indices of the local subdomain (ghosts included) in the
+            global grid
         sub_pts : dict, optional
             Mapping of sub-point names to counts (e.g., {"quad": 4})
         storage_order : StorageOrder, optional
-            Memory layout for field data (default: ArrayOfStructures)
+            Memory layout for field data (default: ArrayOfStructures);
+            ignored for device collections, which always use
+            StructureOfArrays
         nb_ghosts_left : tuple of int, optional
             Ghost layers on low-index side of each dimension
         nb_ghosts_right : tuple of int, optional

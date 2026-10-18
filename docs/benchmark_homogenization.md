@@ -1,35 +1,68 @@
 # Benchmark: homogenization
 
-Wall time of the FEM elasticity [homogenization example](examples.md)
-(`examples/homogenization.py`, fused stiffness kernel), across log-spaced **3D**
-grid sizes. Lower is better.
+## What is measured
 
-!!! info "Test machine & code version"
+Wall time of the conjugate-gradient solves of the
+[homogenization example](examples.md#homogenization) (`examples/homogenization.py`)
+on 3D grids of $N^3$ points, as a function of $N$ and of the execution
+configuration. Problem: the single spherical inclusion (radius 0.25,
+$E_\text{inclusion}/E_\text{matrix} = 10$, $\nu = 0.3$), fused
+`IsotropicStiffnessOperator3D` matvec, no preconditioner, the 6 unit load
+cases. Each load case runs at most `100` CG iterations (relative
+tolerance $10^{-6}$, the example's default); unpreconditioned CG needs more
+than that except on the smallest grids, so the work per configuration is
+essentially fixed at $6 \times 100$ iterations. The reported time is
+the example's `total_time_seconds`: the 6 solves including right-hand-side
+assembly and stress averaging, excluding setup. One measurement per point.
+
+All runs are in **double** precision (`fp64`).
+
+Configurations:
+
+- **CPU (1 core)** — one process without MPI. µGrid's kernels are not
+  multithreaded, so this uses one core. Swept up to 128³.
+- **CPU (92 cores, MPI)** — `mpiexec -n 92`, one rank per core;
+  the grid is split into subdomains that exchange ghost layers in every
+  matvec.
+- **GPU (1 device)** — one process on one GPU.
+- **GPU (4 devices, MPI)** — `mpiexec -n 4`, one rank per GPU (assigned round-robin).
+
+Each configuration is swept in $N$ until the first size that runs out of
+memory; that size is reported as `OOM` and larger sizes are not attempted.
+
+## Provenance
+
+!!! info "Run 2026-06-30T15:55:33"
+    - **Results:** time vs. grid size (fp64)
+    - **Code version:** `0.110.0-9-g3cf17e02-dirty` (commit `3cf17e02`, uncommitted changes in the working tree)
     - **CPU:** AMD Instinct MI300A Accelerator (192 logical cores)
     - **GPU:** 4x AMD Instinct MI300A
-    - **muGrid:** `0.110.0-9-g3cf17e02-dirty` — run 2026-06-30T15:55:33
+    - **Compiler:** not recorded <!-- TODO: benchmark metadata missing: compiler and version -->
+    - **Libraries:** not recorded <!-- TODO: benchmark metadata missing: key library versions (FFT backend, Eigen, pybind11, NumPy) -->
+    - **MPI:** not recorded <!-- TODO: benchmark metadata missing: MPI implementation and version -->
+    - **GPU runtime:** not recorded <!-- TODO: benchmark metadata missing: CUDA/ROCm version -->
+    - **Nodes:** not recorded <!-- TODO: benchmark metadata missing: node count and ranks per node -->
 
-Run configuration: 3D single spherical inclusion, fused stiffness kernel,
-6 load cases, fixed `100` CG iterations per load case — i.e. a **fixed work
-budget** so every configuration performs identical arithmetic. Times are the
-solver wall time (`total_time_seconds`, excluding setup).
+## Commands
 
-## Time vs. grid size
+Each data point is one invocation of the example, launched by
+`examples/benchmark_homogenization.py` as
 
-The plot below merges several ways of running the *same* solve on this machine:
+```bash
+# CPU (1 core)
+python examples/homogenization.py -n N,N,N -d cpu -k fused -i 100 --precision double --inclusion-type single
+# CPU (92 cores, MPI)
+OMPI_MCA_rmaps_base_oversubscribe=1 mpiexec -n 92 python examples/homogenization.py -n N,N,N -d cpu -k fused -i 100 --precision double --inclusion-type single
+# GPU (1 device)
+python examples/homogenization.py -n N,N,N -d gpu -k fused -i 100 --precision double --inclusion-type single
+# GPU (4 devices, MPI)
+OMPI_MCA_rmaps_base_oversubscribe=1 mpiexec -n 4 python examples/homogenization.py -n N,N,N -d gpu -k fused -i 100 --precision double --inclusion-type single
+```
 
-- **CPU (1 core)** — a single core, MPI disabled. muGrid's compute kernels carry
-  no OpenMP, so a non-MPI CPU run uses exactly one core. Only swept up to
-  128³; a single core is hopeless beyond that.
-- **CPU (92 cores, MPI)** — the whole CPU via MPI domain decomposition
-  (`mpiexec -n 92`), the grid split into per-rank subdomains that exchange
-  ghost layers each iteration.
-- **GPU (1 device)** — a single GPU.
-- **GPU (N devices, MPI)** — several GPUs via MPI domain decomposition, one rank per device (round-robin).
+with `N` the grid size of the column and `--json-out FILE` added to collect the
+result.
 
-Each configuration is swept to the largest grid that still fits in memory: the
-first size that runs **out of memory** is recorded as `OOM` in the table and
-dropped from the plot, and larger sizes for that configuration are not attempted.
+## Results
 
 | Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) | 768³ (453.0M) | 1024³ (1073.7M) | 1536³ (3623.9M) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -42,19 +75,12 @@ dropped from the plot, and larger sizes for that configuration are not attempted
 
 ![Homogenization solve time vs. grid size](benchmark_homogenization.png)
 
-A single CPU core is quickly left behind, so the fair comparison is the full CPU
-(all 92 cores via MPI) against the GPU(s). The GPU leads in the mid-range,
-where the heavy per-point FEM stiffness kernel keeps it busy and the working set
-fits in device memory. The largest grids are reached only by MPI domain
-decomposition — across all CPU cores, or across several GPUs (one rank per
-device, round-robin) — which is also what pushes each curve's memory ceiling out
-before the `OOM` cutoff.
+## Reproducing
 
-All data points live in the shared benchmark database `benchmarks/results.csv`
-(date, code version, machine, parameters, results). This page is generated by
-`examples/benchmark_homogenization.py`; re-render it from the database (no
-recompute) with `--render-only`, or run a fresh measurement that appends a new
-dated row set:
+All data points are stored in `benchmarks/results.csv`. This page is generated
+by `examples/benchmark_homogenization.py`; `--render-only` re-renders it from
+the database, and a run without it measures and appends a new dated run (see
+`benchmarks/README.md`):
 
 ```bash
 python examples/benchmark_homogenization.py \

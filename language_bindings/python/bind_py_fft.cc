@@ -155,8 +155,8 @@ auto py_fft_coords(const EngineType & eng) {
 }
 
 void add_fft_utils(py::module & mod) {
-  // Note: fft_freqind, fft_freq, rfft_freqind, rfft_freq are now properties
-  // on the FFTEngine class, not standalone functions.
+  // Frequencies of the local Fourier subdomain are FFTEngine properties
+  // (fftfreq, ifftfreq), not standalone functions.
 
   mod.def(
       "get_hermitian_grid_pts",
@@ -212,11 +212,15 @@ void add_fft_engine(py::module & mod) {
 
   py::class_<PyFFTEngine, muGrid::CartesianDecomposition>(mod, "FFTEngine",
       R"(
-      Distributed FFT engine using pencil (2D) decomposition.
+      Distributed real-to-complex FFT engine.
 
       This class provides distributed FFT operations on structured grids with
-      MPI parallelization. It uses pencil decomposition which allows efficient
-      scaling to large numbers of ranks.
+      MPI parallelization. 2D grids are split along their last axis. 3D grids
+      use a slab decomposition (last axis only) when nb_ranks <= Nz, which
+      transforms each local plane with one batched 2D transform and needs one
+      transpose (MPI_Alltoallw) per transform; with more ranks they use a
+      pencil decomposition (last two axes), which needs two transposes. The
+      `decomposition` argument overrides the choice. 1D grids are serial only.
 
       Key features:
       - Supports 1D, 2D, and 3D grids
@@ -254,7 +258,7 @@ void add_fft_engine(py::module & mod) {
            "nb_sub_pts"_a = SubPtMap_t{},
            "decomposition"_a = "auto",
            R"(
-           Construct an FFT engine with pencil decomposition.
+           Construct an FFT engine.
 
            Parameters
            ----------
@@ -268,6 +272,11 @@ void add_fft_engine(py::module & mod) {
                Ghost cells on high-index side of each dimension
            nb_sub_pts : dict, optional
                Number of sub-points per pixel
+           decomposition : {"auto", "slab", "pencil"}, optional
+               MPI process grid for 3D grids: "slab" splits only the last
+               axis (needs nb_ranks <= Nz; one transpose per transform),
+               "pencil" the last two (two transposes, more than Nz ranks
+               possible), "auto" (default) slab if it fits, else pencil.
            )")
 
       // Transform operations
@@ -533,7 +542,7 @@ void add_fft_engine(py::module & mod) {
       // Geometry queries
       .def_property_readonly("normalisation", &PyFFTEngine::normalisation,
            R"(
-           Get the normalization factor for FFT roundtrip.
+           Get the normalization factor for FFT roundtrip, 1 / prod(N).
            Multiply ifft output by this to recover original values.
            )")
 
@@ -592,7 +601,7 @@ void add_fft_engine(py::module & mod) {
 
       .def_property_readonly("spatial_dim",
            &PyFFTEngine::get_spatial_dim,
-           "Get the spatial dimension (2 or 3).")
+           "Get the spatial dimension (1, 2 or 3).")
 
       // FFT frequency arrays
       .def_property_readonly("fftfreq",
@@ -756,6 +765,11 @@ void add_fft_engine_cuda(py::module & mod) {
                Number of sub-points per pixel
            device_id : int, optional
                CUDA device ID (default: 0)
+           decomposition : {"auto", "slab", "pencil"}, optional
+               MPI process grid for 3D grids: "slab" splits only the last
+               axis (needs nb_ranks <= Nz; one transpose per transform),
+               "pencil" the last two (two transposes, more than Nz ranks
+               possible), "auto" (default) slab if it fits, else pencil.
            )")
 
       .def("fft",
@@ -964,6 +978,11 @@ void add_fft_engine_hip(py::module & mod) {
                Number of sub-points per pixel
            device_id : int, optional
                ROCm device ID (default: 0)
+           decomposition : {"auto", "slab", "pencil"}, optional
+               MPI process grid for 3D grids: "slab" splits only the last
+               axis (needs nb_ranks <= Nz; one transpose per transform),
+               "pencil" the last two (two transposes, more than Nz ranks
+               possible), "auto" (default) slab if it fits, else pencil.
            )")
 
       .def("fft",

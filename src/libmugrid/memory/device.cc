@@ -53,7 +53,8 @@
 namespace muGrid {
 
 namespace {
-    //! Parse MUGRID_UNIFIED_MEMORY. Returns -1 if unset, 0/1 otherwise. The
+    //! Parse MUGRID_UNIFIED_MEMORY. Returns -1 if unset or empty, 1/0 for a
+    //! true/false value and throws otherwise (see environment_flag). The
     //! variable forces the integrated/host-accessible answer for platforms
     //! where the runtime probe is unreliable (e.g. APUs needing a particular
     //! unified/XNACK mode) or to force the conservative host-staging path.

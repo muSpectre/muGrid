@@ -1,419 +1,290 @@
 # Operator Kernel Design
 
-This document describes the design of the discrete differential operators in µGrid, including their common design principles for ghost region handling and periodicity.
+Design notes for the stencil operators in `src/libmugrid/operators/`: how the
+kernels handle ghost regions, which region they compute, how data is laid out,
+and how each operator is evaluated. The mathematical definitions and the Python
+interface are documented in `docs/operators.md`; the notation follows that page
+(dimension $d$, grid point $\mathbf{n}$, spacing $h_\alpha$, unit vector
+$\mathbf{e}_\alpha$, corner offsets $\mathbf{a} \in \{0,1\}^d$).
 
-## Operator Overview
+## Operator overview
 
-µGrid provides several discrete differential operators optimized for structured grids:
+| Operator | Input → output | Stencil (pixels) | Class template |
+|---|---|---|---|
+| `GenericLinearOperator` | nodal → nodal or quadrature | arbitrary (offset $\mathbf{o}$, shape $\mathbf{S}$) | — |
+| `FEMGradientOperator` | nodal → quadrature | $2^d$ corner nodes | `FEMGradientOperator<Element>` |
+| `LaplaceOperator` | nodal → nodal | $2d+1$ points | `LaplaceOperator<Dim>` |
+| `IsotropicStiffnessOperator` | nodal → nodal | $3^d$ nodes | `IsotropicStiffnessOperator<Dim>` |
 
-| Operator | Description | Stencil Size | Input → Output |
-|----------|-------------|--------------|----------------|
-| `GenericLinearOperator` | Flexible stencil-based convolution | Configurable | nodal → quad or nodal → nodal |
-| `FEMGradientOperator` | FEM gradient (nodal → quadrature) | 8 nodes (3D), 4 nodes (2D) | nodal → quad |
-| `LaplaceOperator` | 7-point (3D) or 5-point (2D) Laplacian | 7 (3D), 5 (2D) | nodal → nodal |
-| `IsotropicStiffnessOperator` | Fused elasticity kernel | 8 nodes (3D), 4 nodes (2D) | nodal → nodal |
+All operators except the stiffness operator derive from `LinearOperator`
+(`linear.hh`); the stiffness operator derives from `MaterialOperator`, which
+carries the `apply(displacement, λ, μ, force)` signature.
 
-## Common Design Principles
+## Common design principles
 
-All operators follow these design principles for consistency and correctness:
+### No boundary conditions in the kernels
 
-### 1. Ghost Region Handling
+Kernels never wrap indices. Periodicity and distributed-memory parallelism are
+implemented by the ghost layers, which `CartesianDecomposition::communicate_ghosts()`
+fills before an operator runs: for periodic boundaries the ghost layers hold
+copies from the opposite side of the domain (possibly owned by another rank);
+for other boundary conditions the caller writes the appropriate ghost values
+(e.g. zeros for homogeneous Dirichlet data). One kernel therefore serves
+periodic and non-periodic problems, serial and MPI runs, and host and device.
 
-All operators make no assumption over boundary conditions. They do not wrap anything to periodic domains. Distributed-memory parallelization and periodic boundary conditions are implemented through ghost cell communication:
+### Stencil requirements and the computed region
 
-- **Ghost regions** are filled by `CartesianDecomposition::communicate_ghosts()` before the operator is called
-- For **periodic BC**: ghost regions contain copies from the opposite boundary
-- For **non-periodic BC** with Dirichlet conditions: boundary node values are constrained, and their forces are not computed by the fused kernels (they would be overwritten anyway)
-- **Stencil-based computation region**: Operators compute results for all points where the stencil has valid input data. The iteration bounds are determined by the stencil's requirements, not by the ghost region size.
+Every operator has intrinsic **stencil requirements**: the number of ghost
+layers $\ell_\alpha$ (left) and $r_\alpha$ (right) that one output point reads
+beyond itself along axis $\alpha$.
 
-### Stencil Requirements vs Ghost Size
+| Operator | apply: left / right | transpose: left / right |
+|---|---|---|
+| `GenericLinearOperator` | $\max(0, -o_\alpha)$ / $\max(0, o_\alpha + S_\alpha - 1)$ | mirrored |
+| `FEMGradientOperator` | 0 / 1 | 1 / 0 |
+| `LaplaceOperator` | 1 / 1 | 1 / 1 |
+| `IsotropicStiffnessOperator` | 1 / 1 | — |
 
-Each operator has intrinsic **stencil requirements** (minimum ghost cells needed for valid data access):
+`LinearOperator::get_apply_ghost_requirement()` derives the apply requirement
+from `get_offset()` and `get_stencil_shape()`; the default
+`get_transpose_ghost_requirement()` is its mirror image, because a gather-style
+transpose reads at negated offsets. `get_ghost_requirement()` is the elementwise
+maximum.
 
-| Operator | Left Requirement | Right Requirement |
-|----------|------------------|-------------------|
-| LaplaceOperator2D/3D | 1 | 1 |
-| FEMGradientOperator apply | 0 | 1 |
-| FEMGradientOperator transpose | 1 | 0 |
-| GenericLinearOperator | dynamic | dynamic |
-| IsotropicStiffnessOperator | 1 | 1 |
+For a buffer of $L_\alpha$ points along axis $\alpha$ (interior plus ghosts),
+the operator writes every index $i_\alpha$ with
+$\ell_\alpha \le i_\alpha < L_\alpha - r_\alpha$, i.e. every point whose stencil
+lies inside the buffer. The iteration bounds follow from the stencil, not from
+the ghost width: with three ghost layers on each side and a requirement of one,
+the operator also writes the two outer ghost layers that have valid stencil
+data. Kernel pointers are offset to the first computable point, so index $0$ is
+the first computed point and negative indices address the left ghost region.
 
-**Validation**: If the ghost region is smaller than the stencil requirement, an error is thrown.
+### Upfront validation
 
-**Extended computation**: If the ghost region is larger than the stencil requirement, the operator computes results in the extra ghost points where valid data exists.
+Field compatibility (collection type, storage order, component counts) and
+ghost sufficiency are checked once per call before the kernel runs. An
+insufficient ghost region raises an error naming the operator and the missing
+side; the kernels contain no bounds checks.
 
-**Example** (LaplaceOperator3D with user-configured 3 ghosts on each side):
-- Stencil requires 1 left, 1 right neighbor
-- With 3 ghost cells: iteration bounds are `[1, n-2)` where n includes all ghosts
-- Result: computes for interior + 2 extra points on each side (where stencil has valid data)
+### Stencil offset convention
 
-### 2. Stencil Offset Convention
+The offset places the stencil relative to the output point. The FE operators
+use offset $\mathbf{0}$ and stencil shape $(2, \ldots, 2)$: the quadrature
+points of the element of pixel $\mathbf{n}$ read the nodes $\mathbf{n} +
+\mathbf{a}$. `FEMGradientOperator` exposes this as `offset`, `stencil_shape`
+and `coefficients`, so `GenericLinearOperator(op.offset, op.coefficients)`
+reproduces it.
 
-All operators use a stencil offset to define where the operator "centers":
+### Memory layout
 
-```python
-# Example: FEMGradientOperator with offset [0, 0, 0]
-# Output element (0,0,0) uses input nodes at (0,0,0), (1,0,0), (0,1,0), etc.
-grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+Host fields are array-of-structures (AoS), device fields structure-of-arrays
+(SoA). For a vector field $u_c$ on an $L_0 \times L_1 \times L_2$ buffer with
+$n_c$ components, the element strides are
 
-# Example: GenericLinearOperator with custom offset
-conv_op = muGrid.GenericLinearOperator([0, 0, 0], coefficients)
-```
+| | component | $x$ | $y$ | $z$ |
+|---|---|---|---|---|
+| AoS (CPU) | $1$ | $n_c$ | $n_c L_0$ | $n_c L_0 L_1$ |
+| SoA (GPU) | $L_0 L_1 L_2$ | $1$ | $L_0$ | $L_0 L_1$ |
 
-The offset determines which element's quadrature points correspond to which nodal region.
+SoA makes consecutive GPU threads (consecutive $x$) read consecutive addresses
+for every component, which coalesces the loads; AoS keeps the components of a
+pixel in one cache line on the CPU. Kernels are written against these strides;
+CPU and GPU kernels are separate implementations (`*_gpu.cc` files, compiled as
+CUDA or HIP) dispatched through `kernel_dispatcher.hh`.
 
-### 3. Upfront Validation
+### Precision
 
-Ghost region requirements are validated **once** before kernel execution, not during iteration:
-
-- Operators check that sufficient ghost cells exist in the field collection
-- Invalid configurations throw clear error messages
-- No bounds checking inside the hot loop
-
-### 4. Memory Layout
-
-CPU operators use AoS, and GPU operators use SoA memory layouts:
-
-- CPU: DOF components contiguous `[ux0, uy0, uz0, ux1, uy1, uz1, ...]`
-- GPU: Spatial indices contiguous `[ux0, ux1, ..., uy0, uy1, ..., uz0, uz1, ...]`
-
-The kernel implementations may differ between CPU and GPU as they may be optimized for the respective target architecture.
+Operators are monomorphic in their scalar type at the kernel level. Generic,
+Laplace and stiffness operators provide `Real` and `Real32` overloads on one
+object; `FEMGradientOperator` is instantiated per precision (`_32` suffix in
+the bindings). An overload that an instance does not implement throws.
 
 ---
 
 ## GenericLinearOperator
 
-### Purpose
-Flexible stencil-based convolution operator that can represent any linear differential operator as a sparse stencil.
+The operator is stored as a sparse matrix built from the coefficient tensor
+$S_{kqi}(\mathbf{s})$ for the current grid and component count; coefficients
+whose magnitude is at most a fixed fraction of the largest one are dropped
+(a relative threshold, so the result does not depend on the units of the
+coefficients). Two cached orderings exist: row-major (grouped by output
+quadrature component, so consecutive entries write the same output location in
+`apply`) and column-major (grouped by nodal component, the same property for
+`transpose`). Device copies are created lazily and rebuilt when the grid
+changes. Coefficients are kept in double precision and cast to the field
+precision inside the kernels.
 
-### Design
-- Takes a list of coefficient arrays, one per output component per stencil point
-- Stencil defined by relative offsets from the current position
-- Supports both forward (apply) and adjoint (transpose) operations
-
-### Ghost Requirements
-
-The forward and transpose operations have different ghost requirements because the stencil direction is reversed:
-
-**Forward (`apply`)**: reads at position `p + s` (stencil offset s)
-- Left ghosts: `max(-offset, 0)` in each dimension
-- Right ghosts: `max(stencil_shape - 1 + offset, 0)` in each dimension
-
-**Transpose**: reads at position `p - s` (reversed stencil direction)
-- Left ghosts: `max(stencil_shape - 1 + offset, 0)` in each dimension (swapped from apply's right)
-- Right ghosts: `max(-offset, 0)` in each dimension (swapped from apply's left)
-
-**Example**: For a stencil with offset `[0, 0, 0]` and shape `[2, 2, 2]`:
-- Apply: left=0, right=1 (reads ahead)
-- Transpose: left=1, right=0 (gathers from behind)
-
-### Usage
-```python
-# Create from FEMGradientOperator coefficients
-grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
-conv_op = muGrid.GenericLinearOperator([0, 0, 0], grad_op.coefficients)
-
-# Apply gradient
-conv_op.apply(nodal_field, quadrature_field)
-
-# Apply divergence (transpose)
-conv_op.transpose(quadrature_field, nodal_field, quad_weights)
-```
+The kernel sweeps the output once per non-zero coefficient, resolving the
+input offset of each entry at run time. An apply therefore costs
+$O(\mathrm{nnz}\,N)$ operations and $\mathrm{nnz}$ passes over the output;
+the dedicated operators below make a single pass.
 
 ---
 
 ## FEMGradientOperator
 
-### Purpose
-Computes gradients at quadrature points from nodal displacements using linear finite element (P1) shape functions.
+The element tables (`fem_element.hh`) hold, for each element type, the
+reference shape-function gradients $B_{q\alpha\mathbf{a}}$ (layout
+`[quad][dim][node]`, nodes indexed by the binary corner offset with $x$
+fastest) and the quadrature volume fractions $\bar{w}_q$. The physical gradient
+is $B_{q\alpha\mathbf{a}}/h_\alpha$ and the physical weight
+$W_q = \bar{w}_q \prod_\alpha h_\alpha$. Kernels are templated on the element,
+so a new element only needs a new table.
 
-### Mathematical Formulation
+| Element | nodes | quadrature points | $\bar{w}_q$ |
+|---|---|---|---|
+| `P1Tri2D` | 4 | 2 (triangles $\{0,1,2\}$, $\{1,2,3\}$) | $1/2, 1/2$ |
+| `P1Tet3D` | 8 | 5 (central tetrahedron, four corner tetrahedra) | $1/3, 1/6, 1/6, 1/6, 1/6$ |
+| `Q1Quad2D` | 4 | 4 ($2 \times 2$ Gauss) | $1/4$ each |
+| `Q1Hex3D` | 8 | 8 ($2 \times 2 \times 2$ Gauss) | $1/8$ each |
 
-For linear FEM on structured grids:
-- **2D**: Each pixel decomposed into 2 triangles, 2 quadrature points
-- **3D**: Each voxel decomposed into 5 tetrahedra (Kuhn triangulation), 5 quadrature points
+The 3D P1 split (central tetrahedron on the odd-parity corners $(1,0,0)$,
+$(0,1,0)$, $(0,0,1)$, $(1,1,1)$; corner tetrahedra with apex $(0,0,0)$,
+$(1,1,0)$, $(1,0,1)$, $(0,1,1)$) is not the six-tetrahedron Kuhn
+triangulation: it has no preferred diagonal, which avoids grid-anisotropy
+artefacts. The same split is used in every voxel so that the operator is
+translation invariant; the assembled stiffness is a symmetric 19-point stencil.
 
-The gradient at quadrature point q is:
-```
-∂u/∂x_i = Σ_I B_q[i,I] × u_I / h_i
-```
-where `B_q` contains shape function gradients for the element containing q.
+**Apply** (gradient, nodal → quadrature): for the element of pixel
+$\mathbf{n}$,
+$(\mathbf{B}\mathbf{u})_{i\alpha q}(\mathbf{n}) = h_\alpha^{-1}\sum_{\mathbf{a}}
+B_{q\alpha\mathbf{a}}\,u_i(\mathbf{n}+\mathbf{a})$. It reads node
+$\mathbf{n} + \mathbf{a}$ with $a_\alpha \in \{0, 1\}$, hence one right ghost
+layer of the nodal field.
 
-### Shape Function Gradients
-
-**2D (2 triangles per pixel):**
-```
-B_2D[triangle][dim][node]
-Triangle 0: nodes 0,1,2 (lower-left)
-Triangle 1: nodes 1,2,3 (upper-right)
-```
-
-**3D (5 tetrahedra per voxel):**
-```
-B_3D[tet][dim][node]
-Tet 0: central tetrahedron (weight 1/3)
-Tets 1-4: corner tetrahedra (weight 1/6 each)
-```
-
-### Ghost Requirements
-
-The forward and transpose operations have different ghost requirements because the stencil direction is reversed:
-
-**Forward (`apply`): Gradient - nodal → quadrature**
-- Input (nodal field): 1 ghost cell on **right** in each dimension
-- Output (quadrature field): no ghosts needed
-- Iteration: over elements [0, n-2], reads nodal values at element corners [ix, ix+1] × [iy, iy+1] × [iz, iz+1]
-
-**Transpose (`transpose`): Divergence - quadrature → nodal**
-- Input (quadrature/stress field): 1 ghost cell on **left** in each dimension (for periodic BC)
-- Output (nodal field): no specific ghost requirement
-- Iteration: over elements [0, n-2], accumulates contributions to nodal values at element corners
-
-The ghost requirement swap occurs because:
-- Forward reads "ahead" (node ix+1 when at element ix) → needs right ghosts
-- Transpose gathers from elements "behind" (element ix-1 contributes to node ix) → needs left ghosts for periodic wraparound
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `apply(u, grad_u)` | Gradient: nodal → quadrature |
-| `transpose(stress, force, weights)` | Divergence: quadrature → nodal |
-
-The transpose applies quadrature weights and computes the discretized divergence.
+**Transpose** (weighted divergence, quadrature → nodal):
+$(\mathbf{B}^\top W \boldsymbol{\sigma})_i(\mathbf{n}) =
+\sum_{\mathbf{a}} \sum_{q,\alpha} W_q\, h_\alpha^{-1} B_{q\alpha\mathbf{a}}\,
+\sigma_{i\alpha q}(\mathbf{n} - \mathbf{a})$. Each owned node gathers from the
+$2^d$ elements that contain it, including the element $\mathbf{n} - \mathbf{1}$
+in the left ghost layer of the quadrature field; it needs one left ghost layer.
+The gather writes only owned nodes, so `reduce_ghosts` must not be called on the
+result. With explicit `weights`, $W_q$ is replaced by the given values.
 
 ---
 
 ## LaplaceOperator
 
-### Purpose
-Optimized discrete Laplacian for Poisson-type problems.
+With per-axis weights $w_\alpha = s/h_\alpha^2$ ($w_\alpha = s$ without grid
+spacing), the kernel evaluates
 
-### Mathematical Formulation
+$$
+(Lu)(\mathbf{n}) = \sum_\alpha w_\alpha\big(u(\mathbf{n}+\mathbf{e}_\alpha)
+  - 2u(\mathbf{n}) + u(\mathbf{n}-\mathbf{e}_\alpha)\big)
+$$
 
-Standard finite difference Laplacian:
-```
-∇²u ≈ (u[i+1] + u[i-1] - 2u[i])/h² + ...
-```
-
-**2D (5-point stencil):**
-```
-     1
-   1 -4 1
-     1
-```
-
-**3D (7-point stencil):**
-```
-Center: -6, Neighbors: +1 (×6)
-```
-
-### Ghost Requirements
-- 1 ghost cell in each direction (for accessing neighbors)
-
-### Properties
-- Self-adjoint: transpose equals forward apply
-- Negative semi-definite (positive semi-definite with `-scale`)
-- Configurable scale factor for grid spacing and sign conventions
-
-### Usage
-```python
-# Create Laplacian with scale = -1/h² for positive-definite form
-laplace = muGrid.LaplaceOperator3D(scale=-1.0 / h**2)
-laplace.apply(u, laplacian_u)
-```
+on every point with $1 \le i_\alpha < L_\alpha - 1$, in one unit-stride pass
+over input and output with the $d$ weights held in registers; the fixed access
+pattern lets the compiler vectorise the $x$ loop. Cost: $O(N)$ with $2d+1$
+reads (mostly cache hits) and one write per point. The operator is symmetric,
+so `transpose` calls the same kernel; quadrature weights are rejected because
+the operator has no quadrature points.
 
 ---
 
 ## IsotropicStiffnessOperator
 
-### Purpose
-Fused kernel computing `force = K @ displacement` for isotropic linear elastic materials, avoiding explicit assembly of the stiffness matrix K.
+### Element matrices
 
-### Mathematical Formulation
+At construction the operator computes, from the element table and the grid
+spacing, the $d\,2^d \times d\,2^d$ matrices (row/column index
+$(\mathbf{a}, i)$ = node, displacement component)
 
-For isotropic materials, the element stiffness matrix decomposes as:
-```
-K_elem = 2μ G + λ V
-```
-where:
-- `G = Σ_q w_q B_q^T I' B_q` - geometry matrix (shear stiffness)
-- `V = Σ_q w_q (B_q^T m)(m^T B_q)` - volumetric coupling matrix
-- `I' = diag(1, 1, 1, 0.5, 0.5, 0.5)` - Voigt scaling for strain energy
-- `m = [1, 1, 1, 0, 0, 0]^T` - trace selector vector
+$$
+G = \sum_q W_q\, \mathbf{B}_q^\top \mathbb{I}^\text{sym} \mathbf{B}_q,
+\qquad
+V = \sum_q W_q\, (\mathbf{B}_q^\top \mathbf{m})(\mathbf{m}^\top \mathbf{B}_q),
+$$
 
-This reduces memory from O(N × DOF²) for full K to O(N × 2) for spatially-varying materials.
+where $\mathbf{B}_q$ maps element displacements to the strain in Voigt
+notation at quadrature point $q$, $\mathbb{I}^\text{sym} =
+\operatorname{diag}(1, \ldots, 1, \tfrac12, \ldots, \tfrac12)$ ($d$ normal and
+$d(d-1)/2$ engineering-shear entries) and $\mathbf{m}$ selects the trace
+(ones on the normal entries). With $\mathbf{C} = \lambda\,\mathbf{m}\mathbf{m}^\top
++ 2\mu\,\mathbb{I}^\text{sym}$ this gives the element stiffness
+$K_e = 2\mu_e G + \lambda_e V$. A heterogeneous material therefore needs two
+scalars per pixel instead of $(d\,2^d)^2$ matrix entries ($576$ in 3D). The
+operator also stores the element-averaged gradient
+$\bar{D}_{\alpha\mathbf{a}} = h_\alpha^{-1}\sum_q \bar{w}_q B_{q\alpha\mathbf{a}}$,
+used by the macroscopic-strain helpers.
 
-### Element Decomposition
+### Gather pattern
 
-**2D:** 2 triangles per pixel
-- Quadrature weights: `[0.5, 0.5]`
+Material fields are indexed like the nodal fields: $\lambda(\mathbf{n})$,
+$\mu(\mathbf{n})$ belong to the element whose lowest corner is node
+$\mathbf{n}$. Node $\mathbf{n}$ is corner $\mathbf{a}$ of element
+$\mathbf{n} - \mathbf{a}$, so the kernel computes, for every node,
 
-**3D:** 5 tetrahedra per voxel (Kuhn triangulation)
-- Quadrature weights: `[1/3, 1/6, 1/6, 1/6, 1/6]`
+$$
+f_i(\mathbf{n}) = \sum_{\mathbf{a} \in \{0,1\}^d} \sum_{\mathbf{b}, j}
+  \Big(2\mu(\mathbf{n}-\mathbf{a})\, G_{\mathbf{a}i,\mathbf{b}j}
+       + \lambda(\mathbf{n}-\mathbf{a})\, V_{\mathbf{a}i,\mathbf{b}j}\Big)\,
+  u_j(\mathbf{n} - \mathbf{a} + \mathbf{b}).
+$$
 
-### Field Requirements
+It reads elements at offset $-1$ and nodes at offset $+1$, hence one ghost
+layer on each side of both the displacement and the material fields; the
+computable regions of the two collections must coincide. Each output value is
+written by exactly one thread (one thread per node on the GPU), so no atomics
+are needed. On the GPU the element matrices live in `__constant__` memory (all
+threads of a warp read the same entry, which the constant cache broadcasts);
+the 3D apply stages data through shared memory.
 
-All fields use **node-based indexing** with the same grid dimensions:
-
-| Field | Dimensions | Left Ghosts | Right Ghosts |
-|-------|------------|-------------|--------------|
-| Displacement | (nx, ny, nz) | 1 | 1 |
-| Force | (nx, ny, nz) | 1 | 1 |
-| Material (λ, μ) | (nx, ny, nz) | 1 | 1 |
-
-**Key design principle**: The kernel does not distinguish between periodic and non-periodic boundary conditions. Ghost cell communication (via `CartesianDecomposition::communicate_ghosts()`) handles periodicity:
-- For **periodic BC**: ghost cells contain copies from the opposite boundary
-- For **non-periodic BC**: ghost cells are filled with appropriate boundary values
-
-This unified approach simplifies the kernel implementation and enables consistent behavior across CPU and GPU.
-
-### Gather Pattern
-
-The kernel iterates over **interior nodes** and gathers contributions from all neighboring elements:
-
-**2D (4 elements per node):**
-```
-Element offsets and local node indices:
-  (-1,-1) → local node 3    (0,-1) → local node 2
-  (-1, 0) → local node 1    (0, 0) → local node 0
-```
-
-**3D (8 elements per node):**
-```
-Element offsets and local node indices:
-  (-1,-1,-1) → local node 7    (0,-1,-1) → local node 6
-  (-1, 0,-1) → local node 5    (0, 0,-1) → local node 4
-  (-1,-1, 0) → local node 3    (0,-1, 0) → local node 2
-  (-1, 0, 0) → local node 1    (0, 0, 0) → local node 0
-```
-
-### Iteration Bounds
-
-The kernel computes results for all nodes where the stencil has valid input data. With stencil requirements of 1 left and 1 right ghost:
-
-```cpp
-// Computable region: from stencil_left to total - stencil_right
-// nnx, nny, nnz = grid_with_ghosts - stencil_left - stencil_right
-for (ix = 0; ix < nnx; ix++):
-    for (iy = 0; iy < nny; iy++):
-        // Compute force at node (ix, iy)
-```
-
-**Example**: For a 100-point interior with 3 ghost cells on each side (106 total):
-- Stencil requires 1 left, 1 right
-- Computable region: indices 1 to 104 (104 points computed)
-- This includes interior (100 points) + 2 extra points on each side
-
-The kernel reads from ghost cells at positions -1 (left) and n (right), which must be populated before calling the operator. For periodic BC, these contain copies from the opposite boundary. For non-periodic BC, these contain boundary values (typically zero for homogeneous Dirichlet conditions).
-
-### Kernel Pseudocode
-
-```cpp
-for each node (ix, iy, iz) in [0, nnx) × [0, nny) × [0, nnz):
-    f = [0, 0, 0]  // force accumulator
-
-    for each neighboring element (8 in 3D):
-        // Element indices can be -1 (left ghost) or nx (right ghost)
-        ex, ey, ez = element indices relative to node
-        local_node = which corner of element is this node
-
-        // Material fields are node-indexed, read from element position
-        // (element at ex,ey,ez has material stored at node ex,ey,ez)
-        λ = material_lambda[ex, ey, ez]
-        μ = material_mu[ex, ey, ez]
-
-        // Gather displacement from all element nodes (may read ghosts)
-        u = [displacement at each element corner node]
-
-        // Compute stiffness contribution
-        for each DOF d:
-            row = local_node * NB_DOFS + d
-            f[d] += Σ_j (2μ G[row,j] + λ V[row,j]) × u[j]
-
-    force[ix, iy, iz] = f
-```
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `apply(u, λ, μ, f)` | f = K @ u |
-| `apply_increment(u, λ, μ, α, f)` | f += α × K @ u |
+The other kernels reuse this structure: `apply_uniform` replaces the material
+fields by two scalars; `apply_macro_rhs` replaces $\mathbf{u}$ by the constant
+element vectors of a uniform strain; `assemble_diagonal` accumulates
+$2\mu\,G_{\mathbf{a}i,\mathbf{a}i} + \lambda\,V_{\mathbf{a}i,\mathbf{a}i}$;
+`average_stress` integrates
+$\mathbf{C}:(\bar{\boldsymbol{\varepsilon}}+\boldsymbol{\varepsilon}(\mathbf{u}))$
+element-locally (on the GPU with a two-pass tree reduction);
+`compute_sensitivity` evaluates $\mathbf{a}_e^\top G \mathbf{b}_e$ and
+$\mathbf{a}_e^\top V \mathbf{b}_e$ per pixel.
 
 ---
 
-## Memory Layout Details
-
-### CPU Layout (Array of Structures)
-
-DOF components are contiguous in memory:
-```
-Memory: [ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ...]
-```
-
-Strides:
-```cpp
-disp_stride_d = 1;                    // DOF components contiguous
-disp_stride_x = NB_DOFS;              // = 3 for 3D
-disp_stride_y = NB_DOFS * nx;
-disp_stride_z = NB_DOFS * nx * ny;
-```
-
-### GPU Layout (Structure of Arrays)
-
-Spatial indices are contiguous for coalesced memory access:
-```
-Memory: [ux0, ux1, ux2, ..., uy0, uy1, uy2, ..., uz0, uz1, uz2, ...]
-```
-
-Strides:
-```cpp
-disp_stride_x = 1;                    // Spatial x contiguous
-disp_stride_y = nx;
-disp_stride_z = nx * ny;
-disp_stride_d = nx * ny * nz;         // DOF components separated
-```
-
-### Data Pointer Offset
-
-Pointers are offset to point to the first computable node (based on stencil requirements):
-```cpp
-// Offset based on stencil requirements, not ghost size
-const Real* disp_data = displacement.data() + stencil_left_offset;
-// Now index 0 = first computable node, index -1 = left neighbor (in ghost region)
-```
-
-This allows kernels to iterate from 0 to the computable region size, with negative indices accessing the ghost region for stencil neighbors.
-
----
-
-## File Structure
+## File structure
 
 ```
 src/libmugrid/operators/
-├── linear.hh              # Base LinearOperator class
-├── generic.hh/.cc         # GenericLinearOperator
-├── laplace_2d.hh/.cc      # LaplaceOperator2D
-├── laplace_3d.hh/.cc      # LaplaceOperator3D
-├── fem_gradient_2d.hh/.cc # FEMGradientOperator2D
-├── fem_gradient_3d.hh/.cc # FEMGradientOperator3D
+├── linear.hh                     # LinearOperator base, ghost requirements
+├── kernel_dispatcher.hh          # host/device kernel dispatch
+├── convolution_kernels_cpu.hh    # sparse-operator kernels (host)
+├── convolution_kernels_gpu.hh    # sparse-operator kernels (device)
+├── generic.hh/.cc, generic_gpu.cc            # GenericLinearOperator
+├── fem_element.hh                # P1/Q1 element tables
+├── fem_gradient.hh, fem_gradient_gpu.cc      # FEMGradientOperator<Element>
+├── laplace.hh/.cc, laplace_gpu.cc            # LaplaceOperator<Dim>
+├── nodal_moments.hh/.cc, nodal_moments_gpu.cc  # NodalMomentOperator
+├── transfer.hh/.cc               # GridTransfer (multigrid prolongation/restriction)
 └── solids/
-    ├── isotropic_stiffness_2d.hh/.cc  # IsotropicStiffnessOperator2D
-    ├── isotropic_stiffness_3d.hh/.cc  # IsotropicStiffnessOperator3D
-    └── isotropic_stiffness_gpu.cc     # GPU kernels
+    ├── isotropic_stiffness.hh    # MaterialOperator, IsotropicStiffnessOperator<Dim>
+    ├── isotropic_stiffness_2d.cc # 2D element matrices and host kernels
+    ├── isotropic_stiffness_3d.cc # 3D element matrices and host kernels
+    └── isotropic_stiffness_gpu.cc  # device kernels
 ```
 
 ---
 
 ## Testing
 
-Tests are in `tests/python_isotropic_stiffness_operator_tests.py`:
+`tests/python_isotropic_stiffness_operator_tests.py` covers the stiffness
+operator:
 
-- `test_compare_with_generic_operator`: Compares fused kernel against explicit B^T C B
-- `test_unit_impulse_*`: Verifies response to unit displacement at specific nodes
-- `test_symmetry`: Verifies K is symmetric
-- `ValidationGuardTest*`: Verifies proper error handling for invalid configurations
-- `GPUUnitImpulseTest`: Verifies GPU kernel matches CPU kernel output
+- `test_compare_with_generic_operator`, `test_macro_rhs_and_average_vs_generic`:
+  the fused kernels against an explicit $\mathbf{B}^\top W\mathbf{C}\mathbf{B}$
+  built from generic operators;
+- `TestUnitImpulse2D/3D`: response to a unit displacement at single nodes, with
+  periodic and non-periodic ghost data;
+- `test_symmetry`: symmetry of $\mathbf{K}$;
+- `TestValidationGuard2D/3D`: errors for missing ghosts and mismatched
+  material fields;
+- `TestIsotropicStiffnessOperatorGPUCorrectness`, `TestGPUUnitImpulse`:
+  GPU against CPU results;
+- `TestFEMElements`, `TestAssembleDiagonal`, `TestIsotropicStiffnessApplyUniform`:
+  patch test for both elements, diagonal assembly, uniform-coefficient apply.
 
-With node-based indexing, all tests compare the full output (all nodes), not just interior nodes.
+The other operators are covered by `python_convolution_operator_tests.py`,
+`python_fem_element_tests.py`, `python_fem_gradient_transpose_tests.py`,
+`python_fem_gradient_gpu_tests.py`, `python_laplace_operator_tests.py` and the
+C++ suite `test_convolution_operator.cc`.

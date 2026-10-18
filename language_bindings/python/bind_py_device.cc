@@ -181,8 +181,8 @@ void add_device_classes(py::module & mod) {
     using muGrid::AllocationProfiler;
     mod.def("enable_allocation_profiling",
             []() { AllocationProfiler::instance().enable(); },
-            "Start recording Field buffer allocations (requires building with "
-            "-DMUGRID_PROFILE_ALLOCATIONS=ON to record any data).");
+            "Start recording Field buffer allocations (setting the environment "
+            "variable MUGRID_PROFILE_ALLOCATIONS=1 records from process start).");
     mod.def("disable_allocation_profiling",
             []() { AllocationProfiler::instance().disable(); },
             "Stop recording Field buffer allocations.");

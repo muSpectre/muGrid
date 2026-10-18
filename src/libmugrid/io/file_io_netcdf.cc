@@ -443,6 +443,9 @@ namespace muGrid {
     if (this->open_mode == FileIOBase::OpenMode::Write ||
         this->open_mode == FileIOBase::OpenMode::Overwrite) {
       // write/create a new NetCDF file if it does not already exist.
+      // NC_64BIT_DATA selects the CDF-5 format, the only classic-model
+      // format with unsigned and 64-bit integer types (Uint, Index_t) and
+      // with variables larger than 4 GiB.
       int cmode{NC_64BIT_DATA};
       if (this->open_mode == FileIOBase::OpenMode::Write) {
         cmode |= NC_NOCLOBBER;

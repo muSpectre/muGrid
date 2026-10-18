@@ -104,8 +104,9 @@ void add_decomposition(py::module & mod) {
             Accumulate ghost buffer contributions back to interior domain.
 
             This is the adjoint (transpose) of ``communicate_ghosts()``. It sums
-            contributions from ghost regions back into the interior domain values.
-            For code that scatters into ghost buffers. muGrid's operator
+            contributions from ghost regions back into the interior domain values
+            and zeroes the ghosts. Use it for code that scatters into ghost
+            buffers. muGrid's operator
             transposes (e.g. the FEM divergence) do not: they gather from the
             communicated input ghosts and write only owned points, so their
             results must not be reduced.
@@ -159,14 +160,16 @@ void add_cartesian_decomposition(py::module & mod) {
         ----------
         collection : GlobalFieldCollection
             The underlying field collection
-        coords : tuple of ndarray
-            Physical coordinates at each pixel (excluding ghosts)
-        coordsg : tuple of ndarray
-            Physical coordinates including ghost pixels
-        icoords : tuple of ndarray
-            Integer indices at each pixel (excluding ghosts)
-        icoordsg : tuple of ndarray
-            Integer indices including ghost pixels
+        coords : ndarray
+            Fractional coordinates (global index / N per axis) of each pixel,
+            shape (dim, *nb_subdomain_grid_pts), excluding ghosts
+        coordsg : ndarray
+            Fractional coordinates including ghost pixels
+        icoords : ndarray
+            Global integer indices of each pixel, shape
+            (dim, *nb_subdomain_grid_pts), excluding ghosts
+        icoordsg : ndarray
+            Global integer indices including ghost pixels
         nb_domain_grid_pts : tuple of int
             Global grid dimensions
         nb_subdomain_grid_pts : tuple of int
@@ -240,7 +243,8 @@ void add_cartesian_decomposition(py::module & mod) {
                                [](const CartesianDecomposition & self) {
                                    return py_coords<Real, false>(self);
                                },
-                               "Physical coordinates (excluding ghosts).")
+                               "Fractional coordinates, global index / N "
+                               "(excluding ghosts).")
         .def_property_readonly("icoords",
                                [](const CartesianDecomposition & self) {
                                    return py_coords<Int, false>(self);
@@ -250,7 +254,8 @@ void add_cartesian_decomposition(py::module & mod) {
                                [](const CartesianDecomposition & self) {
                                    return py_coords<Real, true>(self);
                                },
-                               "Physical coordinates (including ghosts).")
+                               "Fractional coordinates, global index / N "
+                               "(including ghosts).")
         .def_property_readonly("icoordsg",
                                [](const CartesianDecomposition & self) {
                                    return py_coords<Int, true>(self);

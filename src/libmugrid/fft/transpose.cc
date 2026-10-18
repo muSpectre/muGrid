@@ -94,7 +94,7 @@ namespace muGrid {
 
         int comm_size{comm.size()};
 
-        // Opt-in: use the contiguous-staging Alltoallv exchange on the host.
+        // Opt-in: use the contiguous-staging exchange on the host.
         if (!this->on_device) {
             this->staged_host =
                 environment_flag("MUGRID_STAGED_TRANSPOSE") == 1;
@@ -411,7 +411,7 @@ namespace muGrid {
         //! destination pitches. Each row is a contiguous memcpy, so the access
         //! pattern is already cache-friendly: the only strided axis is the row
         //! stride, walked sequentially. This mirrors strided_device_copy and
-        //! lets the contiguous-staging Alltoallv path run on the host.
+        //! lets the contiguous-staging path run on the host.
         void strided_host_copy(void * dst, const void * src,
                                std::size_t width_bytes, std::size_t nb_rows,
                                std::size_t dst_pitch_bytes,
@@ -501,7 +501,8 @@ namespace muGrid {
         auto ncomp{static_cast<std::size_t>(this->nb_components)};
         bool aos{this->layout == StorageOrder::ArrayOfStructures};
 
-        // Per-peer element counts (in units of Complex) and displacements
+        // Per-peer element counts (in complex scalars, Complex or Complex32)
+        // and displacements
         std::vector<int> send_counts_el(comm_size), send_displs_el(comm_size);
         std::vector<int> recv_counts_el(comm_size), recv_displs_el(comm_size);
         std::size_t send_total{0}, recv_total{0};
@@ -634,16 +635,17 @@ namespace muGrid {
         // components are not reliably GPU-aware, while point-to-point on
         // contiguous device buffers is the well-trodden CUDA/ROCm-aware path.
         // Posting every peer's receive and send up front and waiting once
-        // lets the per-peer transfers overlap (the previous blocking pairwise
-        // ring fully serialized them, one Sendrecv per step). The self block
-        // never enters MPI: it is copied on the device. Each peer reads and
+        // lets the per-peer transfers overlap, whereas a blocking pairwise
+        // ring (one Sendrecv per step) would serialise them. The self block
+        // never enters MPI: it is copied locally. Each peer reads and
         // writes a disjoint slice of the contiguous staging buffers, so the
         // outstanding requests do not alias.
         {
             MPI_Comm mpi_comm{this->comm.get_mpi_comm()};
             int my_rank{this->comm.rank()};
 
-            // The self block never leaves the device.
+            // The self block never enters MPI (and never leaves the device in
+            // the device case).
             auto self_bytes{static_cast<std::size_t>(send_counts_el[my_rank]) *
                             this->elem_size};
             if (self_bytes > 0) {

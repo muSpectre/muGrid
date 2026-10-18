@@ -135,7 +135,8 @@ elseif(MUGRID_ENABLE_HIP)
     )
 endif()
 
-# Create shared library
+# Create static library; it is compiled position-independent (below) so it
+# can be linked into the shared Python extension module
 add_library(muGrid STATIC ${MUGRID_SOURCES})
 
 # Set library properties

@@ -12,7 +12,7 @@
  * over that stencil's offsets. The reference-material preconditioner is
  * `K(q)^-1` applied mode by mode, so it can be *evaluated* per mode instead of
  * assembled and stored: the stencil is 243 numbers in 3D, where the stored
- * symbol is `n^2` values per Fourier point -- 2.3 GB at 512^3 in single
+ * symbol is `Dim^2` values per Fourier point -- 2.3 GB at 512^3 in single
  * precision, and it grows with the grid.
  *
  * This kernel does that evaluation. It builds the symbol for one mode, inverts
@@ -59,17 +59,36 @@ namespace muGrid {
          * @brief Apply the inverse symbol of a uniform stencil operator to a
          *        Fourier field, in place, evaluating the symbol per mode.
          *
-         * For every mode this forms `K(q) = sum_d S[d] exp(-2 pi i q.d)` over
-         * the stencil's `3^Dim` offsets, inverts the `Dim x Dim` block, scales
-         * by `normalisation` and replaces the mode's component vector by
-         * `K(q)^-1 v`. The `q = 0` block is singular -- the rigid-body
-         * translations are the operator's null space -- and is projected out by
-         * setting that mode to zero, matching the pseudo-inverse the assembled
-         * path stores.
+         * For every mode `q` (frequencies in cycles per grid point) this
+         * forms
          *
-         * The symbol is Hermitian by construction: the stencil of a
-         * self-adjoint operator satisfies `S[d] = S[-d]^T` exactly, so only its
-         * upper triangle is formed.
+         *     K(q) = sum_{d in {-1,0,1}^Dim} S[d] exp(-2 pi i q.d)
+         *
+         * over the stencil's `3^Dim` offsets, inverts the `Dim x Dim` block
+         * by cofactors (with the block first scaled by its largest entry so
+         * the determinant cannot underflow at low frequency) and replaces the
+         * mode's component vector `v` by
+         *
+         *     v <- normalisation * K(q)^-1 v .
+         *
+         * The `q = 0` block is singular -- the rigid-body translations are
+         * the operator's null space -- and is projected out by setting that
+         * mode to zero, matching the pseudo-inverse the assembled path (the
+         * pre-inverted blocks of the Python `BlockFourierPreconditioner`)
+         * stores. Any other block that is exactly singular is zeroed the
+         * same way.
+         *
+         * The sums over the offsets of axes 1 and 2 do not depend on the
+         * axis-0 frequency, so they are formed once per axis-0 line
+         * (`3 * Dim^2` partial sums `P[d0]`), and each mode then only needs
+         * the three-term sum over `d0`, the inverse and the matvec: the cost
+         * is O(nb_modes * Dim^3) plus O((nb_modes / n0) * 3^Dim * Dim^2).
+         *
+         * The symbol is Hermitian when the stencil is that of a self-adjoint
+         * operator, `S[d] = S[-d]^T`: then `K(q)^H = sum_d S[-d] e^{-2 pi i
+         * q.d} = K(q)`. All `Dim^2` entries are nevertheless formed, so
+         * the inversion does not rely on this; the device's single-precision
+         * acceptance test does (it checks positive definiteness).
          *
          * **The symbol is built and inverted in double for every field
          * precision** (on the device, see `apply_inverse_gpu` for the
@@ -93,7 +112,7 @@ namespace muGrid {
          *
          * @tparam Dim number of components, and the block size; compile-time so
          *         the inversion and the inner products unroll
-         * @tparam T  real scalar type of the complex entries
+         * @tparam T  real scalar type of the complex entries (Real or Real32)
          *
          * @param field        Fourier field, modified in place
          * @param stride_component  element stride between components (1 for
@@ -106,7 +125,8 @@ namespace muGrid {
          * @param stencil      `3^Dim * Dim * Dim` real stencil, in double,
          *                     indexed `S[d + 1]` with the offset axes slowest
          *                     and the `Dim x Dim` block fastest (C order), as
-         *                     `reference_stencil` returns it
+         *                     the Python `muGrid.Preconditioners.
+         *                     reference_stencil` returns it
          * @param q            `Dim` pointers to per-axis frequency tables, in
          *                     double and in cycles; entry `i` is the frequency
          *                     of local mode index `i` along that axis
@@ -114,7 +134,9 @@ namespace muGrid {
          *                     is `nb_modes`
          * @param normalisation  the engine's inverse-transform normalisation,
          *                     folded in here rather than by a separate pass
-         * @param nb_modes     number of local Fourier modes
+         * @param nb_modes     number of local Fourier modes (the host
+         *                     implementation walks `nb_fourier_grid_pts` and
+         *                     does not read it)
          */
         template <Dim_t Dim, typename T>
         void apply_inverse(std::complex<T> * field, Index_t stride_component,
@@ -135,7 +157,8 @@ namespace muGrid {
          *
          * **Precision differs from the host for float32 fields.** Double
          * throughput is 1/64 of single on consumer and workstation GPUs, where
-         * building every symbol in double made the kernel 10x slower. So each
+         * building every symbol in double makes the kernel 10x slower
+         * (measured). So each
          * mode is first finished in single precision and the result kept only
          * if an a-posteriori test on the block -- positive definite, and its
          * smallest eigenvalue large against the rounding error of the phase

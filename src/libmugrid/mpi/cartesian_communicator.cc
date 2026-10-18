@@ -76,18 +76,9 @@ namespace muGrid {
             }
         }
 
-        /**
-         * @brief Accumulate (add) memory block using appropriate method for
-         * memory space.
-         *
-         * For host memory, adds source values to destination.
-         * For device memory, uses GPU kernels.
-         *
-         * @param dst Destination address (values are added here)
-         * @param src Source address
-         */
         //! Host block-strided accumulation:
-        //! dst[b*dst_stride + j] += src[b*src_stride + j]
+        //! dst[b*dst_stride + j] += src[b*src_stride + j] for b in
+        //! [0, nb_blocks) and j in [0, block_len), strides in elements of T.
         template <typename T>
         void host_accumulate_strided(T * dst, const T * src, size_t nb_blocks,
                                      size_t block_len, size_t dst_stride,
@@ -185,11 +176,6 @@ namespace muGrid {
             }
         }
 
-        /**
-         * @brief Serial implementation of sendrecv (local copy).
-         *
-         * Used when MPI is not available or not initialized.
-         */
 #ifdef WITH_MPI
         // Narrow Index_t -> int for MPI counts/block lengths/strides, throwing
         // rather than truncating. Lives in mpi/mpi_counts.hh so the FFT
@@ -198,6 +184,15 @@ namespace muGrid {
         using muGrid::checked_mpi_int;
 #endif  // WITH_MPI
 
+        /**
+         * @brief Local implementation of sendrecv (strided copy within
+         * `data`).
+         *
+         * Used when MPI is not available or not initialized, and when this
+         * rank is its own left and right neighbor (periodic wrap of an
+         * undivided direction). The send and receive regions must have the
+         * same shape.
+         */
         void serial_sendrecv(
             Index_t block_stride, Index_t nb_send_blocks,
             Index_t send_block_len, Index_t send_offset,
@@ -225,9 +220,10 @@ namespace muGrid {
         }
 
         /**
-         * @brief Serial implementation of sendrecv with accumulation.
+         * @brief Local implementation of sendrecv with accumulation
+         * (recv region += send region within `data`).
          *
-         * Used when MPI is not available or not initialized.
+         * Used in the same situations as serial_sendrecv.
          */
         void serial_sendrecv_accumulate(
             Index_t block_stride, Index_t nb_send_blocks,
@@ -277,7 +273,7 @@ namespace muGrid {
             return;
         }
 
-        // idiot check
+        // consistency check: one rank per subdomain
         auto nb_total_subdivisions{std::accumulate(nb_subdivisions.begin(),
                                                    nb_subdivisions.end(), 1,
                                                    std::multiplies<Index_t>())};
@@ -293,10 +289,11 @@ namespace muGrid {
         const int spatial_dim{static_cast<int>(nb_subdivisions.size())};
         // the domain is periodic in all directions
         std::vector<int> is_periodic(spatial_dim, true);
-        // reordering is allowed
+        // reordering is not allowed: each rank keeps its rank number of the
+        // parent communicator in the Cartesian communicator
         const bool reoder_is_allowed{false};
 
-        // create the new communicator with cartesian topology
+        // create the communicator with Cartesian topology
         std::vector<int> narr(spatial_dim);
         std::copy(nb_subdivisions.begin(), nb_subdivisions.end(), narr.begin());
         MPI_Cart_create(this->comm, spatial_dim, narr.data(),

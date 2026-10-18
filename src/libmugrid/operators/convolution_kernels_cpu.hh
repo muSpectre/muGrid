@@ -42,15 +42,18 @@
 namespace muGrid {
 
     /**
-     * Parameters for grid traversal in convolution kernels
+     * Parameters for grid traversal in convolution kernels. The traversal
+     * covers the computable region: every pixel of the ghost-padded buffer
+     * whose stencil reach (left/right requirement of the operation) lies
+     * inside the buffer. Indices are element offsets into the field buffer.
      */
     struct GridTraversalParams {
-        Index_t nx, ny, nz;                 // Grid dimensions (without ghosts)
+        Index_t nx, ny, nz;                 // Extent of the computable region
         Index_t total_pixels;               // nx * ny * nz
         Index_t row_width;                  // nx + ghosts in x direction
-        Index_t start_pixel_index;          // Starting pixel offset
-        Index_t nodal_elems_per_pixel;      // DOFs per pixel for nodal field
-        Index_t quad_elems_per_pixel;       // DOFs per pixel for quad field
+        Index_t start_pixel_index;          // First computable pixel (buffer index)
+        Index_t nodal_elems_per_pixel;      // DOFs per pixel for nodal field (1 for SoA)
+        Index_t quad_elems_per_pixel;       // DOFs per pixel for quad field (1 for SoA)
         Index_t nodal_stride_x, nodal_stride_y, nodal_stride_z;
         Index_t quad_stride_x, quad_stride_y, quad_stride_z;
 
@@ -89,7 +92,10 @@ namespace muGrid {
         /**
          * @brief Forward convolution kernel for CPU
          *
-         * Applies: quad_data += alpha * Op * nodal_data
+         * Applies: quad_data += alpha * Op * nodal_data, i.e. for every
+         * non-zero i and every computable pixel p
+         *   quad[p + quad_indices[i]] += alpha c_i nodal[p + nodal_indices[i]].
+         * Cost O(nnz x nx ny nz); the output is swept nnz times.
          *
          * Loop structure is optimized for SIMD vectorization:
          * - Stencil entries are in the outermost loop (constant per x-sweep)
@@ -162,11 +168,14 @@ namespace muGrid {
         /**
          * @brief Transpose convolution kernel for CPU
          *
-         * Applies: nodal_data += alpha * Op^T * quad_data
-         *
-         * Note: This kernel accumulates to nodal_data, which may have
-         * overlapping writes if stencils overlap. For CPU, no atomics
-         * are needed since we process sequentially.
+         * Applies: nodal_data += alpha * Op^T * W * quad_data, i.e. for every
+         * non-zero i and every computable pixel p
+         *   nodal[p + nodal_indices[i]] +=
+         *       alpha w_{q(i)} c_i quad[p + quad_indices[i]],
+         * where quad_indices of the transpose operator carry the negated
+         * stencil offset (a gather from p - s) and w = 1 if `weights` is
+         * nullptr. Each pixel writes only its own nodal entries, so the
+         * transpose needs no atomics (and the loop runs sequentially here).
          *
          * Loop structure is optimized for SIMD vectorization (same as apply).
          */

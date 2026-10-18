@@ -94,8 +94,9 @@ std::vector<Real> fft_freq(Index_t n, Real d = 1.0);
 /**
  * Compute the frequency bin indices for a r2c (half-complex) FFT.
  *
- * For n real input samples, the r2c transform produces n/2+1 complex outputs.
- * Returns indices [0, 1, ..., n/2].
+ * For n real input samples, the r2c transform produces n/2+1 complex outputs
+ * (the remaining modes follow from Hermitian symmetry
+ * F(-k) = conj(F(k))). Returns indices [0, 1, ..., n/2] (integer division).
  *
  * This is equivalent to numpy.fft.rfftfreq(n) * n.
  *
@@ -134,8 +135,8 @@ DynGridIndex get_hermitian_grid_pts(const DynGridIndex & nb_grid_pts,
 /**
  * Compute the normalization factor for FFT roundtrip.
  *
- * For an unnormalized FFT, ifft(fft(x)) = N * x where N is the total number
- * of grid points. This returns 1/N for normalizing the result.
+ * The transforms are unnormalised, so ifft(fft(x)) = N x with
+ * N = prod_alpha N_alpha the total number of grid points. This returns 1/N.
  *
  * @param nb_grid_pts  Grid dimensions
  * @return             Normalization factor (1.0 / total_grid_points)
@@ -145,7 +146,9 @@ Real fft_normalization(const DynGridIndex & nb_grid_pts);
 /**
  * Evenly distribute a global dimension across ranks.
  *
- * Returns the local size and offset for a given rank.
+ * With b = global_size / comm_size and r = global_size mod comm_size, the
+ * first r ranks get b + 1 elements and the others b, so local sizes differ
+ * by at most one and the blocks are contiguous in rank order.
  *
  * @param global_size  Total size of the dimension
  * @param comm_size    Number of MPI ranks
@@ -157,21 +160,34 @@ void distribute_dimension(Index_t global_size, int comm_size, int rank,
                           Index_t & local_size, Index_t & offset);
 
 /**
- * Select an optimal 2D process grid for P ranks.
+ * Select the 2D process grid P1 x P2 = num_ranks for the FFT decomposition.
  *
- * For P total ranks, finds P1 x P2 = P that minimizes communication.
- * Prefers P1 <= P2 and tries to make the grid as square as possible
- * while respecting the grid dimensions.
+ * Real space is split as Y across P2 and Z across P1 (X is never split);
+ * Fourier space as the half-complex X across P2 and Y across P1.
+ *
+ * - 1D: only num_ranks = 1 is supported (throws otherwise); P1 = P2 = 1.
+ * - 2D: P1 = 1, P2 = num_ranks (a slab along Y; all modes coincide).
+ * - 3D "slab": P1 = num_ranks, P2 = 1, so the (X, Y) plane stays local and
+ *   is transformed by one N-D transform followed by a single Y<->Z
+ *   transpose. Throws if num_ranks > Nz.
+ * - 3D "auto": slab whenever num_ranks <= Nz (one transpose instead of two),
+ *   otherwise the "pencil" heuristic.
+ * - 3D "pencil": over all factorizations, maximise
+ *   score = squareness + 0.5 * divisibility + 10 * fits, with
+ *   squareness = 1 - |P1 - P2| / (P1 + P2), divisibility counting
+ *   Nz mod P1 = 0 and Ny mod P2 = 0, and fits = (P1 <= min(Nz, Ny) and
+ *   P2 <= min(Ny, Nx/2+1)), i.e. no rank is left without data. Ties go to
+ *   the smaller P1. Cost O(num_ranks).
  *
  * @param num_ranks    Total number of MPI ranks
- * @param nb_grid_pts  Grid dimensions (used to prefer certain factorizations)
- * @param p1           Output: first dimension of process grid
- * @param p2           Output: second dimension of process grid
- * @param decomposition  "auto" (heuristic, default), "pencil" (force the
- *                       most-square 2D split) or "slab" (force a single split
- *                       axis: P2=1, P1=num_ranks in 3D, so X and Y stay local
- *                       and the FFT uses the native N-D transform). "slab"
- *                       requires num_ranks <= Nz in 3D.
+ * @param nb_grid_pts  Global grid dimensions (enter the divisibility and fit
+ *                     terms of the score)
+ * @param p1           Output: first dimension of process grid (splits Z in
+ *                     real space, Y in Fourier space)
+ * @param p2           Output: second dimension of process grid (splits Y in
+ *                     real space, half-complex X in Fourier space)
+ * @param decomposition  "auto" (default), "pencil" or "slab", as above.
+ *                       Any other value throws.
  */
 void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & p1,
                          int & p2, const std::string & decomposition = "auto");

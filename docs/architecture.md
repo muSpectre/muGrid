@@ -1,473 +1,364 @@
 # Architecture
 
-This page describes the internal design of key µGrid components: the distributed
-FFT engine and the discrete differential operators.
+This page describes the internal design of two µGrid components: the
+distributed FFT engine and the stencil-operator kernels. What the operators
+compute and how to call them is on the [Operators](operators.md) and
+[FFT](fft.md) pages; this page explains how the implementation is laid out and
+why.
 
-## FFT Engine Design
+Notation: $d$ is the spatial dimension, $N_\alpha$ the number of grid points
+along axis $\alpha$, $N = \prod_\alpha N_\alpha$, $h_\alpha$ the grid spacing,
+$P$ the number of MPI ranks, and $C$ the number of degrees of freedom per pixel
+(components × sub-points).
 
-The FFT engine provides distributed Fast Fourier Transform operations on
-structured grids with MPI parallelization. It supports both slab and pencil
-decomposition (auto-selected): a faster single-transpose slab path, falling back
-to pencil for scaling to large numbers of MPI ranks.
+## Storage order
 
-### Storage Order
+A field with $C$ degrees of freedom per pixel on $M$ pixels (ghosts included)
+is stored in one of two orders. Writing $c \in \{0, \dots, C-1\}$ for the
+degree of freedom and $p \in \{0, \dots, M-1\}$ for the linear pixel index
+(column-major, axis 0 fastest), the memory offset of entry $(c, p)$ is
 
-µGrid supports two storage orders for multi-component fields:
+$$
+\text{AoS (array of structures):}\quad c + C\,p, \qquad\qquad
+\text{SoA (structure of arrays):}\quad c\,M + p .
+$$
 
-- **AoS (Array of Structures)** — components interleaved per pixel,
-  `[c0p0, c1p0, c2p0, c0p1, c1p1, c2p1, ...]`. Default on **CPU**
-  (`HostSpace`). X-element stride = `nb_components`; component offset = `comp`.
-- **SoA (Structure of Arrays)** — components in separate contiguous blocks,
-  `[c0p0, c0p1, c0p2, ..., c1p0, c1p1, c1p2, ...]`. Default on **GPU**
-  (`CUDASpace`, `ROCmSpace`). X-element stride = 1; component offset =
-  `comp * nb_pixels`.
+AoS is the default in host memory (`HostSpace`), SoA in device memory
+(`CUDASpace`, `ROCmSpace`). For a pixel with grid index
+$(i_0, i_1, i_2)$ on a subdomain of $(n_0, n_1, n_2)$ points,
+$p = i_0 + n_0 i_1 + n_0 n_1 i_2$, so the stride between neighbours along axis
+0 is $C$ in AoS and $1$ in SoA, and the offset between consecutive components
+is $1$ in AoS and $M$ in SoA. Kernels are written against these strides and
+therefore run on either layout.
 
-**Why two orders?** On the GPU, coalesced memory access is critical: SoA lets
-threads processing different pixels of the same component touch contiguous
-memory, so the hardware combines accesses into one transaction. On the CPU, AoS
-gives cache locality for multi-component operations — all components of a pixel
-share a cache line.
+The two defaults follow from the memory systems:
 
-!!! note
-    FFT work buffers use the same storage order as the memory space they live
-    in (SoA on GPU, AoS on CPU). This avoids expensive storage-order conversions
-    during FFT operations. The engine detects the order via
-    `field.get_storage_order()` and computes the appropriate strides per buffer.
+- **GPU (SoA).** Consecutive threads process consecutive pixels. With SoA they
+  read consecutive addresses of one component, which the hardware coalesces
+  into a single memory transaction. SoA also gives every component unit stride
+  along axis 0, which cuFFT requires for the real side of real-to-complex and
+  complex-to-real transforms (see [Backends](#backends)).
+- **CPU (AoS).** Pointwise operations (constitutive updates, tensor
+  contractions, the fused stiffness kernel) touch all $C$ values of a pixel at
+  once; with AoS these share a cache line.
 
-### Stride Calculations
+FFT work buffers use the storage order of the memory space they live in, so no
+layout conversion takes place inside the transform; the engine reads the order
+from each field and computes the strides per buffer.
 
-For a 2D field `[Nx, Ny]` with `nb_components` components:
+## FFT engine design
 
-```text
-SoA:                                  AoS:
-  comp_offset_factor = nb_pixels        comp_offset_factor = 1
-  x_stride           = 1                x_stride           = nb_components
-  row_dist           = row_width        row_dist           = row_width * nb_components
-```
+### Transform
 
-For a 3D field `[Nx, Ny, Nz]`:
+The engine computes the unnormalised discrete Fourier transform of a real field
+$u$,
 
-```text
-SoA:                                  AoS:
-  comp_offset_factor = nb_pixels        comp_offset_factor = 1
-  x_stride           = 1                x_stride           = nb_components
-  y_dist             = row_x            y_dist             = row_x * nb_components
-  z_dist             = row_x * rows_y   z_dist             = row_x * rows_y * nb_components
-```
+$$
+\hat u(\mathbf{q}) = \sum_{\mathbf{x}} u(\mathbf{x})\,
+e^{-2\pi i \sum_\alpha q_\alpha x_\alpha},
+\qquad q_\alpha \in \{0, \tfrac{1}{N_\alpha}, \dots\} \text{ cycles per grid point},
+$$
 
-### GPU Backend Limitations
+and its inverse without the factor $1/N$ (the engine exposes $1/N$ as
+`normalisation`). Because $u$ is real, $\hat u(-\mathbf{q}) =
+\overline{\hat u(\mathbf{q})}$, so only the half-complex range
+$q_0 \in [0, \tfrac12]$ of axis 0 is stored: the Fourier grid has
+$F_0 = \lfloor N_0/2 \rfloor + 1$ points along axis 0. The transform is
+separable: a real-to-complex (r2c) transform along axis 0 followed by
+complex-to-complex (c2c) transforms along the remaining axes. Each
+one-dimensional pass costs $\mathcal{O}(N \log N_\alpha)$, the full transform
+$\mathcal{O}(N \log N)$.
 
-!!! warning
-    cuFFT does not support **strided real-to-complex (R2C) and complex-to-real
-    (C2R) transforms** — the stride on the real-data side must be 1. With AoS
-    storage the stride between consecutive real values would be `nb_components`.
+### Domain decomposition
 
-**Solution**: With SoA on GPU each component is contiguous (stride = 1),
-satisfying cuFFT's requirement. The engine loops over components, running one
-batched FFT per component.
+The $P$ ranks form a process grid $P = P_1 P_2$:
 
-rocFFT's native API (`rocfft_plan_description_set_data_layout()`) does support
-arbitrary input and output strides, but for consistency and to avoid storage
-order conversions, µGrid uses the same SoA approach on AMD GPUs.
+| Space | Local block (3D) | Local block (2D) | Ghosts |
+|-------|------------------|------------------|--------|
+| Real | $N_0 \times N_1/P_2 \times N_2/P_1$ | $N_0 \times N_1/P_2$ | user-defined |
+| Fourier | $F_0/P_2 \times N_1/P_1 \times N_2$ | $F_0/P_2 \times N_1$ | none |
 
-### MPI Parallel FFT Design
+Axis 0 is always local in real space, so the r2c pass needs no communication.
+The real-space collection carries the user's ghost layers and doubles as the
+domain decomposition for stencil operators. The forward transform is
 
-For 3D distributed FFT in a **pencil decomposition** the engine transforms one
-axis at a time between two transposes:
+1. r2c along axis 0;
+2. transpose axis 0 ↔ axis 1 within each row communicator (ranks with equal
+   $P_1$ coordinate; skipped if it has one rank), c2c along axis 1;
+3. (3D) transpose axis 1 ↔ axis 2 within each column communicator, c2c along
+   axis 2.
 
-1. **Z-pencil**: data distributed in Y and Z, FFT along X (r2c)
-2. **Y-pencil**: transpose Y↔Z, FFT along Y (c2c)
-3. **X-pencil**: transpose X↔Z, FFT along Z (c2c)
+The inverse runs the adjoint sequence with c2r last. Each transpose moves
+$\mathcal{O}(N/P)$ data per rank.
 
-A **slab decomposition** (a single distributed axis, the default when
-`num_ranks ≤ Nz`) keeps X and Y local, so it transforms those two axes with one
-planned N-D transform and needs only the Y↔Z transpose — one transpose instead of
-two.
+- **Slab** ($P_1 = P$, $P_2 = 1$; requires $P \le N_2$). Axes 0 and 1 are both
+  local, so they are transformed together by one planned two-dimensional
+  transform and only the axis 1 ↔ axis 2 transpose is needed.
+- **Pencil** (general $P_1 \times P_2$). Each axis is transformed separately
+  between two transposes. The factorisation maximises a score that favours
+  $P_1 \approx P_2$ and $P_1 \mid N_2$, $P_2 \mid N_1$. Because two axes are
+  distributed, pencil can use more than $N_2$ ranks.
+- **auto** (default) uses slab when $P \le N_2$, otherwise pencil: slab
+  performs one transpose instead of two and so moves less data, and pencil is
+  needed only when there are more ranks than planes.
 
-The `Transpose` class handles the MPI all-to-all communication that
-redistributes data between pencil orientations.
+In 2D the decomposition is always a slab along axis 1 ($P_1 = 1$, $P_2 = P$).
+One-dimensional transforms are serial only.
 
-!!! note
-    `Transpose` takes the storage order of the fields it redistributes and
-    handles both layouts (AoS on the host, SoA on the device), so no
-    storage-order conversion is needed around the all-to-all.
+### Execution paths
 
-!!! note
-    FFT plans and work buffers are cached per engine and released with it. The
-    device reduction and ghost-accumulation scratch buffers are cached per
-    device for the lifetime of the process and only ever grow; they are sized
-    by the largest reduction or halo seen, a small fraction of a field.
+- **Serial N-D path.** On one rank the whole grid is local, and backends that
+  support it (`supports_nd()`) execute the complete r2c/c2r transform as one
+  planned multidimensional call with strides that absorb the ghost padding and
+  the component layout. This avoids work buffers, intermediate copies and
+  per-plane launches. If a backend cannot plan a particular strided layout
+  (rocFFT fails for some ghost-padded grids), the failure is detected before
+  data is written, remembered for that precision, and the per-axis path is
+  used. Setting `MUGRID_FFT_NO_ND=1` before constructing a host engine hides
+  PocketFFT's N-D transforms, so the test suite can cover the per-axis path in
+  serial runs.
+- **Per-axis path.** Used under MPI and as the fallback. Each pass loops over
+  the $C$ degrees of freedom and issues one batched one-dimensional transform
+  per degree of freedom, batched over the pixel rows of the local block. On SoA
+  storage each such batch has unit element stride, which satisfies cuFFT's
+  real-side requirement; on AoS storage the element stride is $C$, which
+  PocketFFT accepts. Batching over degrees of freedom instead would need
+  non-unit strides on the GPU. The cost is one backend call per degree of
+  freedom and pass.
 
-!!! note
-    The FFT module is designed so MPI communication needs no explicit packing
-    and unpacking — data is laid out so that `MPI_Alltoall` operates directly on
-    contiguous memory regions.
+### Transposes
 
-### Forward FFT Algorithms
+The `Transpose` class redistributes data between the two layouts of a
+transpose. It takes the storage order of the fields, so both AoS and SoA are
+handled without conversion.
 
-**2D:**
+- **Host memory.** Blocks are described by MPI derived datatypes
+  (`MPI_Type_create_subarray`, replicated over components with
+  `MPI_Type_create_hvector`) and exchanged with `MPI_Alltoallw`, so no explicit
+  pack/unpack buffers are needed and MPI handles the non-contiguous access.
+  `MUGRID_STAGED_TRANSPOSE=1` selects an alternative that packs into
+  contiguous buffers and uses `MPI_Alltoallv`.
+- **Device memory.** MPI implementations pack derived datatypes on device
+  memory block by block, which is orders of magnitude slower than a device-side
+  gather. Device transposes therefore gather each peer's block into a
+  contiguous staging buffer on the device, exchange flat messages with
+  non-blocking point-to-point MPI, and scatter on the receiver (see
+  [GPU data and MPI](gpu.md#gpu-data-and-mpi)).
 
-```text
-1. r2c FFT along X for each component
-   - Input: real field (with ghosts) -> work buffer (half-complex, no ghosts)
-   - Loop over components, batched over Y rows
-2. [MPI only] Transpose X<->Y (Y-local to X-local)
-3. c2c FFT along Y for each component
-   - In-place on work buffer (serial) or output (MPI), batched over X
-4. [Serial only] Copy work to output (same storage order, direct copy)
-```
+FFT plans and work buffers are cached per engine and released with it. Device
+reduction and ghost-accumulation scratch buffers are cached per device for the
+lifetime of the process and only grow; they are sized by the largest reduction
+or halo seen, a small fraction of a field.
 
-**3D:**
+### Backends
 
-```text
-1. r2c FFT along X for each component
-   - Input: real field -> Z-pencil work buffer (half-complex in X)
-   - Batched over Y rows for each Z plane
-2a. [MPI] Transpose Y<->Z (Z-pencil to Y-pencil)
-2b. c2c FFT along Y for each component (Y-pencil; transforms per (X,Z))
-2c. [MPI] Transpose Z<->Y (Y-pencil back to Z-pencil)
-3.  [MPI] Transpose X<->Z, or copy (Z-pencil to X-pencil output)
-4.  c2c FFT along Z for each component (output buffer; transforms per (X,Y))
-5.  [Serial only] Copy work to output
-```
+The engine is `FFTEngine<MemorySpace>` over an abstract `FFT1DBackend`:
 
-### Per-Component Looping
+- **PocketFFT** on the host. It is header-only and vendored in the source tree
+  (`fft/pocketfft/`), so the CPU build has no external FFT dependency, and it is
+  BSD-3-licensed, which is compatible with µGrid's LGPL. It supports arbitrary
+  strides and both double and single precision.
+- **cuFFT** on NVIDIA GPUs. cuFFT does not support non-unit strides on the real
+  side of r2c/c2r transforms, which the SoA device layout satisfies.
+- **rocFFT** on AMD GPUs, called directly. rocFFT supports arbitrary strides;
+  µGrid uses the same SoA layout as on NVIDIA devices so both share one code
+  path.
 
-Rather than batching across components (which would need non-unit strides on
-GPU), the engine loops over components:
-
-```cpp
-for (Index_t comp = 0; comp < nb_components; ++comp) {
-    Index_t in_comp_offset = comp * in_comp_factor;
-    Index_t out_comp_offset = comp * work_comp_factor;
-    backend->r2c(Nx, batch_size,
-                 input_ptr + in_base + in_comp_offset,
-                 in_x_stride, in_row_dist,
-                 work_ptr + out_comp_offset,
-                 work_x_stride, work_row_dist);
-}
-```
-
-This satisfies cuFFT's unit-stride R2C/C2R requirement, allows efficient
-batching within each component, works for both SoA and AoS, and adds minimal
-overhead (one kernel launch per component).
-
-!!! note
-    Like FFTW and cuFFT, the transforms are **unnormalized**: a forward FFT
-    followed by an inverse FFT multiplies by N (the transform size). Users must
-    normalize explicitly if needed.
-
-### File Structure
+### File structure
 
 ```text
 src/libmugrid/fft/
-├── fft_engine.hh         # Template class FFTEngine<MemorySpace>
-├── fft_engine_base.hh/cc # Base class: field collections and transpose management
-├── fft_backend.hh        # Abstract backend interface (1D primitives + ND)
-├── pocketfft_backend.cc  # CPU backend using pocketfft
-├── cufft_backend.cc      # NVIDIA GPU backend using cuFFT
-├── rocfft_backend.cc     # AMD GPU backend using rocFFT
-└── transpose.hh/cc       # MPI transpose operations
+├── fft_engine_base.hh/cc     # decomposition, collections, transposes
+├── fft_engine.hh/cc          # FFTEngine<MemorySpace>: transform execution
+├── fft_backend.hh            # abstract FFT1DBackend (1D primitives, N-D entry points)
+├── fft_backend_traits.hh     # backend selection per memory space
+├── gpu_fft_backend.hh        # shared GPU backend code
+├── pocketfft_backend.hh/cc   # host backend
+├── cufft_backend.hh/cc       # NVIDIA backend
+├── rocfft_backend.hh/cc      # AMD backend
+├── transpose.hh/cc           # MPI transposes
+├── fft_utils.hh/cc           # frequencies, normalisation, process grid
+└── pocketfft/                # vendored PocketFFT header
 ```
 
-## Operator Kernel Design
+## Operator kernel design
 
-µGrid provides several discrete differential operators optimized for structured
-grids, with common design principles for ghost-region handling and periodicity.
+| Operator | Stencil | Input → output |
+|----------|---------|----------------|
+| `GenericLinearOperator` | arbitrary | nodal → quadrature (or nodal → nodal) |
+| `FEMGradientOperator` | $2^d$ nodes per element | nodal → quadrature |
+| `LaplaceOperator` | $2d + 1$ points | nodal → nodal |
+| `IsotropicStiffnessOperator` | $3^d$ nodes (gather from $2^d$ elements) | nodal → nodal |
 
-| Operator | Description | Stencil Size | Input → Output |
-|----------|-------------|--------------|----------------|
-| `GenericLinearOperator` | Flexible stencil-based convolution | Configurable | nodal → quad or nodal → nodal |
-| `FEMGradientOperator` | FEM gradient | 8 nodes (3D), 4 nodes (2D) | nodal → quad |
-| `LaplaceOperator` | 7-point (3D) / 5-point (2D) Laplacian | 7 (3D), 5 (2D) | nodal → nodal |
-| `IsotropicStiffnessOperator` | Fused elasticity kernel | 8 nodes (3D), 4 nodes (2D) | nodal → nodal |
+### Ghost layers and boundary conditions
 
-### Common Design Principles
+Operators make no assumption about boundary conditions. Periodicity and
+parallelism come entirely from ghost layers filled by
+`communicate_ghosts()` before the operator runs: on a periodic domain the ghost
+layers hold copies from the opposite side (or from the neighbouring rank). The
+same kernel therefore serves serial, MPI-parallel, periodic and non-periodic
+runs on CPU and GPU.
 
-**Ghost region handling.** Operators make no assumption about boundary
-conditions and operate only on an interior region. Distributed-memory
-parallelization and periodic BCs are realized through ghost-cell communication:
+Each operator declares the ghost layers it reads. For a stencil with offset
+$o_\alpha$ and extent $s_\alpha$ along axis $\alpha$, `apply` reads input at
+$p_\alpha + o_\alpha, \dots, p_\alpha + o_\alpha + s_\alpha - 1$ and requires
 
-- Ghost regions are filled by `CartesianDecomposition::communicate_ghosts()`
-  before the operator runs.
-- **Periodic BC**: ghost regions hold copies from the opposite boundary.
-- **Non-periodic BC with Dirichlet**: boundary node values are constrained;
-  their forces are not computed by the fused kernels (they would be overwritten
-  anyway).
-- Operators compute forces for **interior nodes only** (e.g. indices 1 to n-2
-  for a ghost buffer of width 1), never boundary nodes (0 and n-1).
+$$
+g^\mathrm{left}_\alpha = \max(0, -o_\alpha), \qquad
+g^\mathrm{right}_\alpha = \max(0, o_\alpha + s_\alpha - 1)
+$$
 
-**Stencil offset convention.** Each operator uses a stencil offset to define
-where it "centers", determining which element's quadrature points correspond to
-which nodal region:
+ghost layers. The transpose is computed as a *gather* that reads at mirrored
+offsets, so its requirement is the mirror image (left and right swapped). The
+operator reports both (`get_apply_ghost_requirement()`,
+`get_transpose_ghost_requirement()`) and their elementwise maximum
+(`get_ghost_requirement()`), which the Python `ghosts=` argument uses to size
+collections. Before a kernel runs, the field collection is checked once against
+the requirement and an invalid configuration raises; the inner loops contain no
+bounds checks. The computed region is every point whose stencil data lies
+inside the ghost-padded subdomain.
 
-```python
-# FEMGradientOperator with offset [0, 0, 0]:
-# Output element (0,0,0) uses input nodes at (0,0,0), (1,0,0), (0,1,0), etc.
-grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
+Because transposes gather into owned points rather than scatter into
+neighbours, they write no ghost layers and their results need no
+`reduce_ghosts()`.
 
-# GenericLinearOperator with custom offset
-conv_op = muGrid.GenericLinearOperator([0, 0, 0], coefficients)
-```
+| Operator | apply (left, right) | transpose (left, right) |
+|----------|---------------------|-------------------------|
+| `GenericLinearOperator` | $(\max(0,-o), \max(0, o+s-1))$ | swapped |
+| `LaplaceOperator` | $(1, 1)$ | $(1, 1)$ |
+| `FEMGradientOperator` | $(0, 1)$ | $(1, 0)$ |
+| `IsotropicStiffnessOperator` | $(1, 1)$ | — |
 
-**Upfront validation.** Ghost-region requirements are validated **once** before
-kernel execution: operators check sufficient ghost cells exist, invalid
-configurations throw clear errors, and there is no bounds checking inside the
-hot loop.
+For example, a stencil with offset $(0,0,0)$ and extent $(2,2,2)$ reads ahead
+in `apply` (one right ghost layer) and gathers from behind in `transpose` (one
+left ghost layer).
 
-**Memory layout.** CPU operators use AoS, GPU operators use SoA:
+### Finite-element tables
 
-- **CPU**: DOF components contiguous, `[ux0, uy0, uz0, ux1, uy1, uz1, ...]`
-- **GPU**: spatial indices contiguous, `[ux0, ux1, ..., uy0, uy1, ..., uz0, uz1, ...]`
+The finite-element gradient and the fused stiffness operator reduce to the
+same per-pixel contraction of nodal values with a reference table of
+shape-function gradients $B_{q,\alpha,n}$ (quadrature point $q$, direction
+$\alpha$, node $n$ of the $2^d$ pixel corners, numbered by binary offsets with
+axis 0 fastest), scaled by $1/h_\alpha$ and summed over quadrature points with
+weights $w_q = W^\mathrm{frac}_q \prod_\alpha h_\alpha$,
+$\sum_q W^\mathrm{frac}_q = 1$. The element type only changes the numbers in
+the table, not the kernel, so the tables live in `fem_element.hh` and the
+kernels are templated on the element. The supported elements (Q1 and P1 in 2D
+and 3D), their quadrature rules and weights are listed on the
+[Operators](operators.md#femgradientoperator) page.
 
-Kernel implementations may differ between CPU and GPU to suit each architecture.
+The physical gradient at quadrature point $q$ is
 
-### GenericLinearOperator
+$$
+(\nabla u)_{q,\alpha} = \frac{1}{h_\alpha} \sum_n B_{q,\alpha,n}\, u_n .
+$$
 
-A flexible stencil-based convolution that can represent any linear differential
-operator as a sparse stencil. It takes a list of coefficient arrays (one per
-output component per stencil point), with the stencil defined by relative
-offsets from the current position, and supports both forward (apply) and adjoint
-(transpose) operations.
-
-The forward and transpose operations have different ghost requirements because
-the stencil direction is reversed:
-
-- **Forward (apply)** reads at `p + s` (stencil offset s):
-  - Left ghosts: `max(-offset, 0)` per dimension
-  - Right ghosts: `max(stencil_shape - 1 + offset, 0)` per dimension
-- **Transpose** reads at `p - s` (reversed direction):
-  - Left ghosts: `max(stencil_shape - 1 + offset, 0)` per dimension (swapped)
-  - Right ghosts: `max(-offset, 0)` per dimension (swapped)
-
-For a stencil with offset `[0, 0, 0]` and shape `[2, 2, 2]`: apply needs
-left=0, right=1 (reads ahead); transpose needs left=1, right=0 (gathers from
-behind).
-
-```python
-# Create from FEMGradientOperator coefficients
-grad_op = muGrid.FEMGradientOperator(3, grid_spacing)
-conv_op = muGrid.GenericLinearOperator([0, 0, 0], grad_op.coefficients)
-
-# Apply gradient
-conv_op.apply(nodal_field, quadrature_field)
-
-# Apply divergence (transpose)
-conv_op.transpose(quadrature_field, nodal_field, quad_weights)
-```
-
-### FEMGradientOperator
-
-Computes gradients at quadrature points from nodal displacements using linear
-finite element (P1) shape functions. In 2D each pixel is split into 2 triangles
-(2 quadrature points); in 3D each voxel into 5 tetrahedra (the five-tetrahedra split of Leute's thesis, Sec. 3.5.3;
-5 quadrature points).
-
-The gradient at quadrature point q is:
-
-$$ \frac{\partial u}{\partial x_i} = \sum_I B_q[i,I] \times u_I / h_i $$
-
-where \(B_q\) contains shape-function gradients for the element containing q.
-
-**Shape-function gradients:**
-
-```text
-2D, B_2D[triangle][dim][node]:        3D, B_3D[tet][dim][node]:
-  Triangle 0: nodes 0,1,2 (lower-left)  Tet 0: central tetrahedron (weight 1/3)
-  Triangle 1: nodes 1,2,3 (upper-right) Tets 1-4: corner tetrahedra (weight 1/6 each)
-```
-
-**Ghost requirements:**
-
-- **Forward (gradient, nodal → quadrature)**: input nodal field needs 1 ghost
-  cell on the **right** in each dimension; output quadrature field needs none.
-  Iterates over elements [0, n-2], reading nodal values at element corners
-  [ix, ix+1] × [iy, iy+1] × [iz, iz+1].
-- **Transpose (divergence, quadrature → nodal)**: input quadrature/stress field
-  needs 1 ghost cell on the **left** in each dimension (periodic BC); output
-  nodal field has no specific requirement. Iterates over elements [0, n-2],
-  accumulating into nodal values at element corners.
-
-The swap arises because forward reads "ahead" (node ix+1 at element ix → right
-ghosts), while transpose gathers from elements "behind" (element ix-1
-contributes to node ix → left ghosts for periodic wraparound).
+`FEMGradientOperator.apply` evaluates this for every element whose $2^d$
+corner nodes are available (hence one right ghost layer). `transpose` computes
+$\mathbf{B}^\top W$ by letting every owned node gather the contributions of the
+$2^d$ elements that contain it, which reach one layer to the left.
 
 ### LaplaceOperator
 
-An optimized discrete Laplacian for Poisson-type problems, using the standard
-finite-difference form:
-
-$$ \nabla^2 u \approx \frac{u[i+1] + u[i-1] - 2u[i]}{h^2} + \ldots $$
-
-```text
-2D (5-point):        3D (7-point):
-     1                 Center: -6
-   1 -4 1              Neighbors: +1 (x6)
-     1
-```
-
-It needs 1 ghost cell in each direction (to access neighbors). The operator is
-self-adjoint (transpose equals forward apply), negative semi-definite (positive
-semi-definite with `-scale`), and has a configurable scale factor for sign
-conventions. With a `grid_spacing` the two neighbours along axis $d$ are
-weighted by $\mathrm{scale}/h_d^2$ and the centre by
-$-2\,\mathrm{scale}\sum_d 1/h_d^2$, the finite-difference Laplacian of an
-anisotropic grid; without one every axis is weighted by `scale` alone, so a
-cubic grid can fold $1/h^2$ into the scale.
-
-```python
-# -Laplacian (positive definite) on a cubic grid
-laplace = muGrid.LaplaceOperator3D(scale=-1.0 / h**2)
-# the same on an anisotropic grid
-laplace = muGrid.LaplaceOperator3D([hx, hy, hz], scale=-1.0)
-laplace.apply(u, laplacian_u)
-```
+The $(2d+1)$-point finite-difference Laplacian (defined on the
+[Operators](operators.md#laplaceoperator) page) reads one neighbour on each side
+of every axis, so it needs one ghost layer on each side. It is self-adjoint,
+so `transpose` executes the same kernel as `apply`.
 
 ### IsotropicStiffnessOperator
 
-A fused kernel computing `force = K @ displacement` for isotropic linear elastic
-materials, avoiding explicit assembly of the stiffness matrix K. The element
-stiffness matrix decomposes as:
+The operator and the split $K_e = 2\mu_e G + \lambda_e V$ are defined on the
+[Operators](operators.md#isotropicstiffnessoperator) page. In the
+implementation $G$ and $V$ are assembled once at construction in Voigt
+notation with engineering shear strains,
 
-$$ K_e = 2\mu G + \lambda V $$
+$$
+G = \sum_q w_q\, B_q^{\varepsilon\top} I' B_q^{\varepsilon}, \qquad
+V = \sum_q w_q\, (B_q^{\varepsilon\top} m)(m^\top B_q^\varepsilon),
+$$
 
-where:
+where $B_q^\varepsilon$ maps the element's nodal displacements to the Voigt
+strain at $q$, $I' = \operatorname{diag}(1, 1, 1, \tfrac12, \tfrac12,
+\tfrac12)$ (in 2D $\operatorname{diag}(1, 1, \tfrac12)$) so that
+$\varepsilon^\top I' \varepsilon = \varepsilon : \varepsilon$, and
+$m = (1, 1, 1, 0, 0, 0)^\top$ (in 2D $(1,1,0)^\top$) extracts the trace. Only
+this one-time precomputation depends on the element; the per-call kernels are
+element-agnostic, so the element is a constructor argument rather than a
+template parameter.
 
-- \(G = \sum_q w_q B_q^T I' B_q\) — geometry matrix (shear stiffness)
-- \(V = \sum_q w_q (B_q^T m)(m^T B_q)\) — volumetric coupling matrix
-- \(I' = \text{diag}(1, 1, 1, 0.5, 0.5, 0.5)\) — Voigt scaling for strain energy
-- \(m = [1, 1, 1, 0, 0, 0]^T\) — trace selector vector
+**Gather.** The force at node $I$ is
 
-This reduces memory from O(N × DOF²) for full K to O(N × 2) for spatially
-varying materials.
+$$
+f_I = \sum_{e \ni I} \sum_{J \in e} \bigl(2\mu_e G + \lambda_e V\bigr)_{IJ}\, u_J ,
+$$
 
-**Element decomposition:** 2D uses 2 triangles per pixel (quadrature weights
-`[0.5, 0.5]`); 3D uses 5 tetrahedra per voxel (the same five-tetrahedra split, weights
-`[1/3, 1/6, 1/6, 1/6, 1/6]`).
+the sum over the $2^d$ elements incident to $I$. The kernel assigns one thread
+(or loop iteration) per node, which gathers these contributions and writes only
+its own node. No two threads write the same address, so no atomic operations
+are needed on the GPU, and the result is deterministic. The element $e$ with
+origin at pixel $\mathbf{i}$ holds $\lambda_e, \mu_e$ at pixel $\mathbf{i}$;
+node $\mathbf{j}$ is corner $\mathbf{j} - \mathbf{i} \in \{0,1\}^d$ of the
+elements with origins $\mathbf{j} - \boldsymbol{\delta}$,
+$\boldsymbol{\delta} \in \{0,1\}^d$. Hence the displacement and the Lamé fields
+need one ghost layer on each side. `apply_macro_rhs`, `assemble_diagonal`,
+`average_stress` and `compute_sensitivity` use the same gather (or a
+per-element reduction) and need no resident strain or stress field.
 
-All fields use **node-based indexing** with the same grid dimensions:
+The table below gives the local corner index of a node in each incident
+element, by element offset $\boldsymbol{\delta}$ relative to the node:
 
-| Field | Dimensions | Left Ghosts | Right Ghosts |
-|-------|------------|-------------|--------------|
-| Displacement | (nx, ny, nz) | 1 | 1 |
-| Force | (nx, ny, nz) | 1 | 1 |
-| Material (lam, mu) | (nx, ny, nz) | 1 | 1 |
+| 2D offset | corner | 3D offset | corner | 3D offset | corner |
+|-----------|--------|-----------|--------|-----------|--------|
+| $(-1,-1)$ | 3 | $(-1,-1,-1)$ | 7 | $(0,-1,-1)$ | 6 |
+| $(0,-1)$ | 2 | $(-1,0,-1)$ | 5 | $(0,0,-1)$ | 4 |
+| $(-1,0)$ | 1 | $(-1,-1,0)$ | 3 | $(0,-1,0)$ | 2 |
+| $(0,0)$ | 0 | $(-1,0,0)$ | 1 | $(0,0,0)$ | 0 |
 
-!!! note
-    The kernel does not distinguish periodic from non-periodic BCs. Ghost-cell
-    communication (`CartesianDecomposition::communicate_ghosts()`) handles
-    periodicity: periodic BCs put copies from the opposite boundary into the
-    ghost cells, non-periodic BCs fill them with appropriate boundary values.
-    This unified approach simplifies the kernel and yields consistent CPU/GPU
-    behavior.
+### Memory layout in the kernels
 
-**Gather pattern.** The kernel iterates over interior nodes and gathers
-contributions from all neighboring elements:
+For a displacement field with $d$ components on a subdomain of
+$n_0 \times n_1 \times n_2$ points (ghosts included), the strides of the
+component index $c$ and the grid indices are
 
-```text
-2D (4 elements per node):           3D (8 elements per node):
-  (-1,-1) -> local node 3             (-1,-1,-1) -> 7   (0,-1,-1) -> 6
-  ( 0,-1) -> local node 2             (-1, 0,-1) -> 5   (0, 0,-1) -> 4
-  (-1, 0) -> local node 1             (-1,-1, 0) -> 3   (0,-1, 0) -> 2
-  ( 0, 0) -> local node 0             (-1, 0, 0) -> 1   (0, 0, 0) -> 0
-```
+| | $c$ | $i_0$ | $i_1$ | $i_2$ |
+|---|---|---|---|---|
+| CPU (AoS) | $1$ | $d$ | $d\,n_0$ | $d\,n_0 n_1$ |
+| GPU (SoA) | $n_0 n_1 n_2$ | $1$ | $n_0$ | $n_0 n_1$ |
 
-The kernel iterates over all nodes (indices 0 to n-1), reading from ghost cells
-at positions -1 (left) and n (right), which must be populated beforehand:
+Data pointers are offset by the left ghost layers, so index 0 is the first
+owned point and index $-1$ the left ghost. The CPU and GPU kernels are
+separate source files (`*_gpu.cc`, compiled as CUDA or HIP) dispatched through
+`kernel_dispatcher.hh`, so each can be written for its architecture.
 
-```cpp
-// Iterate over all nodes - ghost communication handles periodicity
-for (ix = 0; ix < nnx; ix++):
-    for (iy = 0; iy < nny; iy++):
-        // Compute force at node (ix, iy)
-```
-
-**Kernel pseudocode:**
-
-```cpp
-for each node (ix, iy, iz) in [0, nnx) x [0, nny) x [0, nnz):
-    f = [0, 0, 0]  // force accumulator
-
-    for each neighboring element (8 in 3D):
-        // Element indices can be -1 (left ghost) or nx (right ghost)
-        ex, ey, ez = element indices relative to node
-        local_node = which corner of element is this node
-
-        // Material fields are node-indexed, read from element position
-        lam = material_lambda[ex, ey, ez]
-        mu  = material_mu[ex, ey, ez]
-
-        // Gather displacement from all element nodes (may read ghosts)
-        u = [displacement at each element corner node]
-
-        // Compute stiffness contribution
-        for each DOF d:
-            row = local_node * NB_DOFS + d
-            f[d] += sum_j (2*mu * G[row,j] + lam * V[row,j]) * u[j]
-
-    force[ix, iy, iz] = f
-```
-
-### Memory Layout Details
-
-**CPU (AoS)** — DOF components contiguous:
-
-```text
-Memory: [ux0, uy0, uz0, ux1, uy1, uz1, ux2, uy2, uz2, ...]
-```
-
-```cpp
-disp_stride_d = 1;                    // DOF components contiguous
-disp_stride_x = NB_DOFS;              // = 3 for 3D
-disp_stride_y = NB_DOFS * nx;
-disp_stride_z = NB_DOFS * nx * ny;
-```
-
-**GPU (SoA)** — spatial indices contiguous for coalesced access:
-
-```text
-Memory: [ux0, ux1, ux2, ..., uy0, uy1, uy2, ..., uz0, uz1, uz2, ...]
-```
-
-```cpp
-disp_stride_x = 1;                    // Spatial x contiguous
-disp_stride_y = nx;
-disp_stride_z = nx * ny;
-disp_stride_d = nx * ny * nz;         // DOF components separated
-```
-
-Pointers are offset to account for ghost cells:
-
-```cpp
-const Real* disp_data = displacement.data() + ghost_offset;
-// Now index 0 = first interior node, index -1 = left ghost
-```
-
-### File Structure
+### File structure
 
 ```text
 src/libmugrid/operators/
-├── linear.hh              # Base LinearOperator class
-├── generic.hh/.cc         # GenericLinearOperator
-├── laplace_2d.hh/.cc      # LaplaceOperator2D
-├── laplace_3d.hh/.cc      # LaplaceOperator3D
-├── fem_gradient_2d.hh/.cc # FEMGradientOperator2D
-├── fem_gradient_3d.hh/.cc # FEMGradientOperator3D
+├── linear.hh                 # LinearOperator base, ghost requirements
+├── kernel_dispatcher.hh      # host/device dispatch
+├── convolution_kernels_cpu.hh / _gpu.hh
+├── generic.hh/.cc, generic_gpu.cc          # GenericLinearOperator
+├── laplace.hh/.cc, laplace_gpu.cc          # LaplaceOperator<Dim>
+├── fem_element.hh                           # element tables (P1, Q1)
+├── fem_gradient.hh, fem_gradient_gpu.cc    # FEMGradientOperator<Element, T>
+├── nodal_moments.hh/.cc, nodal_moments_gpu.cc
+├── transfer.hh/.cc                          # multigrid prolongation/restriction
 └── solids/
-    ├── isotropic_stiffness_2d.hh/.cc  # IsotropicStiffnessOperator2D
-    ├── isotropic_stiffness_3d.hh/.cc  # IsotropicStiffnessOperator3D
-    └── isotropic_stiffness_gpu.cc     # GPU kernels
+    ├── isotropic_stiffness.hh               # IsotropicStiffnessOperator<Dim>
+    ├── isotropic_stiffness_2d.cc
+    ├── isotropic_stiffness_3d.cc
+    └── isotropic_stiffness_gpu.cc
 ```
 
 ### Testing
 
-Tests live in `tests/python_isotropic_stiffness_operator_tests.py`:
-
-- `test_compare_with_generic_operator`: fused kernel vs. explicit Bᵀ C B
-- `test_unit_impulse_*`: response to unit displacement at specific nodes
-- `test_symmetry`: verifies K is symmetric
-- `ValidationGuardTest*`: error handling for invalid configurations
-- `GPUUnitImpulseTest`: GPU kernel matches CPU output
-
-With node-based indexing, all tests compare the full output (all nodes), not
-just interior nodes.
+The fused stiffness operator is tested in
+`tests/python_isotropic_stiffness_operator_tests.py` against an explicit
+$\mathbf{B}^\top \mathbf{C} \mathbf{B}$ assembled from `GenericLinearOperator`,
+for symmetry of $\mathbf{K}$, for unit-impulse responses (periodic and
+non-periodic), for the patch test on both elements, for `apply_macro_rhs`,
+`average_stress`, `assemble_diagonal` and `compute_sensitivity`, for
+single-versus-double precision, for CPU/GPU agreement, and for the validation
+errors raised on missing ghost layers or mismatched material fields. The
+element tables and the assembled P1 stencil are pinned in
+`tests/python_fem_element_tests.py`.

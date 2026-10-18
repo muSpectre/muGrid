@@ -1,11 +1,14 @@
 /**
- * @file   isotropic_stiffness_operator.cc
+ * @file   isotropic_stiffness_3d.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   31 Dec 2025
  *
- * @brief  Host implementation of fused isotropic stiffness operator
+ * @brief  Host (3D) implementation of the fused isotropic stiffness
+ *         operator: geometry precomputation (G, V, D̄) and the CPU kernels
+ *         for K u, the macro RHS, the stress integral, diag(K) and the
+ *         sensitivity contractions.
  *
  * Copyright © 2025 Lars Pastewka
  *
@@ -44,7 +47,7 @@
 namespace muGrid {
 
     // Forward declarations of the (templated) host kernels defined at the
-    // bottom of this file, so the operator's impl methods above can call them.
+    // bottom of this file, so the operator's impl methods below can call them.
     namespace isotropic_stiffness_kernels {
         template <typename T>
         void isotropic_stiffness_3d_host(
@@ -99,6 +102,12 @@ namespace muGrid {
 
         // G = Σ_q w_q B_q^T I_sym B_q (shear/μ); V = Σ_q w_q (B_q^T m)(m^T B_q)
         // (volumetric/λ), m = [1,1,1,0,0,0]^T.
+        // Component-wise, with physical gradients ∂_a N_I = B[q][a][I] / h_a and
+        // DOF index (I, a) -> I·Dim + a:
+        //   G_(Ia)(Jb) = ½ Σ_q w_q (δ_ab ∇N_I·∇N_J + ∂_b N_I ∂_a N_J),
+        //   V_(Ia)(Jb) =   Σ_q w_q ∂_a N_I ∂_b N_J,
+        // so uᵀ G v = Σ_q w_q ε(u):ε(v) and uᵀ V v = Σ_q w_q tr ε(u) tr ε(v).
+        // The Voigt shear rows carry engineering strains 2ε_ab, hence the ½.
         for (Index_t q = 0; q < elem_nb_quad; ++q) {
             Real w = elem_Wfrac[q] * hx * hy * hz;  // includes element volume
             for (Index_t I = 0; I < NB_NODES; ++I) {
@@ -830,7 +839,10 @@ namespace muGrid {
             }
         }
 
-        // Per-pixel material entry point (unchanged public signature).
+        // Per-pixel material entry point. Takes the full stride set so the
+        // impl methods pass layout explicitly; the x-strides are asserted to be
+        // the AoS constants and the element counts are unused (one element
+        // per node in the computable region).
         template <typename T>
         void isotropic_stiffness_3d_host(
             const T * MUGRID_RESTRICT displacement,

@@ -392,7 +392,7 @@ void add_linalg_functions(py::module &mod) {
 
         For fields with ghost regions (GlobalFieldCollection), reduction operations
         (vecdot, norm_sq) only iterate over the interior region to ensure correct
-        MPI-parallel semantics. Update operations (axpy, scal, copy) operate on
+        MPI-parallel semantics. Update operations (axpy, axpby, scal, copy) operate on
         the full buffer for efficiency.
 
         Note: These functions return local (process-local) results for parallel

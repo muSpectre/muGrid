@@ -45,7 +45,7 @@ namespace muGrid {
 std::vector<Int> fft_freqind(Index_t n) {
   std::vector<Int> freq(n);
 
-  // First half: 0, 1, 2, ..., n/2 (or (n-1)/2 for odd n)
+  // First half: 0, 1, 2, ..., n/2 - 1 (or (n-1)/2 for odd n)
   // Second half: -n/2, ..., -2, -1 (or -(n-1)/2, ..., -1 for odd n)
   Index_t half{(n + 1) / 2};  // Ceiling division
 
@@ -215,9 +215,11 @@ void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & 
 
     // Every rank must hold data in both spaces: real space splits Z across
     // P1 and Y across P2, Fourier space the half-complex X across P2 and Y
-    // across P1. A factorization violating that idles ranks (16 ranks on a
-    // (16, 16, 3) grid used to pick P1 = 4 > Nz = 3: four empty ranks), so it
-    // only wins when no factorization fits.
+    // across P1. A factorization violating P1 <= min(Nz, Ny) and
+    // P2 <= min(Ny, Fx) leaves ranks with empty subdomains (e.g. 16 ranks on
+    // a (16, 16, 3) grid with P1 = 4 > Nz = 3 would leave four ranks idle),
+    // so the +10 bonus makes any fitting factorization beat every
+    // non-fitting one; a non-fitting one is chosen only if none fits.
     const Index_t Fx{nb_grid_pts[0] / 2 + 1};
     const bool fits{test_p1 <= std::min(Nz, Ny) &&
                     test_p2 <= std::min(Ny, Fx)};

@@ -73,8 +73,8 @@ class Field:
     - `p`: Pixel layout, excluding ghost regions
     - `pg`: Pixel layout, including ghost regions
 
-    For CPU fields, the arrays are numpy arrays. For GPU fields (CUDA),
-    the arrays are CuPy arrays. Both are views into the underlying C++ data,
+    For CPU fields, the arrays are numpy arrays. For GPU fields (CUDA or
+    ROCm), the arrays are CuPy arrays. Both are views into the underlying C++ data,
     so modifications to the arrays will modify the field data directly (zero-copy).
     """
 
@@ -143,9 +143,9 @@ class Field:
         In array-of-structures storage (the host default) that axis runs
         component-fastest, ``j = c + C * s``; in structure-of-arrays storage
         (the device default) sub-point-fastest, ``j = c * S + s``. Each is a
-        zero-copy view only in its own storage order, so ``.p[j]`` named a
-        different (component, sub-point) pair on host and device for the same
-        data -- the same code silently read and wrote different entries.
+        zero-copy view only in its own storage order, so ``.p[j]`` would name
+        a different (component, sub-point) pair on host and device for the
+        same data, and the same code would read and write different entries.
         A copy in one canonical order is not an option either: writes to
         ``.p`` would go into the copy and be lost. The orders agree when the
         last component axis or the sub-point count is 1, so only the other
@@ -194,7 +194,18 @@ class Field:
         """
         Pixel layout array including ghost regions.
 
-        Shape: (nb_components * nb_sub_pts, *spatial_dims_with_ghosts)
+        Shape: (*components_shape[:-1], components_shape[-1] * nb_sub_pts,
+        *spatial_dims_with_ghosts); sub-points are folded into the last
+        component axis (a scalar field has a leading ``nb_sub_pts`` axis if
+        ``nb_sub_pts > 1`` and none otherwise).
+
+        Raises
+        ------
+        ValueError
+            In structure-of-arrays storage (device fields) when there are
+            several sub-points and the last component axis is longer than 1,
+            because the folded order then differs from the host's; use
+            :attr:`sg` instead.
         """
         return self._pixel_view()
 
@@ -203,7 +214,8 @@ class Field:
         """
         Pixel layout array excluding ghost regions.
 
-        Shape: (nb_components * nb_sub_pts, *spatial_dims_without_ghosts)
+        Shape: as :attr:`pg` without the ghost layers. Raises
+        :class:`ValueError` in the same case as :attr:`pg`.
         """
         pixel_buf = self._pixel_view()
         offsets = self._cpp.offsets_p

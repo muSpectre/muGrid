@@ -48,25 +48,22 @@ field.p[...] = 0.0
 
 - [Installation](installation.md) — install the wheel or build the C++ core and
   the optional MPI/GPU backends.
-- [Python API](python.md) — field collections, array views, decomposition, the
-  FFT engine, solvers and preconditioners, and device selection.
+- [Python API](python.md) — reference for field collections, array views,
+  decomposition, the FFT engine, operators, solvers, preconditioners, I/O and
+  device selection.
 - [C++ API](cpp.md) — the Python-free core in namespace `muGrid`.
-- [Operators](operators.md) — stencils, FEM gradients and the fused kernels.
-- [Linear algebra](linalg.md) — the vector kernels the solvers are built on.
-- [GPU](gpu.md) — building with CUDA/HIP and running fields on device.
+- [FFT](fft.md), [Operators](operators.md), [Linear algebra](linalg.md) and
+  [GPU](gpu.md) — topic guides.
 - [Examples](examples.md) — worked Poisson and linear-elasticity solvers.
-- [FFT](fft.md), [Operators](operators.md), [Linear algebra](linalg.md),
-  [GPU](gpu.md) — the topic guides.
-- [Examples](examples.md) and [Benchmark](benchmark.md) — a Poisson solver and
-  its CPU/GPU scaling across grid sizes.
-- [Architecture](architecture.md) — the design of the field/collection model.
+- [Benchmarks](benchmark.md) — measured CPU/GPU performance and scaling.
+- [Architecture](architecture.md) — internal design of the FFT engine and the
+  operator kernels.
 
-## History
+## Relation to µSpectre
 
 µGrid is part of the µSpectre project, an open-source platform for FFT-based
-continuum mesoscale modelling. It was originally developed as the grid
-infrastructure for µSpectre and is now a standalone library that can be used
-independently.
+continuum mesoscale modelling. It provides µSpectre's grid infrastructure and
+has no dependency on µSpectre, so it can be used on its own.
 
 ## Funding
 

@@ -77,7 +77,7 @@ namespace muGrid {
     explicit FileIOError(const char * what) : muGrid::RuntimeError(what) {}
   };
 
-  //! forward declaration of the `muSpectre::Field`
+  //! forward declaration of the `muGrid::Field`
   class Field;
 
   //! forward declaration of the `muGrid::FileFrame`
@@ -88,7 +88,8 @@ namespace muGrid {
    * @brief A virtual base class for FileIO classes.
    *
    * This class provides a common interface for file input/output operations.
-   * It defines an enumeration for open modes (Read, Write, Append) and provides
+   * It defines an enumeration for open modes (Read, Write, Overwrite,
+   * Append) and provides
    * a set of constructors and assignment operators (both copy and move are
    * deleted). It also provides a virtual destructor and a random access
    * operator.
@@ -128,7 +129,8 @@ namespace muGrid {
      * name, open mode, and communicator.
      *
      * @param file_name The name of the file to be opened.
-     * @param open_mode The mode to open the file in (Read, Write, or Append).
+     * @param open_mode The mode to open the file in (Read, Write, Overwrite
+     * or Append).
      * @param comm The communicator to be used for parallel I/O operations
      * (default is a default-constructed Communicator object).
      */

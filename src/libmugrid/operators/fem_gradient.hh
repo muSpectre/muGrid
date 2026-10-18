@@ -5,20 +5,19 @@
  *
  * @date   26 Jun 2026
  *
- * @brief  Dimension-templated hard-coded linear FEM gradient operator (2D/3D)
+ * @brief  Element-templated hard-coded FEM gradient operator (2D/3D)
  *
- * The 2D (linear triangles, 4 nodes / 2 quad points) and 3D (linear
- * tetrahedra, 8 nodes / 5 quad points) FEM gradient operators shared the
- * entire apply/transpose interface, the device dispatch and the field
- * validation, differing only in the dimension, the element counts and the
- * shape-function tables. They are unified here into a single
- * `template <Dim_t Dim> FEMGradientOperator`, with the dimension-varying facts
- * in `FEMGradientTraits<Dim>` and the divergent stride/kernel selection behind
- * `if constexpr`. The dimension-specialised stencil kernels keep their distinct
- * signatures (defined in fem_gradient_2d.cc / fem_gradient_3d.cc for the host
- * and fem_gradient_gpu.cc for the device). The historical class names remain as
- * type aliases (FEMGradientOperator2D / FEMGradientOperator3D) so no binding or
- * downstream code changes.
+ * A single `template <class Element, typename T> FEMGradientOperator` serves
+ * every element of fem_element.hh: linear triangles (P1Tri2D, 4 nodes /
+ * 2 quad points), linear tetrahedra (P1Tet3D, 8 nodes / 5 quad points) and
+ * the Q1 quad/hex elements (4 / 8 quad points). The apply/transpose
+ * interface, device dispatch and field validation are shared; the element
+ * enters only through its shape-function-gradient table B and quadrature
+ * weights, and the dimension through `if constexpr` stride selection. The
+ * host kernels are the element-generic templates in this header; the device
+ * kernels are in fem_gradient_gpu.cc. `FEMGradientOperator2D` /
+ * `FEMGradientOperator3D` are type aliases for the P1 instantiations; the
+ * Python bindings use these names.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -69,16 +68,11 @@
 
 namespace muGrid {
 
-    // Kernel implementations and reference tables. The host kernels are defined
-    // in fem_gradient_2d.cc / fem_gradient_3d.cc, the device kernels in
-    // fem_gradient_gpu.cc; both translation units include this header for the
-    // declarations and the shape-function tables below.
+    // Kernel implementations. The host kernels are the element-generic
+    // templates defined below; the device launch wrappers are declared here
+    // and defined in fem_gradient_gpu.cc. Element data (B, weights, node
+    // layout) lives in fem_element.hh.
     namespace fem_gradient_kernels {
-
-        // Element data (B, weights, node layout) lives in fem_element.hh;
-        // the host gradient/divergence kernels are the element-generic
-        // templates defined further below. Neither per-dimension host kernel
-        // declarations nor shape-function tables belong here.
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // Element-generic device launch wrappers (defined and explicitly
@@ -106,13 +100,20 @@ namespace muGrid {
         // ===================================================================
         // Generic, element-templated host kernels
         // ===================================================================
-        // These replace the per-dimension hand-written kernels above: the
-        // element supplies B[q][d][n] and the node count, and the loops are
-        // fully unrolled because NbQuad/NbNodes/Dim are compile-time, so for a
-        // P1 simplex the compiler folds B's ±1 / zeros and reproduces the
-        // hand-written code. Works for any element (e.g. Q1) with no new code.
+        // The element supplies B[q][d][n] and the node count. NbQuad, NbNodes
+        // and Dim are compile-time constants and B is constexpr, so the loops
+        // are fully unrolled and, for a P1 simplex, B's ±1 entries and
+        // structural zeros fold away: the generated code has no table loads
+        // or multiplications by 0/±1. Any element (e.g. Q1) works without
+        // kernel changes.
 
-        //! Gradient (nodal → quadrature): grad[q][d] = (Σ_n B[q][d][n] u[n])/h_d.
+        //! Gradient (nodal → quadrature): for every pixel (element) e with
+        //! 0 <= e_d < nb_grid_pts[d] - 1 (all elements whose 2^Dim corner
+        //! nodes lie inside the ghosted buffer),
+        //!     grad_e[q][d] [+]= alpha (Σ_n B[q][d][n] u[e + o_n]) / h_d,
+        //! with o_n the binary corner offset of node n. Cost
+        //! O(NbQuad · Dim · NbNodes) per element; each element writes only
+        //! its own quadrature values.
         //! Templated on the field scalar type @p T (Real or Real32); the
         //! element's B table stays `double` constexpr and is read into @p T.
         template <class Element, typename T>
@@ -145,10 +146,11 @@ namespace muGrid {
                     u[n] = nodal_input[nodal_base + node_lin[n]];
                 }
                 // Contract first, then write with a single branch — keeps the
-                // strided stores out of the increment test, matching the
-                // hand-written kernels. Trip counts are compile-time constants
-                // and Element::B is constexpr, so the optimizer unrolls these
-                // loops and folds B's structural zeros / ±1.
+                // strided stores out of the increment test, so the increment
+                // flag is tested once per pixel rather than once per store.
+                // Trip counts are compile-time constants and Element::B is
+                // constexpr, so the optimizer unrolls these loops and folds
+                // B's structural zeros / ±1.
                 T out[NbQuad][Dim];
                 for (Index_t q = 0; q < NbQuad; ++q) {
                     for (Dim_t d = 0; d < Dim; ++d) {
@@ -199,11 +201,14 @@ namespace muGrid {
 
         //! Divergence / transpose (quadrature → nodal) with weights:
         //! f[n] = alpha Σ_e Σ_q w_q Σ_d B[q][d][n] g_e[q][d] / h_d over the
-        //! elements e sharing node n. Writes only the owned nodes
-        //! `[lo, lo + nb)` of each axis, from the elements `[lo - 1, lo + nb -
-        //! 1]`: the element below an owned node lives in the left ghost layer,
-        //! so the caller must have communicated the gradient's ghosts. Ghost
-        //! nodes are not written, so the result never needs a ghost reduction.
+        //! elements e sharing node n, i.e. f = alpha Bᵀ W g. Writes only the
+        //! owned nodes `[lo, lo + nb)` of each axis, from the elements
+        //! `[lo - 1, lo + nb - 1]`: the element below an owned node lives in
+        //! the left ghost layer, so the caller must have communicated the
+        //! gradient's ghosts. Every owned node thus gathers all 2^Dim element
+        //! contributions locally and is complete; ghost nodes are not
+        //! written, so the result never needs a ghost reduction (which would
+        //! double-count). Cost O(NbQuad · Dim · NbNodes) per element.
         //! Templated on the field scalar type @p T (Real or Real32).
         template <class Element, typename T>
         void fem_divergence_host_generic(
@@ -228,8 +233,8 @@ namespace muGrid {
             }
             // Precompute the per-(quad, dim) coefficient w_q · α / h_d once,
             // hoisting the quadrature-weight and 1/h loads out of the pixel
-            // loop (the hand-written kernels do the same). B folds against this
-            // at compile time, dropping the zero entries.
+            // loop. B folds against this at compile time, dropping the zero
+            // entries.
             T coeff[NbQuad][Dim];
             for (Index_t q = 0; q < NbQuad; ++q) {
                 for (Dim_t d = 0; d < Dim; ++d) {
@@ -279,7 +284,8 @@ namespace muGrid {
                              const Index_t (&e)[3]) {
                 // Accumulate each node's contribution quad-point by quad-point
                 // (B folds, so only the nodes touched by quad q contribute),
-                // then scatter once — the structure of the hand-written kernel.
+                // then scatter once, so each nodal value is read-modified-
+                // written once per element instead of once per quad point.
                 // Trip counts are compile-time constants and Element::B is
                 // constexpr, so the optimizer unrolls and folds B.
                 T fa[NbNodes] = {};
@@ -341,9 +347,22 @@ namespace muGrid {
      * @brief FEM gradient operator templated on the element type.
      *
      * `apply()` computes the (unweighted) gradient `B` (nodal → quadrature
-     * points). `transpose()` computes the **quadrature-weighted** transpose
-     * `Bᵀ W` (quadrature → nodal points), i.e. the discretised divergence /
-     * Galerkin (L²) adjoint — **not** the bare matrix transpose `Bᵀ`.
+     * points),
+     *
+     *     (B u)_{e,q,d} = (1/h_d) Σ_n B[q][d][n] u_{e + o_n},
+     *
+     * where e is a pixel/voxel (element), q a quadrature point, d a spatial
+     * direction, n one of the 2^Dim corner nodes at binary offset o_n, and
+     * B[q][d][n] the element's reference shape-function gradient.
+     * `transpose()` computes the **quadrature-weighted** transpose
+     * `Bᵀ W` (quadrature → nodal points),
+     *
+     *     (Bᵀ W g)_m = Σ_{e,n : e + o_n = m} Σ_q w_q Σ_d B[q][d][n] g_{e,q,d} / h_d,
+     *
+     * i.e. the discretised divergence / Galerkin (L²) adjoint — **not** the
+     * bare matrix transpose `Bᵀ`. Both cost O(NbQuad · Dim · 2^Dim) per
+     * pixel and are applied independently to every component of a
+     * multi-component nodal field.
      *
      * Weighting convention (important):
      * - With no `weights` argument, `transpose()` uses the element's *physical*
@@ -373,7 +392,8 @@ namespace muGrid {
      * The element-specific data (shape-function-gradient table B, quadrature
      * weights, node count) comes from the @p Element traits (see
      * fem_element.hh); the kernels are generic over it. Supported elements:
-     * `P1Tri2D/3D` (triangles/tets) and `Q1Quad2D`/`Q1Hex3D`.
+     * `P1Tri2D`/`P1Tet3D` (triangles/tets) and `Q1Quad2D`/`Q1Hex3D`. @p T is
+     * the field scalar type (Real or Real32).
      */
     template <class Element, typename T = Real>
     class FEMGradientOperator : public LinearOperator {
@@ -571,7 +591,9 @@ namespace muGrid {
 
         //! Common validation plus the operator-specific component-count check.
         //! `expected_storage_order` is the dof interleaving the calling
-        //! kernel was written for (AoS on host, SoA on device).
+        //! kernel was written for (AoS on host, SoA on device: on the device
+        //! consecutive threads handle consecutive pixels, so with SoA their
+        //! loads hit consecutive addresses and coalesce).
         const GlobalFieldCollection &
         validate_fields(const Field & nodal_field, const Field & gradient_field,
                         Index_t & nb_components,
@@ -803,9 +825,9 @@ namespace muGrid {
 #endif
     };
 
-    //! 2D linear-triangle FEM gradient. Preserves the historical name.
+    //! 2D linear-triangle FEM gradient (name used by the bindings).
     using FEMGradientOperator2D = FEMGradientOperator<P1Tri2D>;
-    //! 3D linear-tetrahedra FEM gradient. Preserves the historical name.
+    //! 3D linear-tetrahedra FEM gradient (name used by the bindings).
     using FEMGradientOperator3D = FEMGradientOperator<P1Tet3D>;
     //! 2D bilinear-quad (Q1) FEM gradient.
     using FEMGradientOperatorQ1_2D = FEMGradientOperator<Q1Quad2D>;

@@ -60,7 +60,8 @@ namespace muGrid {
          * @param spatial_dimension number of spatial dimensions, must be 1, 2,
          * 3, or Unknown
          * @param nb_sub_pts number of quadrature points per pixel/voxel
-         * @param storage_order storage order for field components
+         * @param storage_order storage order for field components (ignored
+         * for device collections, which always use StructureOfArrays)
          * @param device where to allocate field memory
          */
         GlobalFieldCollection(
@@ -71,11 +72,20 @@ namespace muGrid {
 
         /**
          * Constructor with initialization
+         * @param nb_domain_grid_pts number of grid points of the whole domain
          * @param nb_subdomain_grid_pts_with_ghosts number of grid points on the
-         * current MPI process (subdomain)
+         * current MPI process (subdomain), ghosts included; empty means the
+         * whole domain plus ghosts
          * @param subdomain_locations_with_ghosts location of the current
          * subdomain within the global grid
          * @param nb_sub_pts number of quadrature points per pixel/voxel
+         * @param storage_order storage order for field components (ignored
+         * for device collections, which always use StructureOfArrays); also
+         * selects the pixel order (see initialise())
+         * @param nb_ghosts_left number of ghost layers on the low side of
+         * each axis (empty means none)
+         * @param nb_ghosts_right number of ghost layers on the high side of
+         * each axis (empty means none)
          * @param device where to allocate field memory
          */
         GlobalFieldCollection(
@@ -102,7 +112,8 @@ namespace muGrid {
          * component the pixels are stored next to each other in memory. (This
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
-         * own storage order that is not affected by this setting.
+         * own storage order that is not affected by this setting. Ignored
+         * for device collections, which always use StructureOfArrays.
          * @param device where to allocate field memory
          */
         GlobalFieldCollection(
@@ -130,7 +141,8 @@ namespace muGrid {
          * component the pixels are stored next to each other in memory. (This
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
-         * own storage order that is not affected by this setting.
+         * own storage order that is not affected by this setting. Ignored
+         * for device collections, which always use StructureOfArrays.
          * @param device where to allocate field memory
          */
         GlobalFieldCollection(
@@ -161,10 +173,13 @@ namespace muGrid {
         GlobalFieldCollection &
         operator=(GlobalFieldCollection && other) = delete;
 
-        //! Return the pixels class that allows to iterator over pixels
+        //! Return the pixels class that allows to iterate over pixels,
+        //! ghosts included
         const Pixels & get_pixels_with_ghosts() const;
 
-        //! Return the pixels class that allows to iterator over pixels
+        //! Return the pixels class of the interior (ghosts excluded); it
+        //! shares the ghost-inclusive strides, so its buffer is not
+        //! contiguous when ghosts are present
         const Pixels & get_pixels_without_ghosts() const;
 
         //! evaluate and return the linear index corresponding to dynamic
@@ -218,7 +233,10 @@ namespace muGrid {
         /**
          * freeze the problem size and allocate memory for all fields of the
          * collection. Fields added later on will have their memory allocated
-         * upon construction.
+         * upon construction. `pixels_storage_order` selects column-major
+         * pixel strides (first axis fastest) for ArrayOfStructures and
+         * row-major strides (last axis fastest) for StructureOfArrays;
+         * Automatic uses the collection's storage order.
          */
         void
         initialise(const DynGridIndex & nb_domain_grid_pts,
@@ -289,14 +307,14 @@ namespace muGrid {
         }
 
         //! returns the process-local (subdomain) number of grid points in each
-        //! directionl, but without the ghost cells
+        //! direction, but without the ghost cells
         DynGridIndex get_nb_subdomain_grid_pts_without_ghosts() const {
             return this->get_pixels_with_ghosts().get_nb_subdomain_grid_pts() -
                    this->nb_ghosts_left - this->nb_ghosts_right;
         }
 
-        //! returns the process-local (subdomain) locations of subdomain grid
-        //! including the ghost cells
+        //! returns the global index of the subdomain's first point, counting
+        //! the ghost cells (location without ghosts minus nb_ghosts_left)
         const DynGridIndex & get_subdomain_locations_with_ghosts() const {
             return this->get_pixels_with_ghosts().get_subdomain_locations();
         }
@@ -330,8 +348,9 @@ namespace muGrid {
         }
 
         /**
-        * @brief Returns the index difference between iterators of pixels with
-        * and without ghosts
+         * @brief Returns the index difference between iterators of pixels with
+         * and without ghosts, i.e. the linear (ghost-inclusive) index of the
+         * first interior pixel, sum_k s_k gL_k
          *
          * @return an Index_t instance.
          */

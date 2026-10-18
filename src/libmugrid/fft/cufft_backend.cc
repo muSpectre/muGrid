@@ -45,8 +45,9 @@ namespace muGrid {
 
 namespace {
 //! A plan size, stride or distance as the `int` the 32-bit cuFFT plan API
-//! takes. They were cast unchecked, so a grid beyond the int range on one GPU
-//! (about 1291^3 complex elements per field) silently planned a wrapped size.
+//! takes, range-checked: a bare cast would silently wrap for a grid beyond
+//! the int range on one GPU (2^31 elements, about 1291^3 complex elements
+//! per field) and plan a wrong size, so out-of-range values throw instead.
 template <typename I>
 int plan_int(I value) {
   if (value < 0 || static_cast<long long>(value) >

@@ -87,7 +87,8 @@ class GpuFFTBackend : public FFT1DBackend {
   bool supports_device_memory() const final { return true; }
 
   //! Both GPU backends transform whole multidimensional r2c/c2r natively, so
-  //! the serial engine hands the entire transform over in one planned call.
+  //! the serial engine (and the X-Y plane of an MPI slab) hands the entire
+  //! transform over in one planned call.
   bool supports_nd() const final { return true; }
 
   void r2c(Index_t n, Index_t batch, const Real * input, Index_t in_stride,
@@ -351,7 +352,8 @@ class GpuFFTBackend : public FFT1DBackend {
   }
 
   /**
-   * Throw unless `ptr` is aligned like a complex value (16 bytes). muGrid pads
+   * Throw unless `ptr` is aligned like a complex value (`complex_align`
+   * bytes: 16 for Complex, the default; 8 for Complex32). muGrid pads
    * FFT-engine real-space fields so the real array of every real<->complex
    * transform satisfies this by construction (see the FFTEngineBase
    * constructor); a violation indicates a layout-padding bug or a field not

@@ -26,13 +26,14 @@ the file. Columns:
 | provenance | `timestamp`, `version`, `commit`, `dirty`, `cpu`, `gpu` | when/what/where — identical across all rows of one run |
 | identity | `benchmark`, `study`, `label` | which plot/series the point belongs to |
 | parameters | `device`, `nranks`, `dim`, `n`, `npts`, `precond`, `precision`, `maxiter`, `tol` | enough to reproduce the run |
-| results | `iters`, `secs`, `gbps`, `E` | the measurement |
+| results | `iters`, `secs`, `gbps`, `E`, `status` | the measurement; `status` is `ok` or `oom` (ran out of memory) |
 
 - `version` is `git describe --tags --always --dirty`; `commit` is the short
   hash; `dirty=1` flags an uncommitted working tree (avoid for runs you intend
   to keep).
-- `precision` is `double` (fp64) or `single` (fp32); a blank cell reads as
-  `double`. Each benchmark is run once
+- `precision` is `double` (fp64) or `single` (fp32); a blank cell (or a file
+  whose header lacks the column) reads as `double`. Appending rows rewrites an
+  older header to the current column list. Each benchmark is run once
   per precision (separate jobs, hence separate `timestamp`s); the pages overlay
   whatever precisions are present — latest run *per precision* — with fp64 drawn
   solid and fp32 dashed.
@@ -48,6 +49,19 @@ Current `benchmark`/`study` values:
 | `homogenization` | `time_vs_size` | config key: `cpu1`, `cpuN`, `gpu1`, `gpuN` |
 | `homogenization_preconditioner` | `iterations` | `none`, `reference` |
 | `homogenization_preconditioner` | `reference_timing` | config key |
+
+## Recorded metadata
+
+Every rendered result states the provenance stored with its run: the run
+timestamp, the code version (`version`, `commit`, `dirty`), the CPU model and
+logical core count, the GPU model and count, and the run parameters (device,
+MPI rank count, grid size, preconditioner, precision, iteration limit,
+tolerance), from which the pages reconstruct the command line of each data
+point. The database does **not** record the compiler, library versions (FFT
+backend, Eigen, pybind11, NumPy), the MPI implementation, the CUDA/ROCm
+version, or the node configuration (node count, ranks per node); the pages
+flag each of these with a `<!-- TODO: benchmark metadata missing: ... -->`
+marker (`benchmark_db.UNRECORDED_METADATA`).
 
 ## Workflow
 

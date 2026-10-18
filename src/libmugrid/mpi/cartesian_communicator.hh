@@ -113,13 +113,13 @@ namespace muGrid {
          *                    within the decomposition. Must be consistent with
          *                    the parent communicator's rank.
          * @param left_ranks A vector of neighbor ranks to the left (lower
-         *                   coordinate) in each spatial dimension. Use
-         *                   MPI_PROC_NULL for boundaries (in periodic mode,
-         *                   wraps to the opposite side).
+         *                   coordinate) in each spatial dimension. For a
+         *                   periodic domain the first rank's left neighbor is
+         *                   the last rank; use MPI_PROC_NULL for a missing
+         *                   neighbor.
          * @param right_ranks A vector of neighbor ranks to the right (higher
-         *                    coordinate) in each spatial dimension. Use
-         *                    MPI_PROC_NULL for boundaries (in periodic mode,
-         *                    wraps to the opposite side).
+         *                    coordinate) in each spatial dimension (periodic
+         *                    wrap and MPI_PROC_NULL as for left_ranks).
          */
         explicit CartesianCommunicator(const Parent_t & parent,
                                        const DynGridIndex & nb_subdivisions,
@@ -133,8 +133,9 @@ namespace muGrid {
         //! does not take ownership of it (only the original frees it).
         CartesianCommunicator(const CartesianCommunicator & other);
 
-        // NB: the base Communicator has a non-virtual destructor, so this is a
-        // new virtual destructor rather than an override.
+        // NB: the serial stub Communicator has a non-virtual destructor, so
+        // this is declared `virtual` rather than `override` (with MPI it
+        // overrides the base class's virtual destructor).
         virtual ~CartesianCommunicator();
 
         /**
@@ -170,11 +171,15 @@ namespace muGrid {
         /**
          * @brief Send data to the right neighbor; receive from the left.
          *
-         * @details Performs a synchronous send-receive operation using MPI
-         * derived types to handle non-contiguous memory layouts. Data is sent
+         * @details Performs a blocking MPI_Sendrecv of the strided region
+         * nb_send_blocks x send_block_len (block pitch block_stride). On host
+         * memory the region is described by an MPI vector datatype; device
+         * memory is packed into contiguous staging buffers first (see
+         * sendrecv_staged). Data is sent
          * to the right neighbor (higher coordinate) and received from the left
-         * neighbor (lower coordinate) in the specified spatial dimension. The
-         * MPI derived type efficiently describes strided block data.
+         * neighbor (lower coordinate) in the specified spatial dimension. When
+         * MPI is not initialised, or this rank is its own neighbor in
+         * `direction`, the exchange is a local strided copy.
          *
          * @param direction The spatial dimension in which to communicate
          *                  (0 <= direction < spatial_dim).
@@ -183,24 +188,27 @@ namespace muGrid {
          * @param nb_send_blocks Number of blocks to send.
          * @param send_block_len Length of each contiguous block to send
          *                       (in elements).
-         * @param send_offset Offset of the first block in the send buffer
-         *                    (in blocks, computed as offset *
-         * stride_in_direction).
+         * @param send_offset Index of the first slice (normal to
+         *                    `direction`) to send; the first sent element
+         *                    is at element offset
+         *                    send_offset * stride_in_direction from `data`.
          * @param nb_recv_blocks Number of blocks to receive.
          * @param recv_block_len Length of each contiguous block to receive
          *                       (in elements).
-         * @param recv_offset Offset of the first block in the receive buffer
-         *                    (in blocks, computed as offset *
-         * stride_in_direction).
+         * @param recv_offset Index of the first slice (normal to
+         *                    `direction`) to receive into; the first
+         *                    received element is at element offset
+         *                    recv_offset * stride_in_direction from `data`.
          * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in the communication direction
          *                            (in elements).
          * @param elem_size_in_bytes Size of each element in bytes.
          * @param type_desc TypeDescriptor identifying the element type. Used
-         *                  for MPI type conversion; ignored in serial mode.
-         * @param is_device_memory If true, data resides on GPU device memory.
-         *                         Used in serial mode to select appropriate
-         *                         memory copy method (CUDA/HIP for GPU).
+         *                  for MPI type conversion; ignored by the local copy.
+         * @param is_device_memory If true, data resides on GPU device memory;
+         *                         selects the device copy kernel for the
+         *                         local path and contiguous staging for the
+         *                         MPI path.
          */
         void sendrecv_right(int direction, Index_t block_stride,
                             Index_t nb_send_blocks, Index_t send_block_len,
@@ -214,11 +222,15 @@ namespace muGrid {
         /**
          * @brief Send data to the left neighbor; receive from the right.
          *
-         * @details Performs a synchronous send-receive operation using MPI
-         * derived types to handle non-contiguous memory layouts. Data is sent
+         * @details Performs a blocking MPI_Sendrecv of the strided region
+         * nb_send_blocks x send_block_len (block pitch block_stride). On host
+         * memory the region is described by an MPI vector datatype; device
+         * memory is packed into contiguous staging buffers first (see
+         * sendrecv_staged). Data is sent
          * to the left neighbor (lower coordinate) and received from the right
-         * neighbor (higher coordinate) in the specified spatial dimension. The
-         * MPI derived type efficiently describes strided block data.
+         * neighbor (higher coordinate) in the specified spatial dimension. When
+         * MPI is not initialised, or this rank is its own neighbor in
+         * `direction`, the exchange is a local strided copy.
          *
          * @param direction The spatial dimension in which to communicate
          *                  (0 <= direction < spatial_dim).
@@ -227,24 +239,27 @@ namespace muGrid {
          * @param nb_send_blocks Number of blocks to send.
          * @param send_block_len Length of each contiguous block to send
          *                       (in elements).
-         * @param send_offset Offset of the first block in the send buffer
-         *                    (in blocks, computed as offset *
-         * stride_in_direction).
+         * @param send_offset Index of the first slice (normal to
+         *                    `direction`) to send; the first sent element
+         *                    is at element offset
+         *                    send_offset * stride_in_direction from `data`.
          * @param nb_recv_blocks Number of blocks to receive.
          * @param recv_block_len Length of each contiguous block to receive
          *                       (in elements).
-         * @param recv_offset Offset of the first block in the receive buffer
-         *                    (in blocks, computed as offset *
-         * stride_in_direction).
+         * @param recv_offset Index of the first slice (normal to
+         *                    `direction`) to receive into; the first
+         *                    received element is at element offset
+         *                    recv_offset * stride_in_direction from `data`.
          * @param data Base address of the data buffer.
          * @param stride_in_direction Stride in the communication direction
          *                            (in elements).
          * @param elem_size_in_bytes Size of each element in bytes.
          * @param type_desc TypeDescriptor identifying the element type. Used
-         *                  for MPI type conversion; ignored in serial mode.
-         * @param is_device_memory If true, data resides on GPU device memory.
-         *                         Used in serial mode to select appropriate
-         *                         memory copy method (CUDA/HIP for GPU).
+         *                  for MPI type conversion; ignored by the local copy.
+         * @param is_device_memory If true, data resides on GPU device memory;
+         *                         selects the device copy kernel for the
+         *                         local path and contiguous staging for the
+         *                         MPI path.
          */
         void sendrecv_left(int direction, Index_t block_stride,
                            Index_t nb_send_blocks, Index_t send_block_len,
@@ -329,8 +344,11 @@ namespace muGrid {
          * @brief Send to right neighbor, receive from left and accumulate (add).
          *
          * @details Like sendrecv_right, but received values are added to the
-         * destination rather than overwriting it. This is the adjoint operation
-         * for ghost reduction in transpose operations with periodic BCs.
+         * destination rather than overwriting it: with r the received region
+         * and y the destination, y <- y + r. Pairing a copy step x_g <- x_s of
+         * sendrecv_left with this accumulate in the opposite direction gives
+         * its transpose x_s <- x_s + x_g, which is the building block of
+         * CartesianDecomposition::reduce_ghosts.
          *
          * @param direction The spatial dimension in which to communicate.
          * @param block_stride Stride to the next block.
@@ -358,8 +376,9 @@ namespace muGrid {
          * @brief Send to left neighbor, receive from right and accumulate (add).
          *
          * @details Like sendrecv_left, but received values are added to the
-         * destination rather than overwriting it. This is the adjoint operation
-         * for ghost reduction in transpose operations with periodic BCs.
+         * destination rather than overwriting it (y <- y + r); the transposed
+         * counterpart of a sendrecv_right copy step, used by
+         * CartesianDecomposition::reduce_ghosts.
          *
          * @param direction The spatial dimension in which to communicate.
          * @param block_stride Stride to the next block.
@@ -397,11 +416,13 @@ namespace muGrid {
 
 #ifdef WITH_MPI
         //! Ranks of the left neighbors (lower coordinate) in each dimension.
-        //! Uses MPI_PROC_NULL for periodic boundaries.
+        //! The topology built by MPI_Cart_create is periodic, so these wrap
+        //! around; MPI_PROC_NULL means "no neighbor" (only before topology
+        //! creation or when passed explicitly to the second constructor).
         std::vector<int> left_ranks;
 
         //! Ranks of the right neighbors (higher coordinate) in each dimension.
-        //! Uses MPI_PROC_NULL for periodic boundaries.
+        //! Periodic wrap and MPI_PROC_NULL as for left_ranks.
         std::vector<int> right_ranks;
 
         //! Whether this object owns (and must free) the MPI communicator. Only

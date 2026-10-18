@@ -1,5 +1,5 @@
 /**
- * @file   convolution_operator_device.cc
+ * @file   generic_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -81,7 +81,8 @@ namespace muGrid {
         const auto params = this->compute_traversal_params<DefaultDeviceSpace::storage_order>(
             collection, nb_nodal_components, nb_quad_components, false);
 
-        // Ensure device sparse operator is cached (copies from host if needed)
+        // Ensure the device sparse operator is cached (built on the host with
+        // device storage-order indices and copied over on a cache miss)
         this->get_device_apply_operator<DefaultDeviceSpace>(
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
             nb_nodal_components);
@@ -152,7 +153,8 @@ namespace muGrid {
         const auto params = this->compute_traversal_params<DefaultDeviceSpace::storage_order>(
             collection, nb_nodal_components, nb_quad_components, true);
 
-        // Ensure device sparse operator is cached (copies from host if needed)
+        // Ensure the device sparse operator is cached (built on the host with
+        // device storage-order indices and copied over on a cache miss)
         this->get_device_transpose_operator<DefaultDeviceSpace>(
             collection.get_nb_subdomain_grid_pts_with_ghosts(),
             nb_nodal_components);

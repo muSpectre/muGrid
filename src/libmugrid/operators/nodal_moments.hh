@@ -22,13 +22,14 @@
  *
  * Why it is one fused pass
  * ------------------------
- * Evaluated in array-at-a-time form, this computation materialises the
- * interpolant at every quadrature point of every cell at once -- for the
- * 3x3x3 rule a 27-fold copy of the grid, plus a temporary per term of the
- * polynomial. That is what makes the host implementation cost two orders of
- * magnitude more memory than the solver it regularises. Here every quadrature
- * point is an intermediate consumed in registers and the pass is O(1) in
- * scratch memory.
+ * Evaluated in array-at-a-time form (e.g. with NumPy), this computation
+ * materialises the interpolant at every quadrature point of every cell at
+ * once -- for the 3x3x3 rule a 27-fold copy of the grid, plus a temporary per
+ * term of the polynomial, far more memory than the solver it regularises.
+ * Here every quadrature point is an intermediate consumed in registers and
+ * the pass is O(1) in scratch memory. Arithmetic cost is
+ * O(2^Dim · NbQuad · NbNodes) per node (each cell is evaluated once per
+ * corner; see the kernels).
  *
  * Layout
  * ------
@@ -141,10 +142,19 @@ namespace muGrid {
      * @brief Cell moments ∫_e rho^k dx (k = 2, 3, 4) of a nodal scalar field
      *        and their nodal gradients, in one fused pass.
      *
-     * Q1 elements only: the rule is the 3-point-per-axis tensor Gauss rule of
-     * MomentQuadrature, exact for the quartic integrand. The simplex
-     * interpolant is only piecewise linear over the cell, so it needs the
-     * closed form rather than a cell-level rule (see MomentQuadrature).
+     * For each cell e and k = 2, 3, 4,
+     *
+     *     M_k(e) = ∫_e rho^k dx = V Σ_q w_q rho_q^k,  rho_q = Σ_n N_n(x_q) rho_n,
+     *
+     * and for each node i the gradient of Σ_e M_k(e),
+     *
+     *     ∂/∂rho_i Σ_e M_k(e) = V Σ_{e ∋ i} Σ_q w_q k rho_q^(k-1) N_i(x_q),
+     *
+     * with V = h_x h_y [h_z]. The element (FEMElementKind) selects the rule
+     * of MomentQuadrature: for Q1 the 3-point-per-axis tensor Gauss rule,
+     * for P1 a Gauss-Jacobi rule on each sub-simplex (the simplex
+     * interpolant is only piecewise linear over the cell). Both are exact
+     * for the quartic integrand.
      */
     template <Dim_t Dim>
     class NodalMomentOperator {
@@ -164,6 +174,10 @@ namespace muGrid {
          *
          * Only the cell volume enters: the moments integrate a function of the
          * interpolant, which carries no derivative and hence no 1/h factors.
+         *
+         * @param grid_spacing Positive spacing h_d per axis
+         * @param element      Element family (default Q1)
+         * @throws RuntimeError if a spacing is not positive
          */
         explicit NodalMomentOperator(
             const std::array<Real, Dim> & grid_spacing,
@@ -313,9 +327,9 @@ namespace muGrid {
          *    whole (ghosted) grid apart, which is what makes a warp's access
          *    to one component contiguous.
          *
-         * A scalar field is identical under both, which is why a kernel can
-         * look correct on a 1-component input and scatter its multi-component
-         * output. @p aos selects the layout.
+         * A scalar field is identical under both, so a kernel that used the
+         * wrong layout would be correct on a 1-component input yet scramble
+         * its multi-component output. @p aos selects the layout.
          */
         struct Strides {
             std::array<Index_t, Dim> spatial;

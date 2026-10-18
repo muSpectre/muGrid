@@ -5,6 +5,10 @@
 #include "collection/field_collection_global.hh"
 
 namespace muGrid {
+    //! Abstract interface of a domain decomposition with ghost layers:
+    //! communicate_ghosts() fills ghost entries from their owners (a linear
+    //! map G) and reduce_ghosts() applies its transpose G^T. See
+    //! CartesianDecomposition for the concrete operators.
     class Decomposition {
        public:
         Decomposition() = default;

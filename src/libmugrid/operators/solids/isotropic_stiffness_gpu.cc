@@ -1,11 +1,22 @@
 /**
- * @file   isotropic_stiffness_operator_gpu.cc
+ * @file   isotropic_stiffness_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   31 Dec 2025
  *
  * @brief  GPU (CUDA/HIP) implementation of fused isotropic stiffness operator
+ *
+ * Device counterparts of the host kernels in isotropic_stiffness_{2,3}d.cc:
+ * K u (per-pixel and uniform Lamé), macro RHS, stress integral, diag(K) and
+ * sensitivity contractions. Device fields are SoA ([d][x][y][z], component
+ * stride = number of nodes), so consecutive threads along x read consecutive
+ * addresses for every DOF component (coalesced loads). Assembly is a per-node
+ * gather (one thread per node), so no kernel needs atomics; block-level
+ * synchronisation is used only for the shared-memory staging of the 3D apply
+ * and the tree reduction of the stress integral. The element matrices live in __constant__
+ * memory: all threads of a warp read the same entry in the same instruction,
+ * which the constant cache serves as a broadcast.
  *
  * Copyright © 2025 Lars Pastewka
  *
@@ -56,6 +67,9 @@ __constant__ Real d_V_2D[64];
 
 // Thread-block tile of the 3D stiffness kernel. Compile-time so the kernel can
 // size its shared-memory staging buffer; the two launchers use the same values.
+// 8·8·4 = 256 threads matches __launch_bounds__(256, 2) on the kernel; the
+// staged tile with its halo is 10·10·6 nodes × 3 DOFs (14.4 kB in double).
+// TODO: rationale for the 8×8×4 aspect ratio (vs. e.g. 8×8×8 / 16×4×4)?
 constexpr int STIFFNESS_TILE_X = 8;
 constexpr int STIFFNESS_TILE_Y = 8;
 constexpr int STIFFNESS_TILE_Z = 4;
@@ -64,11 +78,12 @@ constexpr int STIFFNESS_TILE_Z = 4;
 __constant__ Real d_G_3D[576];
 __constant__ Real d_V_3D[576];
 
-// Single-precision mirrors of the same matrices. A float32 solve reads these
-// instead of converting the double entries at every inner-loop term: the
-// conversion issues on the fp64 pipe, which is a fraction of the fp32 rate on
-// most GPUs, and dominated the kernel's run time (measured ~1300 fp64
-// instructions per thread against ~2250 fp32 FMAs). Only the precision the
+// Single-precision mirrors of the same matrices, read by the float32 apply
+// kernels. Converting the double entries at every inner-loop term would issue
+// a double->float conversion on the fp64 pipe, whose throughput is a fraction
+// of the fp32 rate on most GPUs; profiling the 3D apply kernel with per-term
+// conversion counted ~1300 fp64 instructions per thread against ~2250 fp32
+// FMAs, with the conversions dominating run time. Only the precision the
 // kernel actually uses is uploaded, so this costs no extra transfer.
 __constant__ float d_G_2D_f[64];
 __constant__ float d_V_2D_f[64];
@@ -132,7 +147,9 @@ __constant__ Real d_ustar_c_3D[24];
 
 // Portable double-precision atomic add. CUDA provides a native atomicAdd for
 // double only on sm_60+; the TITAN X (Maxwell, sm_52) and any HIP target use
-// the standard compare-and-swap fallback.
+// the standard compare-and-swap fallback. Not called by the kernels in this
+// file: assembly is a gather and the stress integral is a two-pass reduction,
+// so none of them needs atomics.
 __device__ inline double mugrid_atomic_add_double(double * address,
                                                   double val) {
 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 600)
@@ -159,8 +176,14 @@ __device__ inline double mugrid_atomic_add_double(double * address,
  * @brief 2D isotropic stiffness kernel using gather pattern
  *
  * Each thread computes the force at one NODE by gathering contributions from
- * all neighboring elements (up to 4 pixels share each node). This avoids
- * atomic operations entirely.
+ * the 4 pixels (elements) that share it. Every output is written by exactly
+ * one thread, so no atomics are needed:
+ *   f_n = α Σ_{e ∋ n} Σ_c (2μ_e G + λ_e V)[r(n,e)·2 + i][c] u_e[c],
+ * with r(n,e) the local index of node n in element e. Ghost layers (one per
+ * side) supply the neighbours at the subdomain boundary.
+ *
+ * Launch: 2D grid of 16×16 blocks, one thread per computable node.
+ * TODO: rationale for the 16×16 block shape?
  *
  * For a node at (ix, iy), the neighboring elements are:
  *   - Element (ix-1, iy-1): this node is local node 3 (corner 1,1)
@@ -275,8 +298,9 @@ __global__ void isotropic_stiffness_2d_kernel(
  * @brief 3D isotropic stiffness kernel using gather pattern
  *
  * Each thread computes the force at one NODE by gathering contributions from
- * all neighboring elements (up to 8 voxels share each node). This avoids
- * atomic operations entirely.
+ * the 8 voxels (elements) that share it; every output is written by exactly
+ * one thread, so no atomics are needed. Per node this is 8 elements × 3 rows
+ * × 24 columns of K_e = 2μ_e G + λ_e V, i.e. 576 multiply-adds per matrix.
  *
  * For a node at (ix, iy, iz), the neighboring elements are the 8 voxels
  * at positions (ix+ox, iy+oy, iz+oz) where ox, oy, oz ∈ {-1, 0}.
@@ -558,11 +582,13 @@ constexpr int AVERAGE_BLOCK_SIZE = 256;
 // the Dim*Dim components in shared memory and writes one partial sum per block
 // per component into `partial` (laid out [comp][block]). A second pass
 // (isotropic_stiffness_average_final_kernel) sums the partials. This mirrors the
-// CG dot-product reductions in linalg_gpu.cc and replaces the previous global
-// atomic accumulation, whose contention on the Dim*Dim accumulators serialised
-// catastrophically on HIP (which has no native fp64 atomicAdd fast path, so it
-// fell back to a compare-and-swap spin loop). `partial` is *not* scaled by the
-// element volume here -- the host does that after the final reduction.
+// CG dot-product reductions in linalg_gpu.cc. A tree reduction is used rather
+// than global atomics because all threads would contend on the same Dim*Dim
+// accumulators, which serialises the updates; on HIP, without a native fp64
+// atomicAdd fast path, each update is a compare-and-swap retry loop. The
+// result is also deterministic for a fixed launch shape, unlike an atomic sum
+// whose order varies between runs. `partial` is *not* scaled by the element volume here -- the
+// host does that after the final reduction.
 template <typename T>
 __global__ void isotropic_stiffness_2d_average_kernel(
     const T * __restrict__ displacement, const T * __restrict__ lambda,
@@ -904,10 +930,10 @@ namespace isotropic_stiffness_kernels {
  * Grow-only device scratch for the two-pass average reduction: per-block
  * partial sums followed by the final NCOMP-sized result.
  *
- * Allocating this on every call cost a cudaMalloc/cudaFree pair per average
- * and, worse, bypassed device_allocate(), so with an external allocator
- * registered (e.g. use_cupy_allocator) these bytes came from a second owner
- * on the device. Same contract as reduction_scratch in linalg_gpu.cc: each
+ * The buffer is cached so that a call does not pay a device malloc/free
+ * pair, and it is obtained through device_allocate() so that an external
+ * allocator registered with muGrid (e.g. use_cupy_allocator) owns all device
+ * memory. Same contract as reduction_scratch in linalg_gpu.cc: each
  * average ends in a blocking device->host copy, so the buffer is free again
  * when the call returns; it is never freed (process-lifetime cache). Not
  * thread-safe, matching muGrid's single-threaded host call sites.
@@ -926,12 +952,13 @@ Real * average_scratch(Index_t n_reals) {
     return ptr;
 }
 
-// The geometry matrices (Gu/Vu/Dbar/E_macro) stay in double __constant__
+// The geometry matrices (Gu/Vu/Dbar/E_macro/u*) stay in double __constant__
 // memory — uploaded as `const Real*` regardless of T — and are cast to T
-// inside the kernels. The stiffness matrices G/V, which the hot kernels read
+// inside the kernels. The stiffness matrices G/V, which the apply kernels read
 // once per inner-loop term, are instead uploaded in the kernel's working
-// precision by the two helpers below. Only the field data and the per-element
-// arithmetic are templated on T.
+// precision by the two helpers below. (The sensitivity launchers upload G/V in
+// double to d_G_*/d_V_* and the kernels cast per term.) Only the field data
+// and the per-element arithmetic are templated on T.
 
 // Upload G/V in working precision T. Called before every launch because the
 // matrices depend on the operator's grid_spacing, so a one-shot upload would
@@ -1335,7 +1362,8 @@ void IsotropicStiffnessOperator<2>::apply_impl(
     Index_t mat_ghost_offset_x = STENCIL_LEFT;
     Index_t mat_ghost_offset_y = STENCIL_LEFT;
 
-    // GPU uses SoA layout: [d, x, y]
+    // GPU uses SoA layout: [d, x, y] (component stride nx·ny, unit x-stride),
+    // so adjacent threads along x access adjacent addresses (coalesced).
     Index_t disp_stride_d = nx * ny;
     Index_t disp_stride_x = 1;
     Index_t disp_stride_y = nx;

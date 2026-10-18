@@ -49,12 +49,31 @@ namespace muGrid {
          *        axis, batched over independent Fourier modes.
          *
          * Solves `T x = rhs` where, for each mode, `T` is block-tridiagonal
-         * with constant coupling blocks `A0` (super) and `A2` (sub) and
-         * pre-factorised diagonal inverses. This is the host counterpart of the
-         * fused device kernel, and exists because the elementwise alternative
-         * issues four batched matrix products per plane: each of those streams
-         * the whole mode array, so a solve costs `4 * nz` passes over memory
-         * where this costs two.
+         * (non-periodic along the axis) with `Dim x Dim` blocks,
+         *
+         *     A2 x_{k-1} + B x_k + A0 x_{k+1} = rhs_k,   k = 0 .. nz-1,
+         *
+         * (terms with `k-1 < 0` or `k+1 >= nz` absent) with constant coupling
+         * blocks `A0` (super) and `A2` (sub). The caller supplies the block LU
+         * factorisation as the inverses `Dinv_k = D_k^-1` of the Schur
+         * complements `D_0 = B`, `D_k = B - A2 D_{k-1}^-1 A0`. Because the
+         * blocks are constant this recurrence tends to a fixed point, which
+         * is what lets `head` store only its first `nb_head` planes. The sweep
+         * is then
+         *
+         *     forward:  y_0 = rhs_0,  y_k = rhs_k - A2 Dinv_{k-1} y_{k-1}
+         *     backward: x_{nz-1} = Dinv_{nz-1} y_{nz-1},
+         *               x_k = Dinv_k (y_k - A0 x_{k+1}),
+         *
+         * i.e. block Gaussian elimination without pivoting, which is stable
+         * when the factorisation it is given exists and is well conditioned
+         * (e.g. for Hermitian positive definite `T`). Cost is O(nz * nb_modes
+         * * Dim^2) with two passes over the `(nz, nb_modes, Dim)` arrays.
+         *
+         * This is the host counterpart of the fused device kernel, and exists
+         * because the elementwise alternative issues four batched matrix
+         * products per plane: each of those streams the whole mode array, so
+         * a solve costs `4 * nz` passes over memory where this costs two.
          *
          * **Loop order differs from the device deliberately.** The device
          * assigns one thread per mode and marches the axis in registers, so its
@@ -67,7 +86,7 @@ namespace muGrid {
          *
          * @tparam Dim block size (2 or 3); compile-time so the inner products
          *         unroll
-         * @tparam T  real scalar type of the complex entries
+         * @tparam T  real scalar type of the complex entries (Real or Real32)
          *
          * @param rhs       `(nz, nb_modes, Dim)` right-hand side
          * @param head      `(nb_head, nb_modes, Dim, Dim)` leading diagonal
@@ -81,6 +100,10 @@ namespace muGrid {
          * @param A0, A2    `(nb_modes, Dim, Dim)` constant coupling blocks
          * @param y         `(nz, nb_modes, Dim)` scratch for the forward sweep
          * @param out       `(nz, nb_modes, Dim)` solution
+         * @param nz        number of planes along the solved axis
+         * @param nb_modes  number of independent modes per plane
+         * @param nb_head   number of planes stored in `head` (>= 1)
+         * @param nb_exc    number of modes stored in `exc`
          */
         template <Dim_t Dim, typename T>
         void sweep(const std::complex<T> * MUGRID_RESTRICT rhs,

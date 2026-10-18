@@ -8,7 +8,7 @@ https://data-apis.org/array-api/latest/
 
 For fields with ghost regions (GlobalFieldCollection), reduction operations
 (vecdot, norm_sq) only iterate over the interior region to ensure correct
-MPI-parallel semantics. Update operations (axpy, scal, copy) operate on
+MPI-parallel semantics. Update operations (axpy, axpby, scal, copy) operate on
 the full buffer for efficiency.
 
 Note: These functions return local (process-local) results for parallel
@@ -182,8 +182,9 @@ def axpy_norm_sq(alpha, x, y):
 
     This fused operation computes both the AXPY update and the squared norm
     of the result in a single pass through memory. More efficient than
-    separate axpy() + norm_sq() calls because:
-    - axpy + norm_sq: 2 reads of x, 2 reads of y, 1 write of y
+    separate axpy() + norm_sq() calls because of the memory traffic:
+
+    - axpy + norm_sq: 1 read of x, 2 reads of y, 1 write of y
     - axpy_norm_sq:   1 read of x, 1 read of y, 1 write of y
 
     Parameters

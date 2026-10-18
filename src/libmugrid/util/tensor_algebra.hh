@@ -346,8 +346,9 @@ namespace muGrid {
     }
 
     //! compile-time fourth-order deviatoric projector (symmetric part minus
-    //! the spherical part); the name is historical. The spherical part is
-    //! tr/dim -- it was hard-coded to 1/3, correct only in 3D.
+    //! the spherical part), Isymm - (1/dim) I (x) I; despite its name it is
+    //! not the antisymmetric projector. The 1/dim factor makes the spherical
+    //! part the projector onto tr(A)/dim I in any dimension.
     template <Dim_t dim>
     constexpr inline Tens4_t<dim> Iasymm() {
       return Matrices::Isymm<dim>() - (1.0 / dim) * Matrices::Itrac<dim>();

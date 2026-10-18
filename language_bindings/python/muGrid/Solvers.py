@@ -1,5 +1,27 @@
 """
-Collection of simple parallel solvers
+Matrix-free, MPI-parallel Krylov solvers for symmetric positive definite
+systems :math:`A x = b` on muGrid fields.
+
+Both solvers take the operator as a callable ``hessp(input, output)`` that
+writes :math:`A p` and an optional preconditioner ``prec(input, output)``
+that writes :math:`M r` with :math:`M \\approx A^{-1}` symmetric positive
+definite. Vector updates go through :mod:`muGrid.linalg` (host or device);
+global inner products are local reductions summed with ``comm.sum``.
+
+Convergence is declared on the true residual :math:`r = b - A x`,
+
+.. math::
+
+    \\|b - A x\\|_2 \\le \\max(\\mathrm{rtol}\\,\\|b\\|_2,\\; \\mathrm{atol}),
+
+never on the recursively updated residual alone, because the recurrence
+drifts from :math:`b - A x` by rounding and in single precision that drift
+reaches the order of the tolerance.
+
+- :func:`conjugate_gradients` -- standard preconditioned CG.
+- :func:`conjugate_gradients_pipelined` -- Ghysels--Vanroose pipelined CG
+  with one (non-blocking) global reduction per iteration and residual
+  replacement.
 """
 
 import itertools
@@ -13,9 +35,9 @@ from . import linalg
 class ConvergenceError(RuntimeError):
     """
     Raised when an iterative solver fails to converge. Subclasses
-    ``RuntimeError`` for backwards compatibility; catching it specifically
-    avoids masking unrelated runtime errors (e.g. out-of-memory) as
-    non-convergence.
+    ``RuntimeError``, so handlers written for ``RuntimeError`` also catch
+    it; catching it specifically avoids masking unrelated runtime errors
+    (e.g. out-of-memory) as non-convergence.
     """
 
 
@@ -140,11 +162,49 @@ def conjugate_gradients(
         residual=None,
 ):
     """
-    Conjugate gradient method for matrix-free solution of the linear problem
-    Ax = b, where A is represented by the function hessp (which computes the
-    product of A with a vector). The method iteratively refines the solution
-    x until the residual satisfies ``||b - Ax|| <= max(rtol * ||b||, atol)``
-    or until maxiter iterations are reached.
+    Preconditioned conjugate gradients (Hestenes--Stiefel) for the
+    matrix-free solution of :math:`A x = b` with :math:`A` symmetric positive
+    definite, given only through ``hessp``.
+
+    Starting from :math:`r_0 = b - A x_0`, :math:`z_0 = M r_0`,
+    :math:`p_0 = z_0`, each iteration computes
+
+    .. math::
+
+        \\alpha_k = \\frac{r_k^T z_k}{p_k^T A p_k},\\quad
+        x_{k+1} = x_k + \\alpha_k p_k,\\quad
+        r_{k+1} = r_k - \\alpha_k A p_k,
+
+        z_{k+1} = M r_{k+1},\\quad
+        \\beta_k = \\frac{r_{k+1}^T z_{k+1}}{r_k^T z_k},\\quad
+        p_{k+1} = z_{k+1} + \\beta_k p_k .
+
+    In exact arithmetic the iterate minimises the :math:`A`-norm of the
+    error over the Krylov space
+    :math:`\\mathcal{K}_k(MA, M r_0)`, and the error contracts at least as
+
+    .. math::
+
+        \\|x_k - x^*\\|_A \\le 2 \\left(
+        \\frac{\\sqrt{\\kappa} - 1}{\\sqrt{\\kappa} + 1}\\right)^k
+        \\|x_0 - x^*\\|_A, \\qquad \\kappa = \\kappa(MA).
+
+    Each iteration costs one ``hessp``, one ``prec``, three global
+    reductions (:math:`p^T A p`, :math:`r^T r` fused into the residual
+    update, :math:`r^T z`) and four vector updates. Without a preconditioner
+    :math:`z` is aliased to :math:`r`, so four work fields are allocated with
+    and three without.
+
+    When the recursive residual meets the tolerance, the true residual
+    :math:`b - A x` is recomputed (one extra ``hessp``). If it meets the
+    tolerance the solve returns; otherwise CG restarts from it
+    (:math:`p = M(b - Ax)`), and if the true residual has not decreased since
+    the previous such check, the attainable accuracy for the working
+    precision has been reached and :class:`ConvergenceError` is raised.
+
+    The work fields take the dtype of `b`, so a float32 right-hand side gives
+    a single-precision solve throughout; for float32, a `rtol` below
+    :data:`FLOAT32_RTOL_FLOOR` triggers a :class:`RuntimeWarning`.
 
     Parameters
     ----------
@@ -153,31 +213,38 @@ def conjugate_gradients(
     fc : muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or
          muGrid.CartesianDecomposition
         Collection for creating temporary fields used by the CG algorithm.
+        They are named ``cg#<call>-<role>`` and removed again on return.
     b : muGrid.Field
         Right-hand side vector.
     x : muGrid.Field
         Initial guess for the solution (modified in place).
     hessp : callable
-        Function that computes the product of the Hessian matrix A with a vector.
+        Function that computes the product of the matrix A with a vector.
         Signature: hessp(input_field, output_field) where both are muGrid.Field.
     prec : callable, optional
-        Function that applies the preconditioner P to a vector r: z = P*r.
+        Function that applies the preconditioner M to a vector r: z = M r.
         Signature: prec(input_field, output_field) where both are muGrid.Field.
-        If None, no preconditioning is applied (P is identity).
+        M must be symmetric positive definite. If None, no preconditioning is
+        applied (M is the identity).
     tol : float, optional
-        Deprecated alias for `atol`. Passing it restores the historic,
-        purely absolute criterion ``||b - Ax|| < tol`` (it also sets
-        ``rtol = 0`` unless `rtol` is given explicitly). Use `rtol`/`atol`
-        instead.
+        Deprecated alias for `atol`, which selects the purely absolute
+        criterion ``||b - Ax|| <= tol`` (it also sets ``rtol = 0`` unless
+        `rtol` is given explicitly) and emits a :class:`DeprecationWarning`.
+        Use `rtol`/`atol` instead.
     maxiter : int, optional
         Maximum number of iterations. The default is 1000.
     callback : callable, optional
-        Function to call after each iteration with signature:
-        callback(iteration, state_dict) where state_dict contains:
+        Function called once before the first iteration (with iteration 0)
+        and after each iteration, with signature
+        ``callback(iteration, state_dict)`` where state_dict contains:
+
         - "x": solution field
-        - "r": residual field
+        - "r": residual field (recursive)
         - "p": search direction field
-        - "rr": squared residual norm (float)
+        - "z": preconditioned residual field (the same field as "r" when
+          `prec` is None)
+        - "rr": global squared residual norm :math:`r^T r`
+        - "rz": global inner product :math:`r^T z`
     timer : muGrid.Timer, optional
         Timer object for performance profiling. If provided, the solver will
         record timing for the individual solver operations (Hessian-vector
@@ -235,8 +302,8 @@ def conjugate_gradients(
 
     # Without a preconditioner, the preconditioned residual z is identically r,
     # so alias z onto r and skip the apply instead of allocating (and copying
-    # into) a fourth full work vector. This removes dim doubles/voxel -- the
-    # largest remaining term once the strain/stress fields are gone.
+    # into) a fourth full work vector. This saves one value per degree of
+    # freedom of memory and one vector copy per iteration.
     unpreconditioned = prec is None
     if unpreconditioned:
         def prec(src, dst):  # z is aliased to r; nothing to apply
@@ -318,8 +385,8 @@ def conjugate_gradients(
                 # exactly like slow convergence. p^T A p is formed directly from
                 # p, so for a positive definite operator it is positive; zero or
                 # negative means the operator is singular along p or indefinite.
-                # CG on an indefinite operator does not converge to the solution
-                # (it ran 17,529 iterations without an error before this check).
+                # CG on an indefinite operator does not converge to the solution;
+                # without this check it would iterate silently up to maxiter.
                 pAp_val = float(pAp)
                 _reject_non_finite(pAp_val, "the curvature p^T A p", iteration,
                                    dtype, "conjugate_gradients")
@@ -386,8 +453,9 @@ def conjugate_gradients(
                 if next_rr_val <= tol_sq:
                     # The recursive residual says converged; only the true one
                     # may decide. The recurrence drifts from b - Ax by rounding,
-                    # and in float32 the drift reaches the tolerance: asked for
-                    # 1e-5 it returned at a true residual of 1.01e-5. One
+                    # and in float32 the drift reaches the tolerance (measured:
+                    # stopping on the recursive residual at rtol 1e-5 left a
+                    # true relative residual of 1.01e-5). One
                     # operator apply; on failure CG restarts from the true
                     # residual, and raises once that stops decreasing.
                     with timed("true_residual"):
@@ -471,26 +539,52 @@ def conjugate_gradients_pipelined(
     PROTOTYPE. Drop-in replacement for :func:`conjugate_gradients` with the same
     signature and semantics, but reorganised so that the per-iteration inner
     products are merged into a **single global reduction**, instead of the three
-    (``dot_pAp``, ``dot_rr``, ``dot_rz``) that standard PCG performs.
+    (:math:`p^T A p`, :math:`r^T r`, :math:`r^T z`) that standard PCG performs.
 
-    Standard PCG has the dot products on the critical path: you must finish one
-    reduction to form a scalar before the next vector/reduction can be computed.
-    The pipelined formulation introduces auxiliary recurrences (``z, q, s, p``)
-    so that the two coupling inner products ``(r, u)`` and ``(w, u)`` — plus the
-    residual norm used for convergence — can be computed together, and the
-    matrix-vector product ``n = A m`` and preconditioner apply ``m = M⁻¹ w`` of
-    the *next* step no longer depend on that reduction's result.
+    Standard PCG has the inner products on the critical path: each reduction
+    must complete to form a scalar before the next vector update can start.
+    The pipelined formulation carries the images of the search direction as
+    auxiliary recurrences. With :math:`u = M r`, :math:`w = A u`,
+    :math:`m = M w`, :math:`n = A m`, :math:`s = A p`, :math:`q = M s` and
+    :math:`z = A q`, iteration :math:`k` computes
+
+    .. math::
+
+        \\gamma_k = r_k^T u_k,\\quad \\delta_k = w_k^T u_k,\\quad
+        \\beta_k = \\gamma_k / \\gamma_{k-1},\\quad
+        \\alpha_k = \\frac{\\gamma_k}
+                         {\\delta_k - \\beta_k \\gamma_k / \\alpha_{k-1}},
+
+        z_k = n_k + \\beta_k z_{k-1},\\quad
+        q_k = m_k + \\beta_k q_{k-1},\\quad
+        s_k = w_k + \\beta_k s_{k-1},\\quad
+        p_k = u_k + \\beta_k p_{k-1},
+
+        x_{k+1} = x_k + \\alpha_k p_k,\\quad
+        r_{k+1} = r_k - \\alpha_k s_k,\\quad
+        u_{k+1} = u_k - \\alpha_k q_k,\\quad
+        w_{k+1} = w_k - \\alpha_k z_k,
+
+    with :math:`\\beta_k = 0`, :math:`\\alpha_k = \\gamma_k/\\delta_k` on the
+    first iteration and after every restart. In exact arithmetic the
+    iterates are those of :func:`conjugate_gradients`. The three scalars
+    :math:`\\gamma_k`, :math:`\\delta_k` and :math:`r_k^T r_k` come from one
+    fused kernel and one non-blocking allreduce (``comm.isum``), and the
+    applies :math:`m_k = M w_k`, :math:`n_k = A m_k` do not depend on them,
+    so they run while the reduction is in flight.
 
     Cost per iteration vs. standard PCG:
-      - reductions:        1 (combined)        vs. 3
-      - operator applies:  1 (``A m``)         vs. 1
-      - preconditioner:    1 (``M⁻¹ w``)       vs. 1
-      - vector updates:    8 axpy/axpby        vs. ~4
 
-    i.e. it trades a few extra cheap vector updates for two fewer
-    synchronisations — a win when reductions are latency-bound (MPI allreduce at
-    high rank counts, or the blocking device->host copy on the GPU once the
-    inner products are fused into one kernel).
+    - reductions:        1 (combined, overlapped) vs. 3
+    - operator applies:  1 (:math:`A m`)          vs. 1
+    - preconditioner:    1 (:math:`M w`)          vs. 1
+    - vector updates:    8 axpy/axpby             vs. ~4
+    - work fields:       9                        vs. 4
+
+    i.e. it trades extra vector updates and memory for two fewer
+    synchronisations -- a gain when reductions are latency-bound (MPI
+    allreduce at high rank counts, or the blocking device->host copy on the
+    GPU).
 
     Reference: P. Ghysels and W. Vanroose, *Hiding global synchronization
     latency in the preconditioned Conjugate Gradient algorithm*, Parallel
@@ -499,21 +593,22 @@ def conjugate_gradients_pipelined(
     The residual, preconditioned residual and operator images are advanced by
     recurrence rather than recomputed, and in this formulation the rounding
     errors of those recurrences are *amplified* rather than merely accumulated
-    (Cools et al., SIAM J. Matrix Anal. Appl. 39 (2018) 426). Left alone, the
-    recursive residual keeps shrinking while the true residual ``b - Ax``
-    stalls orders of magnitude above it -- at condition number 1e6 and
-    ``rtol=1e-8`` it stopped at a true relative residual of 5e-5 -- and in
-    float32 it diverges outright. Two safeguards keep the result honest:
+    (Cools et al., SIAM J. Matrix Anal. Appl. 39 (2018) 426). Without
+    safeguards the recursive residual keeps shrinking while the true residual
+    ``b - Ax`` stalls orders of magnitude above it (measured: at condition
+    number 1e6 and ``rtol=1e-8`` it stopped at a true relative residual of
+    5e-5), and in float32 it diverges. Two safeguards bound the error:
 
     - **Residual replacement** (Cools et al., 2018): every
       `replacement_interval` iterations the recurrence vectors are recomputed
-      from their definitions (``r = b - Ax``, ``u = M⁻¹r``, ``w = Au``,
-      ``s = Ap``, ``q = M⁻¹s``, ``z = Aq``), which resets the gap between the
+      from their definitions (``r = b - Ax``, ``u = M r``, ``w = Au``,
+      ``s = Ap``, ``q = M s``, ``z = Aq``), which resets the gap between the
       recursive and the true residual, at the cost of four operator and two
-      preconditioner applies. If the gap had grown beyond a factor of two in
-      the residual norm, the search direction is discarded as well and CG
-      restarts from the true residual: keeping a direction built from badly
-      drifted recurrences was seen to stall the solve.
+      preconditioner applies. If the true and recursive residual norms differ
+      by more than a factor of two, the search direction is discarded as well
+      and CG restarts from the true residual, because a direction built from
+      strongly drifted recurrences is not conjugate to the previous ones and
+      the solve stalls along it (observed in float32).
     - **True-residual check**: convergence is only declared once ``b - Ax``
       itself meets the tolerance (one extra operator apply). If it does not,
       CG restarts from the true residual; if the true residual has not
@@ -521,23 +616,40 @@ def conjugate_gradients_pipelined(
       attainable accuracy and a :class:`ConvergenceError` is raised rather
       than returning an unconverged solution.
 
-    On diagonal test operators with condition numbers 1e4-1e7 (float64,
-    ``rtol`` 1e-8-1e-10) this needs about 10% more operator applies than
-    :func:`conjugate_gradients` and reaches the same true residual.
+    A non-positive :math:`\\gamma_k` or denominator of :math:`\\alpha_k` on
+    recurrence vectors first triggers a restart from recomputed vectors
+    (where they equal :math:`r^T M r` and :math:`u^T A u` exactly); only if it
+    recurs there is the operator or preconditioner declared indefinite.
 
-    Parameters are those of :func:`conjugate_gradients`, plus:
+    Measured on diagonal test operators with condition numbers 1e4-1e7
+    (float64, ``rtol`` 1e-8-1e-10), this needs about 10% more operator applies
+    than :func:`conjugate_gradients` and reaches the same true residual.
 
+    Parameters
+    ----------
+    comm, fc, b, x, hessp, prec, tol, maxiter, timer, rtol, atol
+        As for :func:`conjugate_gradients`. Work fields are named
+        ``pcg#<call>-<role>``.
+    callback : callable, optional
+        Called as ``callback(iteration, state_dict)`` at the start of every
+        iteration, after the reduction completes, with keys "x", "r", "p",
+        "rr" (global :math:`r^T r`) and "rz" (global :math:`r^T M r`). There
+        is no ``"z"`` entry; the preconditioned residual is ``u`` here.
     replacement_interval : int, optional
         Iterations between residual replacements. The default depends on the
         precision: 50 for float64, 20 for float32, where the recurrences drift
-        apart much faster (at 50, float32 solves at condition number 1e4
-        failed to converge). ``0`` disables periodic replacement; the
+        apart faster (measured: with 50, float32 solves at condition number
+        1e4 did not converge). ``0`` disables periodic replacement; the
         true-residual check on convergence is always performed.
-
     residual : muGrid.Field, optional
         If given, the final residual ``r = b - Ax`` is copied into this field
         on (converged) return. Convergence is confirmed on the true residual,
         so this is ``b - Ax`` itself, at the cost of one field copy.
+
+    Returns
+    -------
+    x : muGrid.Field
+        Solution to the system Ax = b (same as input field x).
 
     Raises
     ------
@@ -615,11 +727,11 @@ def conjugate_gradients_pipelined(
 
             A restart discards the search direction and its images, so the next
             iteration starts CG afresh from the current iterate. `restart=None`
-            decides by the size of the drift: replacing the residual while keeping
-            a search direction built from recurrences that have drifted far from
-            the truth was seen to stall the solve (float32), so if the true
-            residual norm is off from the recursive one by more than a factor of
-            two, CG restarts instead.
+            decides by the size of the drift: a search direction built from
+            recurrences that have drifted far from the truth stalls the solve
+            when kept (observed in float32), so if the true residual norm is
+            off from the recursive one by more than a factor of two, CG
+            restarts instead.
             """
             if restart is None:
                 recursive_rr = float(comm.sum(linalg.norm_sq(r)))
@@ -694,10 +806,10 @@ def conjugate_gradients_pipelined(
 
                 # NaN means a non-positive-definite operator; an infinity means
                 # the iterate has outgrown the work fields' dynamic range. Both
-                # used to reach the recurrence below, where a non-finite delta
-                # gives alpha = 0 and the *next* iteration then divides by that
-                # zero alpha_prev -- a ZeroDivisionError raised from inside the
-                # recurrence, escaping this solver's own ConvergenceError contract.
+                # must be rejected before the recurrence below: a non-finite
+                # delta gives alpha = 0, and the *next* iteration would divide
+                # by that zero alpha_prev, raising ZeroDivisionError instead of
+                # this solver's ConvergenceError.
                 _reject_non_finite(rr, "the squared residual |r|^2", iteration,
                                    dtype, "conjugate_gradients_pipelined")
                 _reject_non_finite(delta, "the curvature w^T u", iteration, dtype,
@@ -707,8 +819,8 @@ def conjugate_gradients_pipelined(
                 if rr <= tol_sq:
                     # The recursive residual says converged; only the true one
                     # may decide. On failure CG restarts from the true residual:
-                    # the old search direction was built from the drifted
-                    # recurrences, and continuing along it was seen to stall
+                    # the current search direction was built from the drifted
+                    # recurrences, and continuing along it stalls the solve
                     # (the m, n computed above belong to the stale w and are
                     # dropped).
                     with timed("replace"):

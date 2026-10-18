@@ -42,10 +42,10 @@ namespace muGrid {
      *
      * Returns -1 if the variable is unset or empty, 1 for 1/y/yes/t/true/on
      * and 0 for 0/n/no/f/false/off (case-insensitive). Anything else throws a
-     * RuntimeError naming the variable: the switches used to look at the first
-     * character only (so "on" meant false) or only accept '1', and a value
-     * silently taken for the opposite of what was meant is how a run ends up
-     * on the wrong code path.
+     * RuntimeError naming the variable. Matching whole words rather than,
+     * say, the first character keeps "on" and "off" from being confused,
+     * and rejecting unrecognised values ensures a typo cannot silently
+     * select the opposite code path from the one requested.
      */
     int environment_flag(const char * name);
 

@@ -408,48 +408,67 @@ def make_timing_plot(configs, timing, dim, path):
 # --------------------------------------------------------------------------- #
 DOC_TEMPLATE = """# Benchmark: preconditioner
 
-Effect of the reference-material (Green's-function) preconditioner of Ladecký et
-al., Appl. Math. Comput. 446 (2023) 127835, on the [homogenization
-example](examples.md) — `-P reference` vs. `-P none`. Both use the **same fused
-matvec kernel** and are run **to convergence** (relative tolerance `{tol}`).
+## What is measured
 
-!!! info "Test machine & code version"
-    - **CPU:** {cpu}
-    - **GPU:** {gpu}
-    - **muGrid:** `{version}` — run {timestamp}
-
-Run configuration: {dim}D, single spherical inclusion, fused stiffness kernel,
-{ncases} load cases (iterations summed over all cases).
+The effect of the reference-material (Green's-function) preconditioner of
+Ladecký et al., Appl. Math. Comput. 446 (2023) 127835 (`-P reference`, see
+[Preconditioners](linalg.md#preconditioners)) on the conjugate-gradient solves
+of the [homogenization example](examples.md#homogenization)
+(`examples/homogenization.py`), compared with no preconditioner (`-P none`).
+Problem: $N^{dim}$ grid points, single spherical inclusion (radius 0.25,
+$E_\\text{{inclusion}}/E_\\text{{matrix}} = 10$, $\\nu = 0.3$), fused
+`IsotropicStiffnessOperator{dim}D` matvec in both cases, the {ncases} unit
+load cases, each solved to a relative residual of `{tol}`. Iteration counts
+are summed over the load cases; times are the example's `total_time_seconds`
+(all solves including right-hand-side assembly and stress averaging,
+excluding setup). One measurement per point.
 {precision_note}
+
+Two studies are reported:
+
+1. **CG iterations vs. grid size**, both preconditioners, on one CPU core. The
+   iteration count is a property of the operator and preconditioner, not of
+   the device or decomposition. Without preconditioner
+   $\\kappa(\\mathbf{{K}}) = O(h^{{-2}})$, so CG needs $O(N)$ iterations; with
+   the reference preconditioner $\\kappa \\le c_\\text{{max}}/c_\\text{{min}}$
+   for material data bounded by multiples of the reference, independent of
+   $N$.
+2. **Reference-preconditioned solve time vs. grid size** for the device and
+   MPI configurations of the [homogenization
+   benchmark](benchmark_homogenization.md). Each preconditioned iteration
+   applies one matvec and one forward/inverse FFT pair, so this measures the
+   per-iteration cost of the FFT engine (on the GPU and in the slab MPI
+   decomposition) together with the matvec. Each configuration is swept in
+   $N$ until the first size that runs out of memory (`OOM`); larger sizes are
+   not attempted.
+
+## Provenance
+
+{provenance}
+
+## Commands
+
+Each data point is one invocation of the example, launched by
+`examples/benchmark_homogenization_preconditioner.py` as
+
+```bash
+{commands}
+```
+
+with `N` the grid size of the column and `--json-out FILE` added to collect the
+result.
 
 ## CG iterations vs. grid size
 
-The central result: unpreconditioned CG iterations grow with the grid (the
-condition number is `O(h⁻²)`), while the reference preconditioner makes the count
-**nearly independent of grid size**. The count depends only on the operator and
-preconditioner, not the device or the MPI decomposition, so this is measured on a
-single CPU core.
-
 {iter_table}
 
-(last row: unpreconditioned ÷ reference **wall time** on one CPU core)
+(rows `none`/`reference`: CG iterations summed over the {ncases} load cases;
+last row: wall time without preconditioner ÷ wall time with the reference
+preconditioner, one CPU core)
 
 ![Iterations vs. grid size]({iter_plot})
 
-## Reference solve: device & MPI scaling
-
-This mirrors the (unpreconditioned) [homogenization
-benchmark](benchmark_homogenization.md), but for the **reference-preconditioned**
-solve: the same single-CPU-core / full-machine-MPI-CPU / single-GPU / multi-GPU
-comparison, across {dim}D grid sizes. Because the iteration count is
-grid-independent, this isolates the **per-iteration** cost — and each
-preconditioned iteration applies a forward/inverse **FFT pair**, so it is where
-the FFT-engine paths matter: the native N-D transform on the GPU, and the slab
-MPI decomposition on multi-rank runs.
-
-Each configuration is swept to the largest grid that still fits in memory: the
-first size that runs **out of memory** is recorded as `OOM` in the table and
-dropped from the plot, and larger sizes for that configuration are not attempted.
+## Reference solve: device and MPI configurations
 
 {timing_table}
 
@@ -458,18 +477,12 @@ memory)
 
 ![Reference solve time vs. grid size]({timing_plot})
 
-The preconditioner parallelises cleanly: it is applied in Fourier space by the
-FFT engine, which owns its MPI decomposition, and the per-mode block solve is
-rank-local. `-P reference` gives identical iteration counts and homogenised
-stiffness in serial and under MPI, so the single CPU core is quickly left behind
-and the largest grids are reached by MPI domain decomposition across all CPU
-cores or across several GPUs (one rank per device, round-robin).
+## Reproducing
 
-All data points live in the shared benchmark database `benchmarks/results.csv`
-(date, code version, machine, parameters, results). This page is generated by
-`examples/benchmark_homogenization_preconditioner.py`; re-render from the
-database with `--render-only`, or run a fresh measurement that appends a new
-dated row set:
+All data points are stored in `benchmarks/results.csv`. This page is generated
+by `examples/benchmark_homogenization_preconditioner.py`; `--render-only`
+re-renders it from the database, and a run without it measures and appends a
+new dated run (see `benchmarks/README.md`):
 
 ```bash
 python examples/benchmark_homogenization_preconditioner.py \\
@@ -479,23 +492,54 @@ python examples/benchmark_homogenization_preconditioner.py \\
 
 
 def _precision_note(precisions):
-    """One-line note describing the precision(s) shown, or '' for plain fp64."""
+    """One-line note describing the precision(s) shown."""
     if len(precisions) > 1:
         return ("\nBoth **double** (`fp64`, solid) and **single** (`fp32`, "
                 "dashed) precision are shown; single precision halves the "
                 "resident field memory and the bytes moved per iteration.")
     if precisions == ["single"]:
         return "\nAll runs are in **single** precision (`fp32`)."
-    return ""
+    return "\nAll runs are in **double** precision (`fp64`)."
+
+
+def _commands(rows, dim, precisions):
+    """Command lines of both studies, one per configuration present."""
+    prec = (precisions[0] if len(precisions) == 1
+            else "{" + "|".join(precisions) + "}")
+    grid = ",".join(["N"] * dim)
+    lines = []
+
+    def args(precond, r):
+        return (f"-n {grid} -d {{device}} -k fused -P {precond} "
+                f"-i {r['maxiter']} --tol {r['tol']} --precision {prec} "
+                f"--inclusion-type single")
+
+    it = [r for r in rows if r["study"] == "iterations"]
+    if it:
+        lines.append("# CG iterations vs. grid size (one CPU core)")
+        lines.append(db.config_command("homogenization.py",
+                                       args("{none|reference}", it[0]),
+                                       "cpu", 1))
+    for key, label, _style in db.render_configs(rows, "reference_timing"):
+        r = next(r for r in rows
+                 if r["study"] == "reference_timing" and r["label"] == key)
+        lines.append(f"# Reference solve, {label}")
+        lines.append(db.config_command("homogenization.py",
+                                       args("reference", r),
+                                       r["device"], int(r["nranks"])))
+    return "\n".join(lines)
 
 
 def write_doc_page(path, meta, dim, tol, ncases, iter_table, timing_table,
-                   iter_plot, timing_plot, precisions):
+                   iter_plot, timing_plot, precisions, rows=()):
     with open(path, "w") as fh:
         fh.write(DOC_TEMPLATE.format(
-            cpu=meta["cpu"], gpu=meta["gpu"], version=meta["version"],
-            timestamp=meta["timestamp"], dim=dim, tol=tol, ncases=ncases,
+            dim=dim, tol=tol, ncases=ncases,
             precision_note=_precision_note(precisions),
+            provenance=db.provenance_markdown(
+                rows, {"iterations": "CG iterations vs. grid size",
+                       "reference_timing": "reference solve timing"}),
+            commands=_commands(rows, dim, precisions),
             iter_table=iter_table, timing_table=timing_table,
             iter_plot=os.path.basename(iter_plot),
             timing_plot=os.path.basename(timing_plot)))
@@ -627,7 +671,7 @@ def main():
     if args.doc_out:
         write_doc_page(args.doc_out, meta, dim, tol,
                        3 if dim == 2 else 6, it_tab, t_tab,
-                       iters_path, time_path, precisions)
+                       iters_path, time_path, precisions, rows)
         sys.stderr.write(f"wrote {os.path.abspath(args.doc_out)}\n")
 
 

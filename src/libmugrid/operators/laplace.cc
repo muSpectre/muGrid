@@ -66,7 +66,9 @@ namespace muGrid {
                 for (Index_t ix = 1; ix < nx - 1; ++ix) {
                     Index_t idx = ix * stride_x + iy * stride_y;
 
-                    // 5-point stencil: [0,1,0; 1,-4,1; 0,1,0]
+                    // 5-point stencil: wx on the x neighbours, wy on the y
+                    // neighbours, -2 (wx + wy) on the centre
+                    // ([0,1,0; 1,-4,1; 0,1,0] for wx = wy = 1)
                     T center = input[idx];
                     T left   = input[idx - stride_x];
                     T right  = input[idx + stride_x];
@@ -112,7 +114,9 @@ namespace muGrid {
                     for (Index_t ix = 1; ix < nx - 1; ++ix) {
                         Index_t idx = ix * stride_x + iy * stride_y + iz * stride_z;
 
-                        // 7-point stencil: center=-6, neighbors=+1
+                        // 7-point stencil: w_d on the face neighbours along
+                        // axis d, -2 (wx + wy + wz) on the centre (center -6,
+                        // neighbours +1 for w = 1)
                         T center = input[idx];
                         T xm = input[idx - stride_x];
                         T xp = input[idx + stride_x];

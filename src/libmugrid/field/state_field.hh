@@ -193,7 +193,8 @@ namespace muGrid {
      */
     Index_t nb_sub_pts;
 
-    //! the current (historically accurate) ordering of the fields
+    //! the current ordering of the fields in time: indices[k] is the
+    //! position in `fields` of the value k steps ago (k = 0 is current)
     std::vector<size_t> indices{};
 
     //! storage of references to the diverse fields

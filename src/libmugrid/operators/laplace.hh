@@ -7,15 +7,13 @@
  *
  * @brief  Dimension-templated hard-coded Laplace operator (2D/3D)
  *
- * The 2D (5-point) and 3D (7-point) Laplace operators were ~90% identical: the
- * apply/apply_increment/transpose quartet, the field validation, the device
- * dispatch and the metadata differed only in the dimension and the stencil
- * size. They are unified here into a single `template <Dim_t Dim>
- * LaplaceOperator`, with the dimension-varying facts in `LaplaceTraits<Dim>`
- * and the only true divergence — the stencil itself — selected with
- * `if constexpr`. The historical class names remain as type aliases
- * (LaplaceOperator2D / LaplaceOperator3D) so no binding or downstream code
- * changes.
+ * A single `template <Dim_t Dim> LaplaceOperator` covers the 2D (5-point)
+ * and 3D (7-point) stencils: apply/apply_increment/transpose, field
+ * validation, device dispatch and metadata depend on the dimension only
+ * through the stencil size (`LaplaceTraits<Dim>`) and the stencil itself,
+ * which is selected with `if constexpr`. `LaplaceOperator2D` and
+ * `LaplaceOperator3D` are type aliases for the two instantiations; the
+ * Python bindings and the C++ tests use these names.
  *
  * Copyright © 2024 Lars Pastewka
  *
@@ -71,9 +69,23 @@ namespace muGrid {
         /**
          * @brief Apply the 5-point 2D Laplace stencil on host.
          *
-         * Stencil: w[0] on the two x neighbours, w[1] on the two y
-         * neighbours and -2 (w[0] + w[1]) on the centre; for w = scale * (1, 1)
-         * the classic scale * [0, 1, 0; 1,-4, 1; 0, 1, 0].
+         * Computes, for every point (ix, iy) with 1 <= ix < nx - 1 and
+         * 1 <= iy < ny - 1 (all points whose stencil lies inside the ghosted
+         * buffer),
+         *
+         *     out(i) [+]= sum_d w[d] (in(i + e_d) - 2 in(i) + in(i - e_d)),
+         *
+         * i.e. w[0] on the two x neighbours, w[1] on the two y neighbours and
+         * -2 (w[0] + w[1]) on the centre; for w = scale * (1, 1) the classic
+         * scale * [0, 1, 0; 1, -4, 1; 0, 1, 0]. Points on the outermost layer
+         * are not written. Cost O(nx ny), one pass over input and output.
+         *
+         * @param input     Scalar input buffer including ghosts
+         * @param output    Scalar output buffer (same layout as input)
+         * @param nx, ny    Buffer extent per axis, ghosts included
+         * @param stride_x, stride_y Element strides per axis
+         * @param w         Per-axis neighbour weights (`Dim` entries)
+         * @param increment Add to `output` instead of overwriting it
          */
         template <typename T>
         void laplace_2d_host(
@@ -88,7 +100,8 @@ namespace muGrid {
          * @brief Apply the 7-point 3D Laplace stencil on host.
          *
          * Stencil: w[d] on the two face neighbours along axis d and
-         * -2 (w[0] + w[1] + w[2]) on the centre.
+         * -2 (w[0] + w[1] + w[2]) on the centre, evaluated on every point
+         * with 1 <= i_d < n_d - 1; parameters as for laplace_2d_host.
          */
         template <typename T>
         void laplace_3d_host(
@@ -102,7 +115,8 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // Single GPU launcher per stencil (the CUDA/HIP backend split lives
         // inside gpu_runtime.hh, not in the operator), matching the generic and
-        // stiffness operators' *_gpu convention.
+        // stiffness operators' *_gpu convention. Same arguments and computed
+        // region as the host kernels.
         template <typename T>
         void laplace_2d_gpu(
             const T* input, T* output, Index_t nx, Index_t ny,
@@ -141,10 +155,21 @@ namespace muGrid {
      * a scale factor, which can incorporate grid spacing and sign conventions
      * (e.g. for a positive-definite operator usable with CG solvers).
      *
-     * With a grid spacing the stencil is the finite-difference Laplacian of
-     * an anisotropic grid: the two neighbours along axis d carry
-     * `scale / h_d^2` and the centre `-2 scale * sum_d 1 / h_d^2`. Without
-     * one every axis carries `scale`, the unit-spacing stencil above.
+     * With a grid spacing the stencil is the second-order central-difference
+     * Laplacian of an anisotropic grid,
+     *
+     *     (L u)_i = sum_{d < Dim} w_d (u_{i+e_d} - 2 u_i + u_{i-e_d}),
+     *     w_d = scale / h_d^2,
+     *
+     * i.e. the two neighbours along axis d carry `scale / h_d^2` and the
+     * centre `-2 scale * sum_d 1 / h_d^2`. Without a grid spacing every axis
+     * carries `scale`, the unit-spacing stencil above. The truncation error
+     * is O(h_d^2) per axis.
+     *
+     * Like every LinearOperator, it assumes nothing about boundary
+     * conditions: it reads one ghost layer on each side (filled beforehand,
+     * e.g. periodically by the domain decomposition) and writes every point
+     * whose stencil lies inside the ghosted buffer.
      *
      * Conventions to keep in mind when mixing it with other operators:
      * - With scale = 1/h^2 this is the finite-difference div grad, which is
@@ -157,9 +182,14 @@ namespace muGrid {
      *   operator with per-axis coefficients 1/h_d^2 is the slower
      *   equivalent).
      *
-     * The hard-coded implementation provides significantly better performance
-     * (~3-10x) than the generic convolution operator due to compile-time known
-     * memory access patterns that enable SIMD vectorization.
+     * The hard-coded implementation is faster than the generic convolution
+     * operator (GenericLinearOperator) applying the same coefficients: it
+     * makes a single unit-stride pass over input and output with the Dim
+     * weights in registers, whereas the generic kernel sweeps the whole
+     * output once per stencil non-zero (5 or 7 passes) and resolves offsets
+     * at run time. The fixed access pattern also lets the compiler vectorize
+     * the x loop. (A speed-up of ~3-10x is quoted for this comparison;
+     * TODO: rationale for the 3-10x figure -- benchmark and grid sizes?)
      *
      * Since the Laplacian is self-adjoint (symmetric), the transpose operation
      * is identical to the forward apply operation.
@@ -385,10 +415,14 @@ namespace muGrid {
          *     w_d = scale / h_d^2 (all equal to `scale` on a unit grid).
          * 3D: 27 entries, center (index 13) = -2 (w_x + w_y + w_z), the two
          *     neighbours along x (index 13 +- 1) = w_x, along y (+- 3) = w_y,
-         *     along z (+- 9) = w_z, rest zero. (The z neighbours used to sit
-         *     at +- 1 and the x neighbours at +- 9, i.e. the exported stencil
-         *     had x and z swapped; invisible while every axis had the same
-         *     weight.)
+         *     along z (+- 9) = w_z, rest zero.
+         *
+         * The flat index of stencil offset (i_x, i_y, i_z) in {0, 1, 2}^3 is
+         * i_x + 3 i_y + 9 i_z (x fastest), so the x neighbours must sit at
+         * +- 1 and the z neighbours at +- 9; only then does a
+         * GenericLinearOperator built from these coefficients reproduce
+         * apply() on an anisotropic grid (with equal weights an x/z swap
+         * would go unnoticed).
          */
         std::vector<Real> get_coefficients() const {
             const auto & w{this->weights};
@@ -514,8 +548,9 @@ namespace muGrid {
             T * output = output_field.data();
             const auto w = this->effective_weights<T>(alpha);
 
-            // ArrayOfStructures layout: stride_x = 1, stride_y = nx,
-            // stride_z = nx*ny.
+            // Scalar field (one value per pixel, so AoS and SoA coincide)
+            // with column-major pixels: stride_x = 1, stride_y = nx,
+            // stride_z = nx*ny, ghosts included.
             if constexpr (Dim == 2) {
                 laplace_kernels::laplace_2d_host<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
@@ -529,7 +564,8 @@ namespace muGrid {
         }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        //! Device apply with optional increment.
+        //! Device apply with optional increment. A scalar field has the same
+        //! strides in SoA (device) as in AoS (host) storage.
         template <typename T>
         void apply_impl(
             const TypedFieldBase<T, DefaultDeviceSpace> & input_field,
@@ -558,9 +594,9 @@ namespace muGrid {
 #endif
     };
 
-    //! 2D Laplace operator (5-point stencil). Preserves the historical name.
+    //! 2D Laplace operator (5-point stencil); name used by the bindings.
     using LaplaceOperator2D = LaplaceOperator<2>;
-    //! 3D Laplace operator (7-point stencil). Preserves the historical name.
+    //! 3D Laplace operator (7-point stencil); name used by the bindings.
     using LaplaceOperator3D = LaplaceOperator<3>;
 
 }  // namespace muGrid

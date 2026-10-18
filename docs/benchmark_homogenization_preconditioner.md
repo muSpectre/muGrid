@@ -1,25 +1,86 @@
 # Benchmark: preconditioner
 
-Effect of the reference-material (Green's-function) preconditioner of Ladecký et
-al., Appl. Math. Comput. 446 (2023) 127835, on the [homogenization
-example](examples.md) — `-P reference` vs. `-P none`. Both use the **same fused
-matvec kernel** and are run **to convergence** (relative tolerance `1e-06`).
+## What is measured
 
-!!! info "Test machine & code version"
+The effect of the reference-material (Green's-function) preconditioner of
+Ladecký et al., Appl. Math. Comput. 446 (2023) 127835 (`-P reference`, see
+[Preconditioners](linalg.md#preconditioners)) on the conjugate-gradient solves
+of the [homogenization example](examples.md#homogenization)
+(`examples/homogenization.py`), compared with no preconditioner (`-P none`).
+Problem: $N^3$ grid points, single spherical inclusion (radius 0.25,
+$E_\text{inclusion}/E_\text{matrix} = 10$, $\nu = 0.3$), fused
+`IsotropicStiffnessOperator3D` matvec in both cases, the 6 unit
+load cases, each solved to a relative residual of `1e-06`. Iteration counts
+are summed over the load cases; times are the example's `total_time_seconds`
+(all solves including right-hand-side assembly and stress averaging,
+excluding setup). One measurement per point.
+
+All runs are in **double** precision (`fp64`).
+
+Two studies are reported:
+
+1. **CG iterations vs. grid size**, both preconditioners, on one CPU core. The
+   iteration count is a property of the operator and preconditioner, not of
+   the device or decomposition. Without preconditioner
+   $\kappa(\mathbf{K}) = O(h^{-2})$, so CG needs $O(N)$ iterations; with
+   the reference preconditioner $\kappa \le c_\text{max}/c_\text{min}$
+   for material data bounded by multiples of the reference, independent of
+   $N$.
+2. **Reference-preconditioned solve time vs. grid size** for the device and
+   MPI configurations of the [homogenization
+   benchmark](benchmark_homogenization.md). Each preconditioned iteration
+   applies one matvec and one forward/inverse FFT pair, so this measures the
+   per-iteration cost of the FFT engine (on the GPU and in the slab MPI
+   decomposition) together with the matvec. Each configuration is swept in
+   $N$ until the first size that runs out of memory (`OOM`); larger sizes are
+   not attempted.
+
+## Provenance
+
+!!! info "Run 2026-06-28T01:19:13"
+    - **Results:** CG iterations vs. grid size (fp64)
+    - **Code version:** `0.109.0-56-gf1774dbd-dirty` (commit `f1774dbd`, uncommitted changes in the working tree)
     - **CPU:** AMD Instinct MI300A Accelerator (192 logical cores)
     - **GPU:** 4x AMD Instinct MI300A
-    - **muGrid:** `0.110.0-dirty` — run 2026-06-29T12:13:40
+    - **Compiler:** not recorded <!-- TODO: benchmark metadata missing: compiler and version -->
+    - **Libraries:** not recorded <!-- TODO: benchmark metadata missing: key library versions (FFT backend, Eigen, pybind11, NumPy) -->
+    - **MPI:** not recorded <!-- TODO: benchmark metadata missing: MPI implementation and version -->
+    - **GPU runtime:** not recorded <!-- TODO: benchmark metadata missing: CUDA/ROCm version -->
+    - **Nodes:** not recorded <!-- TODO: benchmark metadata missing: node count and ranks per node -->
 
-Run configuration: 3D, single spherical inclusion, fused stiffness kernel,
-6 load cases (iterations summed over all cases).
+!!! info "Run 2026-06-29T12:13:40"
+    - **Results:** reference solve timing (fp64)
+    - **Code version:** `0.110.0-dirty` (commit `f3ef7b08`, uncommitted changes in the working tree)
+    - **CPU:** AMD Instinct MI300A Accelerator (192 logical cores)
+    - **GPU:** 4x AMD Instinct MI300A
+    - **Compiler:** not recorded <!-- TODO: benchmark metadata missing: compiler and version -->
+    - **Libraries:** not recorded <!-- TODO: benchmark metadata missing: key library versions (FFT backend, Eigen, pybind11, NumPy) -->
+    - **MPI:** not recorded <!-- TODO: benchmark metadata missing: MPI implementation and version -->
+    - **GPU runtime:** not recorded <!-- TODO: benchmark metadata missing: CUDA/ROCm version -->
+    - **Nodes:** not recorded <!-- TODO: benchmark metadata missing: node count and ranks per node -->
+
+## Commands
+
+Each data point is one invocation of the example, launched by
+`examples/benchmark_homogenization_preconditioner.py` as
+
+```bash
+# CG iterations vs. grid size (one CPU core)
+python examples/homogenization.py -n N,N,N -d cpu -k fused -P {none|reference} -i 20000 --tol 1e-06 --precision double --inclusion-type single
+# Reference solve, CPU (1 core)
+python examples/homogenization.py -n N,N,N -d cpu -k fused -P reference -i 20000 --tol 1e-06 --precision double --inclusion-type single
+# Reference solve, CPU (92 cores, MPI)
+OMPI_MCA_rmaps_base_oversubscribe=1 mpiexec -n 92 python examples/homogenization.py -n N,N,N -d cpu -k fused -P reference -i 20000 --tol 1e-06 --precision double --inclusion-type single
+# Reference solve, GPU (1 device)
+python examples/homogenization.py -n N,N,N -d gpu -k fused -P reference -i 20000 --tol 1e-06 --precision double --inclusion-type single
+# Reference solve, GPU (4 devices, MPI)
+OMPI_MCA_rmaps_base_oversubscribe=1 mpiexec -n 4 python examples/homogenization.py -n N,N,N -d gpu -k fused -P reference -i 20000 --tol 1e-06 --precision double --inclusion-type single
+```
+
+with `N` the grid size of the column and `--json-out FILE` added to collect the
+result.
 
 ## CG iterations vs. grid size
-
-The central result: unpreconditioned CG iterations grow with the grid (the
-condition number is `O(h⁻²)`), while the reference preconditioner makes the count
-**nearly independent of grid size**. The count depends only on the operator and
-preconditioner, not the device or the MPI decomposition, so this is measured on a
-single CPU core.
 
 | Preconditioner | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) |
 |---|---|---|---|---|---|
@@ -27,24 +88,13 @@ single CPU core.
 | reference | 105 | 105 | 105 | 102 | 102 |
 | **CPU-core wall-time speedup** | 5× | 9× | 10× | 15× | 19× |
 
-(last row: unpreconditioned ÷ reference **wall time** on one CPU core)
+(rows `none`/`reference`: CG iterations summed over the 6 load cases;
+last row: wall time without preconditioner ÷ wall time with the reference
+preconditioner, one CPU core)
 
 ![Iterations vs. grid size](benchmark_homogenization_preconditioner_iters.png)
 
-## Reference solve: device & MPI scaling
-
-This mirrors the (unpreconditioned) [homogenization
-benchmark](benchmark_homogenization.md), but for the **reference-preconditioned**
-solve: the same single-CPU-core / full-machine-MPI-CPU / single-GPU / multi-GPU
-comparison, across 3D grid sizes. Because the iteration count is
-grid-independent, this isolates the **per-iteration** cost — and each
-preconditioned iteration applies a forward/inverse **FFT pair**, so it is where
-the FFT-engine paths matter: the native N-D transform on the GPU, and the slab
-MPI decomposition on multi-rank runs.
-
-Each configuration is swept to the largest grid that still fits in memory: the
-first size that runs **out of memory** is recorded as `OOM` in the table and
-dropped from the plot, and larger sizes for that configuration are not attempted.
+## Reference solve: device and MPI configurations
 
 | Configuration | 16³ (4k) | 24³ (14k) | 32³ (33k) | 48³ (111k) | 64³ (262k) | 96³ (885k) | 128³ (2.1M) | 192³ (7.1M) | 256³ (16.8M) | 384³ (56.6M) | 512³ (134.2M) | 768³ (453.0M) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -58,18 +108,12 @@ memory)
 
 ![Reference solve time vs. grid size](benchmark_homogenization_preconditioner_time.png)
 
-The preconditioner parallelises cleanly: it is applied in Fourier space by the
-FFT engine, which owns its MPI decomposition, and the per-mode block solve is
-rank-local. `-P reference` gives identical iteration counts and homogenised
-stiffness in serial and under MPI, so the single CPU core is quickly left behind
-and the largest grids are reached by MPI domain decomposition across all CPU
-cores or across several GPUs (one rank per device, round-robin).
+## Reproducing
 
-All data points live in the shared benchmark database `benchmarks/results.csv`
-(date, code version, machine, parameters, results). This page is generated by
-`examples/benchmark_homogenization_preconditioner.py`; re-render from the
-database with `--render-only`, or run a fresh measurement that appends a new
-dated row set:
+All data points are stored in `benchmarks/results.csv`. This page is generated
+by `examples/benchmark_homogenization_preconditioner.py`; `--render-only`
+re-renders it from the database, and a run without it measures and appends a
+new dated run (see `benchmarks/README.md`):
 
 ```bash
 python examples/benchmark_homogenization_preconditioner.py \

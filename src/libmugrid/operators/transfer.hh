@@ -47,10 +47,11 @@
 
 namespace muGrid {
 
-    // Kernel implementations (transfer.cc for the host, transfer_gpu.cc for the
-    // device). Both take explicit strides, so the same kernel serves the host's
-    // array-of-structures and the device's structure-of-arrays layout; the
-    // caller supplies the matching strides. Pointers are pre-offset to the
+    // Kernel implementations (transfer.cc; host only -- GridTransfer has no
+    // device overloads). The kernels take explicit pixel and dof strides
+    // (`c*`/`f*` for the coarse/fine grid, `*d` the stride between scalars of
+    // one pixel), so they do not depend on the dof layout; the caller
+    // supplies the strides of its fields. Pointers are pre-offset to the
     // first *interior* node of their grid.
     namespace transfer_kernels {
 
@@ -59,8 +60,17 @@ namespace muGrid {
          *
          * Iterates coarse nodes and writes the 2^Dim fine nodes of each coarse
          * cell, so every fine node is written exactly once (no read-modify-write
-         * and no double counting). Reads one coarse node beyond the interior in
-         * every direction, which is why the coarse grid needs a ghost layer.
+         * and no double counting):
+         *
+         *     f(2c + o) = 2^(-|o|) Σ_{s ∈ {0,1}^Dim, s <= o} u(c + s),
+         *     o ∈ {0,1}^Dim, |o| = number of non-zero entries of o,
+         *
+         * (u the coarse, f the fine field): a vertex copies, an edge midpoint
+         * averages two corners, a face centre four and (3D) the cell centre
+         * all eight -- multilinear interpolation, exact for multilinear
+         * fields. Cost O(2^Dim) per coarse node and dof.
+         * Reads one coarse node beyond the interior in every direction (on the
+         * high side), which is why the coarse grid needs a ghost layer.
          *
          * @param ncx, ncy  coarse *interior* extent
          * @param nb_dof    scalars per pixel (components x sub-points)
@@ -88,14 +98,18 @@ namespace muGrid {
          *
          * Gathers the 3^Dim fine nodes around each coarse node with weights
          * `(1/2)^(number of non-zero offsets)` — the tensor product of
-         * `[1/2, 1, 1/2]`. This is `Pᵀ`, *not* the `1/2^Dim`-normalised full
+         * `[1/2, 1, 1/2]`:
+         *
+         *     u(c) = Σ_{o ∈ {-1,0,1}^Dim} 2^(-|o|) f(2c + o).
+         *
+         * Cost 3^Dim multiply-adds per coarse node and dof. This is `Pᵀ`, *not* the `1/2^Dim`-normalised full
          * weighting: the residual is a force (a functional), so restricting it
          * carries no measure factor, and `R = Pᵀ` is what keeps the resulting
          * two-grid operator — and hence the preconditioner — symmetric.
          *
-         * Reads one fine node beyond the interior in every direction, which is
-         * why the fine grid needs a ghost layer (the stiffness stencil already
-         * requires one).
+         * Reads one fine node beyond the interior in every direction (fine
+         * node 2c - 1 for c = 0, on the low side), which is why the fine grid needs a ghost layer (the
+         * stiffness stencil already requires one).
          */
         template <typename T>
         void restrict_2d_host(const T * MUGRID_RESTRICT fine,
@@ -155,9 +169,14 @@ namespace muGrid {
      * Galerkin product R K_h P equals the rediscretised K_2h. For P1 (simplex)
      * operators it does not -- P1 coarse functions are interpolated along the
      * simplex edges, not multilinearly -- so a P1 multigrid built on these
-     * transfers is not Galerkin-exact (0.26 / 0.50 relative difference in 2D
-     * / 3D). The multigrid preconditioner rediscretises every level and only
-     * converges somewhat more slowly for P1; it remains correct.
+     * transfers is not Galerkin-exact (measured relative difference between
+     * R K_h P and the rediscretised K_2h: 0.26 in 2D, 0.50 in 3D). The
+     * multigrid preconditioner rediscretises every level and only converges
+     * somewhat more slowly for P1; it remains correct.
+     *
+     * Both operations are host-only and cost O(nb_dof · coarse nodes):
+     * 2^Dim writes (prolong) or 3^Dim multiply-adds (restrict) per coarse
+     * node.
      *
      * The caller is responsible for the ghost exchange: `prolong` reads the
      * coarse field's ghosts, `restrict` reads the fine field's, so

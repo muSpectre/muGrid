@@ -124,9 +124,9 @@ class FieldCollectionMixin:
         """
         Get the C++ field collection for field creation.
 
-        Subclasses must override this method. The default implementation
-        returns self._cpp, which works for GlobalFieldCollection and
-        LocalFieldCollection.
+        The default implementation returns ``self._cpp``, which is correct for
+        GlobalFieldCollection and LocalFieldCollection; classes whose C++
+        object owns a collection (e.g. CartesianDecomposition) override it.
         """
         return self._cpp
 
@@ -138,7 +138,11 @@ class FieldCollectionMixin:
         dtype: Any = np.float64,
     ) -> Field:
         """
-        Create a real-valued field.
+        Get or create a real-valued field.
+
+        Returns the existing field of that name if one is registered (raising
+        if its dtype, component shape or sub-point type differ), else
+        registers a new one.
 
         Parameters
         ----------
@@ -174,7 +178,11 @@ class FieldCollectionMixin:
         dtype: Any = np.complex128,
     ) -> Field:
         """
-        Create a complex-valued field.
+        Get or create a complex-valued field.
+
+        Returns the existing field of that name if one is registered (raising
+        if its dtype, component shape or sub-point type differ), else
+        registers a new one.
 
         Parameters
         ----------
@@ -209,7 +217,7 @@ class FieldCollectionMixin:
         sub_pt: str = "pixel",
     ) -> Field:
         """
-        Create an integer field.
+        Get or create an integer field.
 
         Parameters
         ----------
@@ -235,7 +243,7 @@ class FieldCollectionMixin:
         sub_pt: str = "pixel",
     ) -> Field:
         """
-        Create an unsigned integer field.
+        Get or create an unsigned integer field.
 
         Parameters
         ----------
@@ -525,6 +533,16 @@ class GlobalFieldCollection(FieldCollectionMixin):
         ghost buffers from the requirement the operators report. An int n
         means n ghost layers on both sides of every dimension; a
         (left, right) pair gives explicit per-side counts.
+    nb_subdomain_grid_pts : Sequence[int], optional
+        Grid points of the local subdomain, ghosts included, when the
+        collection holds only part of the domain. Default: the whole domain
+        plus ghosts.
+    storage_order : StorageOrder, optional
+        Storage order of the field components on the host; the C++
+        constructor derives the pixel storage order from it as well. Default
+        ``ArrayOfStructures``. Ignored for device collections, which always
+        use ``StructureOfArrays`` (coalesced access and the unit-stride
+        layout cuFFT/rocFFT need).
 
     Examples
     --------
@@ -691,8 +709,8 @@ def _default_subdivisions(nb_ranks: int, nb_domain_grid_pts: Shape) -> list:
 
     Each prime factor of the rank count, largest first, goes to the axis with
     the most grid points per rank so far, which keeps subdomains close to
-    cubic. (The default used to be all zeros, which the decomposition
-    rejects: leaving out ``nb_subdivisions`` always raised.)
+    cubic and so minimises the halo surface per subdomain volume. The product
+    of the counts is always ``nb_ranks``, as the decomposition requires.
     """
     factors, n, p = [], int(nb_ranks), 2
     while n > 1:
@@ -723,7 +741,10 @@ class CartesianDecomposition(FieldCollectionMixin):
     nb_domain_grid_pts : Sequence[int]
         Global domain grid dimensions.
     nb_subdivisions : Sequence[int], optional
-        Number of subdivisions in each dimension. Default is automatic.
+        Number of subdivisions in each dimension; their product must equal
+        the number of ranks. Default: the prime factors of the rank count,
+        largest first, each assigned to the axis with the most grid points
+        per rank (subdomains close to cubic).
     nb_ghosts_left : Sequence[int], optional
         Ghost cells on low-index side. Default is no ghosts. Prefer the
         `ghosts` argument, which sizes the buffers from the operators that
@@ -898,8 +919,14 @@ class FFTEngine:
     """
     Python wrapper for muGrid FFTEngine.
 
-    The FFTEngine provides distributed FFT operations on structured grids
-    with MPI parallelization using pencil (2D) decomposition.
+    The FFTEngine provides distributed real-to-complex FFTs on structured
+    grids. Transforms are unnormalised; ``normalisation = 1/∏N_α`` restores
+    the identity after ``ifft(fft(x))``. The Fourier grid is half-complex
+    along axis 0 (``N_0//2 + 1`` points). Under MPI a 2D grid is split along
+    its last axis; a 3D grid is split as a slab (last axis only) when the
+    number of ranks ``P ≤ N_z`` and as a pencil (two axes) otherwise, see
+    `decomposition`. The real-space collection doubles as a ghosted
+    Cartesian decomposition for stencil operators.
 
     Parameters
     ----------
@@ -917,9 +944,10 @@ class FFTEngine:
     nb_sub_pts : dict, optional
         Number of sub-points per pixel.
     device : str or Device, optional
-        Device for FFT execution: "cpu" (default), "cuda", "cuda:N", "gpu",
-        or a Device instance. When a GPU device is specified, the FFT uses
-        cuFFT and fields are allocated on GPU memory.
+        Device for FFT execution: "cpu" (default), "cuda", "cuda:N", "rocm",
+        "rocm:N", "gpu", or a Device instance. On the host the transforms use
+        PocketFFT; on a GPU they use cuFFT or rocFFT and fields are allocated
+        in device memory.
     ghosts : operator, sequence of operators, int, or (left, right), optional
         Ghost-buffer specification for the real-space fields; mutually
         exclusive with `nb_ghosts_left`/`nb_ghosts_right`. Pass the stencil
@@ -928,6 +956,15 @@ class FFTEngine:
         the operators report. An int n means n ghost layers on both sides
         of every dimension; a (left, right) pair gives explicit per-side
         counts.
+    decomposition : {"auto", "slab", "pencil"}, optional
+        MPI process grid for 3D transforms. "slab" splits only the last axis
+        (requires ``P ≤ N_z``): the local (x, y) plane is transformed by one
+        batched N-D transform and only one transpose is needed. "pencil"
+        splits the last two axes over a near-square factorisation of ``P``
+        (preferring factors that divide the grid) and needs two transposes,
+        but admits more than ``N_z`` ranks.
+        "auto" (default) uses slab when ``P ≤ N_z``, else pencil. 2D grids
+        are always split along their last axis.
 
     Examples
     --------
@@ -1029,8 +1066,9 @@ class FFTEngine:
         """
         Forward FFT: real space -> Fourier space.
 
-        The transform is unnormalized. To recover original data after
-        ifft(fft(x)), multiply by `normalisation`.
+        Computes ``x̂(q) = Σ_r x(r) exp(-2πi q·r)`` over the global grid. The
+        transform is unnormalized. To recover original data after
+        ifft(fft(x)), multiply by `normalisation` (``1/∏N_α``).
 
         Parameters
         ----------
@@ -1046,8 +1084,10 @@ class FFTEngine:
         """
         Inverse FFT: Fourier space -> real space.
 
-        The transform is unnormalized. To recover original data after
-        ifft(fft(x)), multiply by `normalisation`.
+        Computes ``x(r) = Σ_q x̂(q) exp(+2πi q·r)``, using the Hermitian
+        symmetry of the half-complex input. The transform is unnormalized. To
+        recover original data after ifft(fft(x)), multiply by `normalisation`
+        (``1/∏N_α``).
 
         Parameters
         ----------
@@ -1662,7 +1702,9 @@ class FEMGradientOperator:
         weights: Optional[Sequence[float]] = None,
     ) -> None:
         """
-        Apply transpose and add scaled result: output += alpha * div(input).
+        Apply the transpose and add the scaled result:
+        ``nodal_field += alpha · Bᵀ W quadrature_point_field`` (with the same
+        weighting convention as :meth:`transpose`).
 
         Parameters
         ----------
@@ -1673,7 +1715,8 @@ class FEMGradientOperator:
         nodal_field : Field
             Output field at nodal points (updated in-place).
         weights : sequence of float, optional
-            Weights for the transpose operation.
+            Per-quadrature-point weights overriding the physical quadrature
+            weights ``W``, as in :meth:`transpose`. Defaults to ``W``.
         """
         if weights is None:
             weights = []
@@ -1693,11 +1736,24 @@ class IsotropicStiffnessOperator:
     """
     Python wrapper for the fused isotropic linear-elastic stiffness operator.
 
-    Computes ``force = K @ displacement`` with ``K = B^T C B`` for linear
-    triangular (2D) or tetrahedral (3D) elements, where ``C`` is the isotropic
-    elasticity tensor parameterized by per-element Lamé fields ``lambda`` and
-    ``mu``. The geometry-only matrices are precomputed from the grid spacing at
-    construction time.
+    Computes ``force = K @ displacement`` with ``K = Bᵀ W C B`` for Q1
+    (bi/trilinear, default) or P1 (linear simplex) elements, where ``C`` is
+    the isotropic elasticity tensor parameterized by per-pixel Lamé fields
+    ``lambda`` and ``mu``. The element stiffness of pixel ``e`` is
+
+        ``K_e = 2 μ_e G + λ_e V``,
+
+    with ``G`` (shear) and ``V`` (volumetric) geometry-only matrices
+    precomputed from the grid spacing at construction time, so the operator
+    stores two scalars per pixel instead of an assembled matrix and needs no
+    resident strain or stress fields.
+
+    Besides :meth:`apply` and :meth:`apply_increment`, the underlying C++
+    object provides (via attribute delegation) ``apply_uniform`` (uniform
+    scalar ``λ, μ``), ``assemble_diagonal`` (``diag(K)``, for Jacobi-type
+    preconditioners), ``apply_macro_rhs`` (``Bᵀ W C:Ē`` for a macroscopic
+    strain ``Ē``), ``average_stress`` and ``compute_sensitivity``. The
+    displacement must have its ghosts communicated before every apply.
 
     Parameters
     ----------
@@ -1706,6 +1762,8 @@ class IsotropicStiffnessOperator:
     grid_spacing : sequence of float
         Grid spacing in each direction, e.g. ``[hx, hy]`` (2D) or
         ``[hx, hy, hz]`` (3D).
+    element : muGrid.FEMElement, optional
+        ``FEMElement.q1`` (default) or ``FEMElement.p1``.
 
     Examples
     --------
@@ -1800,6 +1858,16 @@ class NodalMomentOperator:
     ``rho`` must be a 1-component field whose ghosts have been communicated;
     ``moments`` and ``moment_gradients`` must have 3 components and live on the
     same collection. Only the interior (owned) region is written.
+
+    Parameters
+    ----------
+    dim : int
+        Spatial dimension (2 or 3).
+    grid_spacing : sequence of float
+        Grid spacing in each direction.
+    element : muGrid.FEMElement, optional
+        ``FEMElement.q1`` (default) or ``FEMElement.p1``; for P1 the integrals
+        run over the simplices of each pixel.
     """
 
     def __init__(self, dim: int, grid_spacing: Sequence[float],
@@ -1822,6 +1890,7 @@ class NodalMomentOperator:
 
     @property
     def cell_volume(self) -> float:
+        """Volume (area in 2D) of one pixel, ``∏h_α``."""
         return self._cpp.cell_volume
 
     @property
@@ -1874,7 +1943,8 @@ if hasattr(_muGrid, "FileIONetCDF"):
         >>> file.append_frame().write()
         """
 
-        # Class-level enum for backwards compatibility
+        # Class-level alias of the C++ enum, so FileIONetCDF.OpenMode.Write
+        # works without reaching into _muGrid.
         OpenMode = _OpenMode
 
         def __init__(

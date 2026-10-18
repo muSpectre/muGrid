@@ -1,5 +1,5 @@
 /**
- * @file   fem_gradient_operator_gpu.cc
+ * @file   fem_gradient_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -12,13 +12,20 @@
  * kernels are templated on it. The contraction is unrolled at compile time via
  * `if constexpr` recursion, so B[q][d][n] is a constant expression — the
  * compiler folds the structural zeros / ±1 of a simplex (and skips the global
- * loads multiplied by a zero coefficient), so the generated code matches a
+ * loads multiplied by a zero coefficient), so the generated code is that of a
  * hand-unrolled per-element kernel while one template still covers any
  * element (e.g. Q1) with no new code.
  *
  * Both apply (gradient, nodal → quadrature) and transpose (divergence,
  * quadrature → nodal) use a gather pattern — one thread per output point —
- * so no atomics are needed. The kernel code is identical for CUDA and HIP;
+ * so no atomics are needed:
+ *   - gradient: thread e computes grad_e[q][d] = Σ_n B[q][d][n] u[e + o_n] / h_d
+ *     from its 2^Dim corner nodes;
+ *   - divergence: thread m (an owned node) computes
+ *     f_m = Σ_{n} Σ_{q,d} w_q B[q][d][n] g_{m - o_n}[q][d] / h_d over the
+ *     2^Dim elements m - o_n that have m as local node n.
+ * Both cost O(NbQuad · Dim · 2^Dim) per thread and produce the same values
+ * as the host kernels in fem_gradient.hh up to summation order. The kernel code is identical for CUDA and HIP;
  * only the launch mechanism differs, abstracted via macros.
  *
  * Copyright © 2024 Lars Pastewka
@@ -54,15 +61,18 @@
 namespace muGrid {
 namespace fem_gradient_kernels {
 
-    // Block sizes for GPU kernels
+    // Block sizes for GPU kernels: 16 x 16 = 256 threads in 2D, 8 x 8 x 8 = 512
+    // in 3D, multiples of the warp (32) / wavefront (64) width, with x (the
+    // unit-stride SoA axis) on threadIdx.x for coalesced loads.
+    // TODO: rationale for 16 x 16 / 8 x 8 x 8 over other shapes?
     constexpr int BLOCK_SIZE_2D = 16;
     constexpr int BLOCK_SIZE_3D = 8;
 
     namespace {
 
         // sum_n B[q][d][n] * u[n], unrolled over n at compile time. Terms with a
-        // structurally-zero B are dropped (no multiply), and the gathered u
-        // values are cheap corner reads, so this matches the hand-written code.
+        // structurally-zero B are dropped (no multiply); the u values are the
+        // corner nodes already gathered into registers.
         template <typename T, class E, Index_t q, Index_t d, Index_t n = 0>
         __device__ __forceinline__ T bsum(const T * u) {
             if constexpr (n == E::NbNodes) {

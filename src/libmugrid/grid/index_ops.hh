@@ -50,14 +50,17 @@
 
 namespace muGrid {
     namespace CcoordOps {
-        //! modulo operator that can handle negative values
+        //! modulo operator that can handle negative values: returns
+        //! a mod b in [0, b) for b > 0
         template <typename T>
         T modulo(const T & a, const T & b) {
             return (b + (a % b)) % b;
         }
 
         //------------------------------------------------------------------------//
-        //! get the i-th pixel in a grid of size nb_grid_pts
+        //! get the i-th pixel in a column-major grid of size nb_grid_pts
+        //! whose first pixel sits at `locations`:
+        //! x_k = floor(i / prod_{j<k} N_j) mod N_k + location_k
         template <size_t Dim>
         constexpr GridIndex<Dim> get_coord(const GridIndex<Dim> & nb_grid_pts,
                                           const GridIndex<Dim> & locations,
@@ -95,7 +98,11 @@ namespace muGrid {
             return GridIndex<1>({get_coord<1>(nb_grid_pts, locations, index)});
         }
 
-        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order.
+        //! Inverts i = sum_k s_k (x_k - location_k) by peeling off the axes
+        //! from slowest to fastest, x_{pi(k)} = floor(r_k / s_{pi(k)}), with
+        //! r the remainder after the slower axes; exact for non-overlapping
+        //! strides (each stride at least the extent of all faster axes).
         template <size_t dim>
         GridIndex<dim> get_coord_from_axes_order(
             const GridIndex<dim> & nb_grid_pts, const GridIndex<dim> & locations,
@@ -124,8 +131,9 @@ namespace muGrid {
                 compute_axes_order(nb_grid_pts, strides), index);
         }
 
-        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order
-        //! and location
+        //! get the i-th pixel in a grid of size nb_grid_pts, with axes order,
+        //! relative to the grid origin (no location offset; see
+        //! get_coord_from_axes_order)
         template <class T>
         T get_coord0_from_axes_order(const T & nb_grid_pts, const T & strides,
                                      const T & axes_order, Index_t index) {
@@ -163,7 +171,8 @@ namespace muGrid {
         }
 
         //------------------------------------------------------------------------//
-        //! get the linear index of a pixel in a column-major grid
+        //! get the linear index of a pixel in a column-major grid,
+        //! i = sum_k (x_k - location_k) prod_{j<k} N_j
         template <size_t Dim>
         constexpr Index_t get_index(const GridIndex<Dim> & nb_grid_pts,
                                     const GridIndex<Dim> & locations,
@@ -183,7 +192,7 @@ namespace muGrid {
 
         //-----------------------------------------------------------------------//
         //! these functions can be used whenever it is necessary to calculate
-        //! the volume of a cell or each pixels of the cell
+        //! the volume of a cell or of each pixel of the cell, prod_k L_k
         template <size_t MaxDim, typename T>
         T compute_volume(const DynCoord<MaxDim, T> & lengths) {
             T vol{};
@@ -195,7 +204,7 @@ namespace muGrid {
         }
 
         //! these functions can be used whenever it is necessary to calculate
-        //! the volume of a cell or each pixels of the cell
+        //! the volume of a cell or of each pixel of the cell, prod_k L_k
         template <typename T>
         T compute_volume(const std::vector<T> & lengths) {
             T vol{};
@@ -206,7 +215,8 @@ namespace muGrid {
             return vol;
         }
 
-        //! get the linear index of a pixel given a set of strides
+        //! get the linear index of a pixel given a set of strides,
+        //! i = sum_k s_k (x_k - location_k)
         template <size_t Dim>
         constexpr Index_t
         get_index_from_strides(const GridIndex<Dim> & strides,

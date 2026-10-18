@@ -89,8 +89,8 @@ class cuFFTBackend : public GpuFFTBackend<cuFFTBackend, cufftHandle> {
               const std::vector<Index_t> & out_strides) override;
 
   // Single-precision N-D transforms (CUFFT_R2C/C2R), used by the serial-nd
-  // engine path. The 1D fp32 primitives (MPI GPU path) are provided by the
-  // GpuFFTBackend base via the fp32 exec hooks below.
+  // and MPI slab engine paths. The 1D fp32 primitives (MPI pencil path) are
+  // provided by the GpuFFTBackend base via the fp32 exec hooks below.
   void r2c_nd(const std::vector<Index_t> & shape,
               const std::vector<Index_t> & axes, const Real32 * input,
               const std::vector<Index_t> & in_strides, Complex32 * output,
@@ -120,8 +120,9 @@ class cuFFTBackend : public GpuFFTBackend<cuFFTBackend, cufftHandle> {
                          Complex * output);
 
   // Single-precision exec hooks (CUFFT_R2C/C2R/C2C). cuFFT, unlike rocFFT,
-  // bakes the precision into the *execution* call, so these use the float
-  // entry points cufftExec{R2C,C2R,C2C}.
+  // also encodes the precision in the *execution* entry point (in addition
+  // to the plan type), so these use the float entry points
+  // cufftExec{R2C,C2R,C2C}.
   void exec_r2c(cufftHandle & plan, const Real32 * input, Complex32 * output);
   void exec_c2r(cufftHandle & plan, const Complex32 * input, Real32 * output);
   void exec_c2c_forward(cufftHandle & plan, const Complex32 * input,

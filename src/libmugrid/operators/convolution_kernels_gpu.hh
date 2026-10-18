@@ -62,6 +62,10 @@ namespace gpu {
      * Computes: quad_data[quad_offset + quad_indices[i]] +=
      *           alpha * nodal_data[nodal_offset + nodal_indices[i]] * op_values[i]
      *
+     * One thread per computable pixel, looping over all nnz entries. Every
+     * quad index of the apply operator lies within the thread's own pixel,
+     * so threads never write the same address and no atomics are needed.
+     *
      * Works with both CUDA and HIP backends.
      */
     // Templated on the field scalar type T; the sparse-operator coefficients
@@ -104,7 +108,13 @@ namespace gpu {
      * @brief GPU kernel for transpose convolution
      *
      * Computes: nodal_data[nodal_offset + nodal_indices[i]] +=
-     *           alpha * quad_data[quad_offset + quad_indices[i]] * op_values[i]
+     *           alpha * w[q_i] * quad_data[quad_offset + quad_indices[i]]
+     *           * op_values[i]
+     * with w = 1 when `weights` is nullptr.
+     *
+     * Formulated as a gather (the transpose operator's quad indices carry
+     * the negated stencil offsets), so each thread writes only its own
+     * pixel's nodal entries and no atomics are needed.
      *
      * Works with both CUDA and HIP backends.
      */
@@ -169,7 +179,11 @@ namespace gpu {
         const Index_t quad_base = params.start_pixel_index *
                                   params.quad_elems_per_pixel;
 
-        // Thread block size (8x8x8 = 512 threads)
+        // Thread block size (8x8x8 = 512 threads, a multiple of the warp
+        // and wavefront width; threadIdx.x runs along the unit-stride SoA
+        // pixel axis so loads coalesce). For 2D grids nz = 1 and only one
+        // z-slice of each block is active.
+        // TODO: rationale for 8x8x8 also for 2D grids?
         dim3 block(8, 8, 8);
         dim3 grid(
             (params.nx + block.x - 1) / block.x,
@@ -212,7 +226,7 @@ namespace gpu {
         const Index_t quad_base = params.start_pixel_index *
                                   params.quad_elems_per_pixel;
 
-        // Thread block size (8x8x8 = 512 threads)
+        // Thread block size (8x8x8 = 512 threads), as for the forward kernel
         dim3 block(8, 8, 8);
         dim3 grid(
             (params.nx + block.x - 1) / block.x,

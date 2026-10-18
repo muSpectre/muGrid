@@ -183,8 +183,8 @@ namespace muGrid {
 
             constexpr int BLOCK_SIZE{256};
             //! Lines whose hoisted sums a block keeps in shared memory. A block
-            //! of BLOCK_SIZE modes touches at most BLOCK_SIZE / n0 + 2 lines,
-            //! so this covers every axis-0 length from about 40 modes up.
+            //! of BLOCK_SIZE modes touches at most (BLOCK_SIZE - 1) / n0 + 2
+            //! lines, so this covers every axis-0 length n0 >= 37.
             constexpr int MAX_LINES{8};
 
             /**

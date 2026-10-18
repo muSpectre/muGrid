@@ -218,7 +218,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map with corresponding
-     * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+     * `muGrid::Field` you wish to iterate over pixel by pixel or quadrature
      * point by quadrature point with a chosen, statically sized plain `Eigen`
      * type
      *
@@ -233,7 +233,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map with corresponding
-     * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+     * `muGrid::Field` you wish to iterate over pixel by pixel or quadrature
      * point by quadrature point with statically sized `Eigen::Matrix` iterates
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
@@ -251,7 +251,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map with corresponding
-     * `muSpectre::Field` you wish to iterate over pixel by pixel or quadrature
+     * `muGrid::Field` you wish to iterate over pixel by pixel or quadrature
      * point by quadrature point with statically sized `Eigen::Array` iterates
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
@@ -269,7 +269,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map of scalars with corresponding
-     * `muSpectre::Field` you wish to iterate over.
+     * `muGrid::Field` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -283,7 +283,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map of second-rank with
-     * corresponding `muSpectre::Field` you wish to iterate over.
+     * corresponding `muGrid::Field` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -300,7 +300,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map of second-rank with
-     * corresponding `muSpectre::Field` you wish to iterate over.
+     * corresponding `muGrid::Field` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -315,7 +315,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map of first-rank with corresponding
-     * `muSpectre::Field` you wish to iterate over.
+     * `muGrid::Field` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -330,7 +330,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedField` for a map of fourth-rank with
-     * corresponding `muSpectre::Field` you wish to iterate over.
+     * corresponding `muGrid::Field` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`

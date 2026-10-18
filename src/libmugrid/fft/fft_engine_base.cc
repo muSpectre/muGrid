@@ -90,7 +90,7 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
   // Create row and column subcommunicators
   MPI_Comm mpi_comm = comm.get_mpi_comm();
   if (mpi_comm != MPI_COMM_NULL && num_ranks > 1) {
-    // Row communicator: ranks with same p1 (for Y redistribution in 3D)
+    // Row communicator: ranks with same p1 (carries the X<->Y transpose)
     MPI_Comm_split(mpi_comm, this->proc_coord_p1, this->proc_coord_p2,
                    &this->row_mpi_comm_handle);
     this->row_comm = Communicator(this->row_mpi_comm_handle);
@@ -212,8 +212,9 @@ FFTEngineBase::FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
   // override their collection's storage order, so verifying once that the
   // real-space and Fourier-space collections agree guarantees that every
   // fft()/ifft() call operates on a consistent layout. (Both collections
-  // are currently constructed AoS on host and forced to SoA on device, so
-  // this guards against future changes to collection construction.)
+  // are constructed AoS on host and SoA on device, so this check holds by
+  // construction; it makes the invariant explicit and fails loudly if the
+  // collection construction ever diverges.)
   if (this->get_collection().get_storage_order() !=
       this->fourier_collection->get_storage_order()) {
     throw RuntimeError(

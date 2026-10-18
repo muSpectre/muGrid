@@ -16,8 +16,8 @@
  * points with weights w_q. The element type only changes the numbers in that
  * table — not the kernel structure — so all element-specific data lives here
  * and the kernels are templated on the element. This covers linear simplices
- * (the historical 2-triangle / 5-tetrahedron decompositions) and, by adding a
- * traits struct, Q1 (bilinear quad / trilinear hex) elements, with no new
+ * (2 triangles per pixel, 5 tetrahedra per voxel) and Q1 (bilinear quad /
+ * trilinear hex) elements; a further element needs only a traits struct, no
  * kernel code.
  *
  * Conventions
@@ -71,7 +71,8 @@ namespace muGrid {
 
     /**
      * @struct P1Tri2D
-     * @brief 2D pixel split into 2 linear triangles (the historical element).
+     * @brief 2D pixel split into 2 linear triangles (the element of
+     *        FEMGradientOperator2D).
      *
      * Quadrature point q is the (constant-gradient) interior of triangle q;
      * each weight is half the pixel area.
@@ -197,6 +198,12 @@ namespace muGrid {
      * @struct Q1Hex3D
      * @brief 3D trilinear hexahedron (one Q1 element per voxel) with 2×2×2
      *        Gauss quadrature (8 points).
+     *
+     * B[q][d][n] = trilinear ∂N_n/∂ξ_d at the Gauss points of the unit cube
+     * (physical gradient = B/h_d); Gauss point q = (q&1, (q>>1)&1, q>>2)
+     * over {0.5∓1/(2√3)}, node order the binary corner index. A product of
+     * two trilinear gradients has degree <= 2 per axis, which the 2-point
+     * rule (exact to degree 3) integrates exactly.
      */
     struct Q1Hex3D {
         static constexpr Dim_t SpatialDim = 3;
@@ -295,7 +302,10 @@ namespace muGrid {
      * and a 3-point rule per axis (exact to degree 5) is.
      *
      * These live in their own tables rather than replacing Wfrac/B: the
-     * stiffness path must keep the quadrature it was built and validated with.
+     * gradient/stiffness integrands are already exact with the cheaper rules
+     * above, and a 3-point-per-axis rule would multiply their quadrature
+     * points (and cost) by (3/2)^Dim without changing the result beyond
+     * rounding.
      * ------------------------------------------------------------------- */
 
     //! 3-point Gauss-Legendre rule on the unit interval [0, 1], exact to
@@ -320,12 +330,13 @@ namespace muGrid {
      * The interpolant at q is then `rho_q = Σ_n N[q][n] rho_n` and the integral
      * of any f(rho) over the cell is `h_x h_y [h_z] Σ_q Wfrac[q] f(rho_q)`.
      *
-     * Defined for the Q1 elements only. The simplex (P1) interpolant is
-     * piecewise linear across the sub-simplices, so a cell-level smooth rule is
-     * *not* exact for it; its moments have a closed form instead (the integral
-     * of a linear function's k-th power over a simplex is a complete
-     * homogeneous symmetric polynomial in the corner values), which is where a
-     * P1 specialisation should go if one is needed.
+     * For the Q1 elements this is a 3^Dim tensor-product Gauss rule. The
+     * simplex (P1) interpolant is piecewise linear across the sub-simplices,
+     * so a cell-level smooth rule is *not* exact for it; the P1
+     * specialisations (P1MomentQuadrature below) instead place a reference
+     * simplex rule on each sub-simplex. (Alternatively, the integral of a
+     * linear function's k-th power over a simplex has a closed form, a
+     * complete homogeneous symmetric polynomial in the corner values.)
      */
     template <class Element>
     struct MomentQuadrature;

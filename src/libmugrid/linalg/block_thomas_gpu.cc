@@ -41,8 +41,10 @@
  * walk one mode instead would stride by `nb_modes * Dim` between plane steps,
  * the trap `cuSPARSE`'s `gtsv2StridedBatch` documents.
  *
- * The sweep is serial in the axis by nature; the parallelism is the mode count,
- * `nx * (ny/2 + 1)`, which is ample.
+ * The sweep is serial in the axis by nature; the parallelism is the mode
+ * count, the number of local Fourier modes in the two transformed axes
+ * (`(N_0/2 + 1) * N_1` for an undistributed grid, axis 0 being the
+ * half-complex one), which is ample.
  */
 
 #include "linalg/block_thomas.hh"
