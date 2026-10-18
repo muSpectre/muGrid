@@ -53,6 +53,7 @@
 #include "memory/gpu_runtime.hh"
 
 #include <limits>
+#include <map>
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 
@@ -301,6 +302,23 @@ namespace muGrid {
 
         }  // namespace
 
+        int launch_threads() {
+            // Warp size of each device, queried once per device (the sweep
+            // runs on the current device). A failed query is not cached, so
+            // a later call on an initialised device gets the true value.
+            static std::map<int, int> warp_sizes;
+            const int device{gpu_get_device()};
+            auto found{warp_sizes.find(device)};
+            if (found == warp_sizes.end()) {
+                const int warp_size{gpu_warp_size(device)};
+                if (warp_size <= 0) {
+                    return device_threads(0);
+                }
+                found = warp_sizes.emplace(device, warp_size).first;
+            }
+            return device_threads(found->second);
+        }
+
         template <Dim_t Dim, typename T>
         void sweep_gpu(const std::complex<T> * rhs, const std::complex<T> * head,
                        const std::complex<T> * exc, const int * exc_index,
@@ -318,19 +336,32 @@ namespace muGrid {
             if (nz == 0 || nb_modes == 0) {
                 return;
             }
-            const Index_t nb_blocks{(nb_modes + DEVICE_THREADS - 1) /
-                                    DEVICE_THREADS};
-            GPU_LAUNCH_KERNEL(
-                (block_thomas_kernel<Dim, T, DEVICE_CHUNK, DEVICE_THREADS>),
-                nb_blocks, DEVICE_THREADS,
-                reinterpret_cast<const DC *>(rhs),
-                reinterpret_cast<const DC *>(head),
-                reinterpret_cast<const DC *>(exc), exc_index,
-                reinterpret_cast<const DC *>(A0),
-                reinterpret_cast<const DC *>(A2), reinterpret_cast<DC *>(y),
-                reinterpret_cast<DC *>(out), static_cast<int>(nz),
-                static_cast<int>(nb_modes), static_cast<int>(nb_head),
-                static_cast<int>(nb_exc));
+            const int threads{launch_threads()};
+            const Index_t nb_blocks{(nb_modes + threads - 1) / threads};
+            const auto * rhs_d{reinterpret_cast<const DC *>(rhs)};
+            const auto * head_d{reinterpret_cast<const DC *>(head)};
+            const auto * exc_d{reinterpret_cast<const DC *>(exc)};
+            const auto * a0_d{reinterpret_cast<const DC *>(A0)};
+            const auto * a2_d{reinterpret_cast<const DC *>(A2)};
+            auto * y_d{reinterpret_cast<DC *>(y)};
+            auto * out_d{reinterpret_cast<DC *>(out)};
+            // Each launch shape is its own instantiation, so that
+            // __launch_bounds__ states the block size actually launched.
+            if (threads == 32) {
+                GPU_LAUNCH_KERNEL(
+                    (block_thomas_kernel<Dim, T, DEVICE_CHUNK, 32>), nb_blocks,
+                    32, rhs_d, head_d, exc_d, exc_index, a0_d, a2_d, y_d,
+                    out_d, static_cast<int>(nz), static_cast<int>(nb_modes),
+                    static_cast<int>(nb_head), static_cast<int>(nb_exc));
+            } else {
+                GPU_LAUNCH_KERNEL(
+                    (block_thomas_kernel<Dim, T, DEVICE_CHUNK,
+                                         DEVICE_THREADS>),
+                    nb_blocks, DEVICE_THREADS, rhs_d, head_d, exc_d,
+                    exc_index, a0_d, a2_d, y_d, out_d, static_cast<int>(nz),
+                    static_cast<int>(nb_modes), static_cast<int>(nb_head),
+                    static_cast<int>(nb_exc));
+            }
             GPU_KERNEL_DEBUG_SYNC("block_thomas");
         }
 

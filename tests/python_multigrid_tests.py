@@ -997,6 +997,41 @@ def test_hybrid_fused_kernel_handles_the_exception_table(comm, n):
     assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
 
 
+@pytest.mark.skipif(not _has_gpu(), reason="needs a GPU")
+def test_hybrid_fused_kernel_launches_one_warp_per_block(comm):
+    """The device sweep launches one warp per block (32 threads on NVIDIA,
+    64 on AMD), and that instantiation agrees with the reference loop in 2D
+    (few modes, latency-bound) and 3D."""
+    import cupy as cp
+    from muGrid import linalg
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+
+    if comm is not None and comm.size > 1:
+        pytest.skip("single-rank comparison")
+    cp.cuda.Device(0).use()
+    warp = cp.cuda.runtime.getDeviceProperties(0)["warpSize"]
+    assert linalg.block_thomas_gpu_launch_threads() == min(
+        warp, linalg.block_thomas_gpu_threads)
+
+    for nb_grid_pts in ((96, 96), (20, 12, 10)):
+        dim = len(nb_grid_pts)
+        decomp = muGrid.CartesianDecomposition(
+            comm, list(nb_grid_pts), nb_subdivisions=[1] * dim,
+            nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim,
+            device=muGrid.Device.gpu(0))
+        prec = HybridFourierTridiagonalPreconditioner(
+            decomp, tuple(1.0 / n for n in nb_grid_pts), 1.3, 0.7,
+            communicator=comm)
+        rng = cp.random.default_rng(5)
+        shape = (prec.nz_local,) + prec._mode_shape + (dim, 1)
+        rhs = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+               ).astype(prec._cdtype)
+        fused = prec._solve_local_fused(rhs)
+        loop = prec._solve_local(rhs, fused=False)
+        scale = float(cp.abs(loop).max())
+        assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
+
+
 def _nb_gpus():
     try:
         import cupy

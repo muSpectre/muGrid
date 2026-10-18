@@ -126,12 +126,35 @@ namespace muGrid {
         //! thread, within both CDNA3's and NVIDIA's 255.
         constexpr int DEVICE_CHUNK{2};
 
-        //! Threads per block of the device sweep, also its
-        //! `__launch_bounds__`. One thread per mode, and the mode count is
-        //! small (8320 at 128^3), so small blocks spread the work over more
-        //! compute units: on MI300A 64-thread blocks occupy 130 of 228 CUs
-        //! where 256-thread blocks occupy 33 (0.307 vs 0.423 ms per sweep).
+        //! Largest block of the device sweep (threads); the sweep launches
+        //! one warp per block, `device_threads(warp_size)`, so this is the
+        //! block on a 64-wide AMD wavefront and twice the NVIDIA one.
         constexpr int DEVICE_THREADS{64};
+
+        /**
+         * @brief Threads per block of the device sweep on a device with
+         *        `warp_size` threads per warp: one warp, capped at
+         *        `DEVICE_THREADS`.
+         *
+         * One thread per mode, and the mode count is small -- `(N_0/2 + 1)
+         * N_1` in 3D (8320 at 128^3) and only `N/2 + 1` in 2D -- while each
+         * thread marches all planes serially, so the sweep is latency-bound
+         * and gains from spreading its warps over as many multiprocessors and
+         * schedulers as possible; one warp per block does that.
+         *
+         * Measured on MI300A (64-wide wavefronts, 3D 128^3): 64-thread
+         * blocks occupy 130 of 228 CUs where 256-thread blocks occupy 33,
+         * 0.307 vs 0.423 ms per sweep. On an RTX PRO 500 (32-wide warps, 14
+         * SMs; ms per sweep, 64 / 32 threads): 2D 1024^2 single 0.730 /
+         * 0.452, double 1.970 / 1.744; 3D 64^3 double 0.568 / 0.493; 3D
+         * 128^3 single 0.613 / 0.570, double 3.696 / 3.676; 3D 192^3 double
+         * 11.759 / 11.759 -- never slower, up to 1.6x faster.
+         */
+        constexpr int device_threads(int warp_size) {
+            return (warp_size > 0 && warp_size < DEVICE_THREADS)
+                       ? warp_size
+                       : DEVICE_THREADS;
+        }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
@@ -140,8 +163,13 @@ namespace muGrid {
          * Defined in `block_thomas_gpu.cc`. The loop order differs from the
          * host: one thread per mode marching the axis in registers, which is
          * what the z-major layout is for. Pointers are device pointers.
-         * Requires `nz` and `nb_modes` to fit in an `int`.
+         * Requires `nz` and `nb_modes` to fit in an `int`. The block size is
+         * `launch_threads()`.
          */
+        //! Threads per block `sweep_gpu` launches on the current device:
+        //! `device_threads` of its warp size.
+        int launch_threads();
+
         template <Dim_t Dim, typename T>
         void sweep_gpu(const std::complex<T> * rhs,
                        const std::complex<T> * head,
