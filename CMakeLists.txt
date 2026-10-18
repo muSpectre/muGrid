@@ -28,8 +28,23 @@ if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
         set(MUGRID_GIT_DIRTY "true")
     endif()
 else()
-    set(MUGRID_VERSION_STRING "unknown")
-    set(MUGRID_GIT_HASH "unknown")
+    # No git checkout: a build from a source archive, e.g. an offline
+    # `pip install mugrid-X.Y.Z.tar.gz`. scikit-build-core passes the package
+    # version, which setuptools-scm wrote into the archive's metadata when the
+    # archive was made; a development version names its commit there as
+    # "+g<hash>". A plain CMake build of an archive has neither.
+    if(DEFINED SKBUILD_PROJECT_VERSION_FULL
+            AND NOT "${SKBUILD_PROJECT_VERSION_FULL}" STREQUAL "")
+        set(MUGRID_VERSION_STRING "${SKBUILD_PROJECT_VERSION_FULL}")
+    else()
+        set(MUGRID_VERSION_STRING "unknown")
+    endif()
+    string(REGEX MATCH "\\+g([0-9a-f]+)" _hash_match "${MUGRID_VERSION_STRING}")
+    if(_hash_match)
+        set(MUGRID_GIT_HASH "${CMAKE_MATCH_1}")
+    else()
+        set(MUGRID_GIT_HASH "unknown")
+    endif()
     set(MUGRID_GIT_DIRTY "false")
 endif()
 

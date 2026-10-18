@@ -16,6 +16,12 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.5.1 (not yet released)
+-------------------------
+
+- BUILD: Builds from a source archive, e.g. an offline pip install of the sdist, report
+  their release version (and the commit of a development version) instead of "unknown"
+
 v1.5.0 (18Oct26)
 ----------------
 
