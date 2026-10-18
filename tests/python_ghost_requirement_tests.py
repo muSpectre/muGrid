@@ -23,12 +23,12 @@ def test_laplace_ghost_requirement():
 def test_fem_gradient_ghost_requirement():
     op2 = muGrid.FEMGradientOperator(2, [0.1, 0.1])
     assert op2.apply_ghost_requirement == ((0, 0), (1, 1))
-    # The scatter-style transpose writes into the same ghost buffers that
-    # apply() reads, so the requirement is NOT mirrored
-    assert op2.transpose_ghost_requirement == ((0, 0), (1, 1))
-    assert op2.ghost_requirement == ((0, 0), (1, 1))
+    # The transpose gathers onto the owned nodes, and the element below an
+    # owned node lives in the left ghost layer: the mirrored requirement
+    assert op2.transpose_ghost_requirement == ((1, 1), (0, 0))
+    assert op2.ghost_requirement == ((1, 1), (1, 1))
     op3 = muGrid.FEMGradientOperator(3, [0.1, 0.1, 0.1])
-    assert op3.ghost_requirement == ((0, 0, 0), (1, 1, 1))
+    assert op3.ghost_requirement == ((1, 1, 1), (1, 1, 1))
 
 
 def test_generic_ghost_requirement():
@@ -60,12 +60,12 @@ def test_collection_from_operator_list():
     fc = muGrid.GlobalFieldCollection(
         [8, 8],
         ghosts=[
-            muGrid.FEMGradientOperator(2, [0.1, 0.1]),  # (0, 0), (1, 1)
-            muGrid.GenericLinearOperator([-1, 0], np.ones((3, 1))),
+            muGrid.LaplaceOperator(2),  # (1, 1), (1, 1)
+            muGrid.GenericLinearOperator([-2, 0], np.ones((3, 1))),
         ],
     )
-    assert fc.nb_ghosts_left == (1, 0)
-    assert fc.nb_ghosts_right == (1, 1)
+    assert fc.nb_ghosts_left == (2, 1)
+    assert fc.nb_ghosts_right == (2, 1)
 
 
 def test_collection_from_int():

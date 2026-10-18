@@ -196,3 +196,240 @@ def test_float64_rtol_below_float32_floor_is_silent(solver):
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
         solver(comm, fc, b, x, hessp=hessp, rtol=1e-9, maxiter=5)
+
+
+def _ill_conditioned_diagonal_problem(dtype, cond, n=64):
+    """``A = diag(d)`` with ``d`` log-spaced over ``[1, cond]`` and shuffled,
+    on an ``n x n`` scalar field, with a random right-hand side."""
+    fc = GlobalFieldCollection((n, n))
+    rng = np.random.default_rng(1)
+    d = np.logspace(0, np.log10(cond), n * n).reshape(n, n)
+    rng.shuffle(d.ravel())
+    b = fc.real_field("rhs", dtype=dtype)
+    x = fc.real_field("solution", dtype=dtype)
+    b.p[...] = rng.standard_normal(b.p.shape)
+    D = d.astype(dtype)
+
+    def hessp(src, dst):
+        dst.p[...] = D * src.p
+
+    def true_relative_residual():
+        bb = np.asarray(b.p, dtype=np.float64)
+        return (np.linalg.norm(bb - d * np.asarray(x.p, dtype=np.float64))
+                / np.linalg.norm(bb))
+
+    return fc, b, x, hessp, true_relative_residual
+
+
+@serial_only
+@pytest.mark.parametrize("dtype,cond,rtol,replacement_interval", [
+    (np.float64, 1e5, 1e-8, None),
+    (np.float64, 1e5, 1e-10, None),
+    (np.float32, 1e3, 1e-5, None),
+    (np.float64, 1e5, 1e-8, 0),
+    (np.float64, 1e5, 1e-10, 0),
+])
+def test_pipelined_cg_converges_in_the_true_residual(dtype, cond, rtol,
+                                                     replacement_interval):
+    """Pipelined CG may only report convergence when ``b - Ax`` itself meets
+    the tolerance.
+
+    It advances the residual by recurrence, and in the pipelined formulation
+    the rounding errors of the recurrences are amplified: the recursive
+    residual kept shrinking while the true one stalled. It used to return at
+    a true relative residual of 6e-7 when asked for 1e-8 (float64, condition
+    number 1e5) and, in float32 at condition number 1e3, to declare
+    convergence at a true residual of 20 times the right-hand side.
+    ``replacement_interval=0`` exercises the true-residual check on its own,
+    without periodic residual replacement.
+    """
+    comm = Communicator()
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(dtype, cond)
+    conjugate_gradients_pipelined(
+        comm, fc, b, x, hessp=hessp, rtol=rtol, maxiter=20000,
+        replacement_interval=replacement_interval)
+    assert true_relative_residual() <= rtol
+
+
+@serial_only
+def test_pipelined_cg_without_replacement_never_returns_a_drifted_iterate():
+    """Without residual replacement the float32 recurrences drift far from
+    the truth. The solve used to return the drifted iterate as converged, at
+    a true residual 20 times ``|b|``; it may now only return a true solution
+    or raise. (It currently converges: the drift drives the recurrence
+    curvature non-positive, which restarts the iteration from the true
+    residual -- the indefiniteness guard of audit finding S4.)"""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float32, 1e3)
+    try:
+        conjugate_gradients_pipelined(
+            comm, fc, b, x, hessp=hessp, rtol=1e-5, maxiter=2000,
+            replacement_interval=0)
+    except ConvergenceError:
+        return
+    assert true_relative_residual() <= 1e-5
+
+
+SOLVERS = [conjugate_gradients, conjugate_gradients_pipelined]
+
+
+@serial_only
+@pytest.mark.parametrize("outer", SOLVERS)
+@pytest.mark.parametrize("inner", SOLVERS)
+def test_solve_nested_in_the_preconditioner_keeps_its_own_vectors(outer,
+                                                                  inner):
+    """A preconditioner that runs CG on the solver's own collection must not
+    share the outer solve's work fields (audit finding S5).
+
+    The inner solve is on ``2 I``, so it converges in one step and the
+    preconditioner is the fixed linear map ``z = r / 2``: any failure of the
+    outer solve comes from shared state, not from a variable preconditioner.
+    With fixed work-field names the inner solve overwrote the outer residual
+    and search direction.
+    """
+    comm = Communicator()
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float64, 1e3, n=16)
+
+    def twice(src, dst):
+        dst.p[...] = 2 * src.p
+
+    def prec(r, z):
+        z.p[...] = 0
+        inner(comm, fc, r, z, hessp=twice, rtol=1e-12, maxiter=10)
+
+    outer(comm, fc, b, x, hessp=hessp, prec=prec, rtol=1e-8, maxiter=2000)
+    assert true_relative_residual() <= 1e-8
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_float32_solve_after_float64_on_the_same_collection(solver):
+    """The work fields of a float64 solve must not be handed to a later
+    float32 solve on the same collection (it raised TypeError)."""
+    comm = Communicator()
+    fc = GlobalFieldCollection((8, 8))
+
+    def twice(src, dst):
+        dst.p[...] = 2 * src.p
+
+    for dtype in (np.float64, np.float32):
+        name = np.dtype(dtype).name
+        b = fc.real_field(f"rhs-{name}", dtype=dtype)
+        x = fc.real_field(f"solution-{name}", dtype=dtype)
+        b.p[...] = 1
+        solver(comm, fc, b, x, hessp=twice, rtol=1e-6, maxiter=10)
+        np.testing.assert_allclose(np.asarray(x.p), 0.5, rtol=1e-6)
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_solver_leaves_no_work_fields_behind(solver):
+    """Work fields are removed when the solve ends, by return or by raising,
+    so repeated solves do not accumulate them in the collection."""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float64, 1e3)
+    before = sorted(fc.field_names)
+    solver(comm, fc, b, x, hessp=hessp, rtol=1e-6, maxiter=5000)
+    assert sorted(fc.field_names) == before
+    x.p[...] = 0
+    with pytest.raises(ConvergenceError):
+        solver(comm, fc, b, x, hessp=hessp, rtol=1e-12, maxiter=3)
+    assert sorted(fc.field_names) == before
+
+
+def test_single_precision_field_refuses_a_mismatched_existing_one():
+    """Get-or-create in float32 checks the existing field as the float64 path
+    does, instead of returning whatever field has the name."""
+    fc = GlobalFieldCollection((4, 4), sub_pts={"quad": 2})
+    fc.real_field("a")  # float64
+    with pytest.raises(ValueError, match="already exists"):
+        fc.real_field("a", dtype=np.float32)
+    b = fc.real_field("b", (3,), dtype=np.float32)
+    assert fc.real_field("b", (3,), dtype=np.float32).dtype == np.float32
+    with pytest.raises(ValueError, match="already exists"):
+        fc.real_field("b", (2,), dtype=np.float32)
+    with pytest.raises(ValueError, match="already exists"):
+        fc.real_field("b", (3,), "quad", dtype=np.float32)
+    del b
+
+
+@serial_only
+def test_cg_converges_in_the_true_residual_in_float32():
+    """conjugate_gradients may only return once ``b - Ax`` meets the
+    tolerance: in float32 at condition number 1e4 it returned at a true
+    relative residual of 1.01e-5 when asked for 1e-5 (audit finding S3)."""
+    comm = Communicator()
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float32, 1e4)
+    conjugate_gradients(comm, fc, b, x, hessp=hessp, rtol=1e-5, maxiter=20000)
+    assert true_relative_residual() <= 1e-5
+
+
+@serial_only
+def test_cg_below_the_float32_floor_raises_instead_of_returning():
+    """Asked for less than float32 can deliver, the solve used to return at
+    a true residual of 6e-7 for rtol=1e-8; it must warn and then raise."""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float32, 1e3)
+    with pytest.warns(RuntimeWarning, match="floor"):
+        with pytest.raises(ConvergenceError, match="stagnated|did not converge"):
+            conjugate_gradients(comm, fc, b, x, hessp=hessp, rtol=1e-8,
+                                maxiter=20000)
+
+
+def _indefinite_problem(n=16):
+    """``A = diag(d)`` with one entry in seven negative (audit finding S4:
+    conjugate_gradients ran 17,529 iterations on it without an error)."""
+    fc = GlobalFieldCollection((n, n))
+    rng = np.random.default_rng(2)
+    d = np.logspace(0, 2, n * n).reshape(n, n)
+    d.ravel()[::7] *= -1
+    b = fc.real_field("rhs")
+    x = fc.real_field("solution")
+    b.p[...] = rng.standard_normal(b.p.shape)
+
+    def hessp(src, dst):
+        dst.p[...] = d * src.p
+
+    return fc, b, x, hessp
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_indefinite_operator_raises(solver):
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp = _indefinite_problem()
+    with pytest.raises(ConvergenceError, match="not positive definite"):
+        solver(comm, fc, b, x, hessp=hessp, rtol=1e-8, maxiter=500)
+
+
+@serial_only
+@pytest.mark.parametrize("solver", SOLVERS)
+def test_indefinite_preconditioner_raises(solver):
+    """A preconditioner that flips the sign on part of the domain makes
+    ``r^T M r`` non-positive; CG must say so instead of iterating on."""
+    from muGrid.Solvers import ConvergenceError
+
+    comm = Communicator()
+    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float64, 1e2,
+                                                           n=16)
+    sign = np.ones((16, 16))
+    sign[:8] = -1
+
+    def prec(r, z):
+        z.p[...] = sign * r.p
+
+    with pytest.raises(ConvergenceError, match="not positive definite"):
+        solver(comm, fc, b, x, hessp=hessp, prec=prec, rtol=1e-8,
+               maxiter=500)

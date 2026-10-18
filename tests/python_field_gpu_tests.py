@@ -126,7 +126,7 @@ class DeviceCollectionTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_device_collection_is_on_device(self):
@@ -183,7 +183,7 @@ class DeviceFieldFactoryTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_real_field_on_device_collection(self):
@@ -211,7 +211,7 @@ class CuPyIntegrationTests(unittest.TestCase):
         # Create a device collection
         self.fc = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_device_field_returns_cupy_array(self):
@@ -287,7 +287,7 @@ class MixedHostDeviceTests(unittest.TestCase):
         # Create device collection
         self.fc_device = muGrid.GlobalFieldCollection(
             self.nb_grid_pts,
-            device=muGrid.Device.cuda()
+            device=muGrid.Device.gpu()
         )
 
     def test_host_and_device_collections(self):
@@ -385,3 +385,41 @@ class CupyAllocatorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(GPU_AVAILABLE, "GPU backend not available")
+class PixelLayoutPortabilityTests(unittest.TestCase):
+    """The pixel layout (.p) folds sub-points into the last component axis in
+    a storage-order-dependent order, so the same code indexed different
+    entries on host and device (audit finding M1). Where the orders differ,
+    the device refuses .p; where they agree, it matches the host."""
+
+    def _fields(self, components, nb_quad):
+        out = []
+        for kw in ({}, {"device": muGrid.Device.gpu()}):
+            fc = muGrid.GlobalFieldCollection(
+                (3, 2), sub_pts={"quad": nb_quad}, **kw)
+            out.append(fc.real_field("f", components, "quad"))
+        host, device = out
+        values = np.arange(np.prod(host.s.shape), dtype=float).reshape(
+            host.s.shape)
+        host.s[...] = values
+        device.s[...] = cp.asarray(values)
+        return host, device
+
+    def test_s_layout_agrees(self):
+        host, device = self._fields((2,), 3)
+        np.testing.assert_array_equal(host.s, cp.asnumpy(device.s))
+
+    def test_pixel_layout_refused_where_orders_differ(self):
+        host, device = self._fields((2,), 3)
+        host.p  # array-of-structures: the host order, a view
+        with self.assertRaises(ValueError):
+            device.p
+        with self.assertRaises(ValueError):
+            device.pg
+
+    def test_pixel_layout_agrees_where_orders_coincide(self):
+        for components, nb_quad in (((1,), 3), ((), 4), ((3,), 1)):
+            host, device = self._fields(components, nb_quad)
+            np.testing.assert_array_equal(host.p, cp.asnumpy(device.p))

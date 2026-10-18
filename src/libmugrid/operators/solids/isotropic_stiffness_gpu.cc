@@ -1301,6 +1301,7 @@ void IsotropicStiffnessOperator<2>::apply_impl(
     T alpha,
     TypedFieldBase<T, DefaultDeviceSpace>& force,
     bool increment) const {
+        DeviceGuard device_guard{displacement.get_device_id()};
 
     // Validate field collections and ghosts; the dimension-generic checks
     // live in internal::validate_stiffness_fields (isotropic_stiffness.hh).
@@ -1377,6 +1378,7 @@ void IsotropicStiffnessOperator<3>::apply_impl(
     T alpha,
     TypedFieldBase<T, DefaultDeviceSpace>& force,
     bool increment) const {
+        DeviceGuard device_guard{displacement.get_device_id()};
 
     // Validate field collections and ghosts; the dimension-generic checks
     // live in internal::validate_stiffness_fields (isotropic_stiffness.hh).
@@ -1463,6 +1465,7 @@ void IsotropicStiffnessOperator<2>::apply_uniform_impl(
     T lambda, T mu, T alpha,
     TypedFieldBase<T, DefaultDeviceSpace>& force,
     bool increment) const {
+        DeviceGuard device_guard{displacement.get_device_id()};
 
     auto& disp_coll = displacement.get_collection();
     auto* disp_global_fc = dynamic_cast<const GlobalFieldCollection*>(&disp_coll);
@@ -1518,6 +1521,7 @@ void IsotropicStiffnessOperator<3>::apply_uniform_impl(
     T lambda, T mu, T alpha,
     TypedFieldBase<T, DefaultDeviceSpace>& force,
     bool increment) const {
+        DeviceGuard device_guard{displacement.get_device_id()};
 
     auto& disp_coll = displacement.get_collection();
     auto* disp_global_fc = dynamic_cast<const GlobalFieldCollection*>(&disp_coll);
@@ -1581,6 +1585,7 @@ void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & mu,
     const std::array<Real, 4> & E_macro,
     TypedFieldBase<T, DefaultDeviceSpace> & force) const {
+        DeviceGuard device_guard{lambda.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<2>(
         force.get_collection(), lambda.get_collection());
@@ -1620,6 +1625,7 @@ void IsotropicStiffnessOperator<3>::apply_macro_rhs_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & mu,
     const std::array<Real, 9> & E_macro,
     TypedFieldBase<T, DefaultDeviceSpace> & force) const {
+        DeviceGuard device_guard{lambda.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<3>(
         force.get_collection(), lambda.get_collection());
@@ -1663,6 +1669,7 @@ void IsotropicStiffnessOperator<2>::assemble_diagonal_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
     const TypedFieldBase<T, DefaultDeviceSpace> & mu,
     TypedFieldBase<T, DefaultDeviceSpace> & diagonal) const {
+        DeviceGuard device_guard{lambda.get_device_id()};
 
     // diag(K) = Σ_e (2μ_e diag(G) + λ_e diag(V)): the macro-RHS gather with the
     // per-element vectors replaced by the diagonals of G, V (see the host impl).
@@ -1706,6 +1713,7 @@ void IsotropicStiffnessOperator<3>::assemble_diagonal_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
     const TypedFieldBase<T, DefaultDeviceSpace> & mu,
     TypedFieldBase<T, DefaultDeviceSpace> & diagonal) const {
+        DeviceGuard device_guard{lambda.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<3>(
         diagonal.get_collection(), lambda.get_collection());
@@ -1755,6 +1763,7 @@ void IsotropicStiffnessOperator<2>::compute_sensitivity_impl(
     const std::array<Real, 4> & costate_macro,
     TypedFieldBase<T, DefaultDeviceSpace> & g_shear,
     TypedFieldBase<T, DefaultDeviceSpace> & g_vol) const {
+        DeviceGuard device_guard{forward_disp.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<2>(
         forward_disp.get_collection(), g_shear.get_collection());
@@ -1801,6 +1810,7 @@ void IsotropicStiffnessOperator<3>::compute_sensitivity_impl(
     const std::array<Real, 9> & costate_macro,
     TypedFieldBase<T, DefaultDeviceSpace> & g_shear,
     TypedFieldBase<T, DefaultDeviceSpace> & g_vol) const {
+        DeviceGuard device_guard{forward_disp.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<3>(
         forward_disp.get_collection(), g_shear.get_collection());
@@ -1850,6 +1860,7 @@ std::array<Real, 4> IsotropicStiffnessOperator<2>::average_stress_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
     const TypedFieldBase<T, DefaultDeviceSpace> & mu,
     const std::array<Real, 4> & E_macro) const {
+        DeviceGuard device_guard{displacement.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<2>(
         displacement.get_collection(), lambda.get_collection());
@@ -1890,6 +1901,7 @@ std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
     const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
     const TypedFieldBase<T, DefaultDeviceSpace> & mu,
     const std::array<Real, 9> & E_macro) const {
+        DeviceGuard device_guard{displacement.get_device_id()};
 
     const auto info = internal::validate_stiffness_fields<3>(
         displacement.get_collection(), lambda.get_collection());

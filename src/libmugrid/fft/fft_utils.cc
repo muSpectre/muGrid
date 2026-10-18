@@ -35,6 +35,8 @@
 
 #include "fft_utils.hh"
 
+#include <algorithm>
+
 #include <cmath>
 #include <numeric>
 
@@ -211,7 +213,16 @@ void select_process_grid(int num_ranks, const DynGridIndex & nb_grid_pts, int & 
     if (Ny % test_p2 == 0)
       divisibility += 1.0;
 
-    double score = squareness + 0.5 * divisibility;
+    // Every rank must hold data in both spaces: real space splits Z across
+    // P1 and Y across P2, Fourier space the half-complex X across P2 and Y
+    // across P1. A factorization violating that idles ranks (16 ranks on a
+    // (16, 16, 3) grid used to pick P1 = 4 > Nz = 3: four empty ranks), so it
+    // only wins when no factorization fits.
+    const Index_t Fx{nb_grid_pts[0] / 2 + 1};
+    const bool fits{test_p1 <= std::min(Nz, Ny) &&
+                    test_p2 <= std::min(Ny, Fx)};
+
+    double score = squareness + 0.5 * divisibility + (fits ? 10.0 : 0.0);
 
     if (score > best_score) {
       best_score = score;

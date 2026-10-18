@@ -410,9 +410,21 @@ def test_jacobi_apply(comm):
     JacobiPreconditioner(2.0)(r, z)
     np.testing.assert_allclose(z.p, r.p / 2, atol=1e-15)
 
-    # Singular diagonal is rejected
-    with pytest.raises(ValueError, match="non-singular"):
-        JacobiPreconditioner(0.0)
+    # Singular, negative and non-finite diagonals are rejected
+    for bad in (0.0, -2.0, np.nan):
+        with pytest.raises(ValueError, match="positive, finite"):
+            JacobiPreconditioner(bad)
+
+
+def test_jacobi_rejects_a_bad_entry_on_any_rank_collectively(comm):
+    """With a communicator, a negative entry on one rank makes every rank
+    raise; a rank-local raise would leave the others blocked in their next
+    collective operation (audit finding S4)."""
+    values = np.ones((4, 4))
+    if comm.rank == 0:
+        values[1, 2] = -1.0
+    with pytest.raises(ValueError, match="1 entries"):
+        JacobiPreconditioner(values, communicator=comm)
 
 
 def screened_poisson_cg(comm, engine, prec, rtol=1e-8, maxiter=1000):
@@ -1186,6 +1198,116 @@ def test_evaluated_symbol_stores_only_the_stencil(comm, dim):
     assert stored_scalars == 3 ** dim * dim * dim + sum(fourier_shape)
 
 
+def _low_frequency_modes(dim, n):
+    """Frequency tables for the longest wavelengths of an ``n^dim`` grid:
+    the half-complex axis 0 in full, the first eight modes of the others."""
+    q = [np.arange(n // 2 + 1) / n] + [np.fft.fftfreq(n)[:8]] * (dim - 1)
+    return q, [len(qd) for qd in q]
+
+
+@pytest.mark.parametrize("dim,n,h,modulus", [
+    (2, 4096, 1 / 4096, 1.0), (2, 65536, 1 / 65536, 1e-3),
+    (3, 2048, 1 / 2048, 1.0), (3, 4096, 1 / 4096, 1.0),
+    (3, 256, 1e-2, 1e-3),
+])
+def test_evaluated_symbol_is_accurate_in_single_precision(dim, n, h, modulus):
+    """The float32 kernel must invert the lowest modes as accurately as float32
+    can store the result.
+
+    The stencil's rows sum to zero, so at frequency q the phase sum cancels
+    O(S) terms down to O(S q^2): built in single precision that is a relative
+    error of about ``eps N^2``, order one at N = 4096, and ``|det|^2`` --
+    the Dim-th power of entries that small -- underflowed, so the kernel took
+    such modes for the q = 0 null space and zeroed them. Those are the
+    long-wavelength modes the preconditioner exists to treat. Only the lowest
+    modes of a large grid are evaluated, through the per-axis frequency tables,
+    so this stays cheap.
+    """
+    from muGrid import linalg
+    from muGrid.Preconditioners import reference_stencil
+
+    stencil = reference_stencil(dim, (h,) * dim, muGrid.FEMElement.q1,
+                                modulus, modulus).ravel()
+    q, shape = _low_frequency_modes(dim, n)
+    nb_modes = int(np.prod(shape))
+    rng = np.random.default_rng(0)
+    v = rng.standard_normal(nb_modes * dim) + 1j * rng.standard_normal(
+        nb_modes * dim)
+
+    ref = v.copy()
+    getattr(linalg, f"apply_green_symbol_{dim}d")(
+        ref, 1, dim, stencil, q, shape, 1.0)
+    got = v.astype(np.complex64)
+    getattr(linalg, f"apply_green_symbol_{dim}d_f32")(
+        got, 1, dim, stencil, q, shape, 1.0)
+
+    ref = ref.reshape(nb_modes, dim)
+    got = got.reshape(nb_modes, dim).astype(np.complex128)
+    scale = np.abs(ref).max(axis=1)
+    nonzero = scale > 0
+    assert nonzero.sum() == nb_modes - 1  # only q = 0 is projected out
+    rel = np.abs(got - ref).max(axis=1)[nonzero] / scale[nonzero]
+    assert rel.max() < 1e-6
+
+
+@pytest.mark.parametrize("dim,n,h,lam,mu", [
+    (2, 65536, 1 / 65536, 1e-3, 1e-3), (3, 4096, 1 / 4096, 1.0, 1.0),
+    (3, 256, 1e-2, 1e-3, 1e-3),
+    # nearly incompressible, and an element eight times longer along axis 1:
+    # both make the block ill-conditioned, and both once let a float block
+    # with two negative eigenvalues pass the acceptance test (error 7e2)
+    (3, 4096, 1 / 4096, 100.0, 1.0), (3, 4096, (1 / 4096, 1 / 512, 1 / 4096),
+                                      1.3, 0.7),
+    (2, 4096, (1 / 4096, 1 / 512), 100.0, 1.0),
+])
+def test_evaluated_symbol_on_device_is_accurate_in_single_precision(
+        dim, n, h, lam, mu):
+    """Device counterpart of the single-precision accuracy test: the float32
+    device kernel against the float64 host kernel on the lowest modes.
+
+    Unlike the host kernel, which works in double throughout, the device
+    kernel finishes each mode in single precision and redoes it in double only
+    where an a-posteriori test says the single-precision result is off by more
+    than 1e-4 -- double throughput is 1/64 of single on consumer GPUs. So the
+    tolerance is that design target, not float32 resolution. It still fails by
+    orders of magnitude on a kernel that builds the symbol in single precision
+    alone (errors of 1 and zeroed modes)."""
+    skip_if_gpu_unavailable("gpu")
+    import cupy
+
+    from muGrid import linalg
+    from muGrid.Preconditioners import reference_stencil
+
+    kernel = getattr(linalg, f"apply_green_symbol_gpu_{dim}d_f32", None)
+    if kernel is None:
+        pytest.skip("muGrid built without the device symbol kernel")
+    h = h if isinstance(h, tuple) else (h,) * dim
+    stencil = reference_stencil(dim, h, muGrid.FEMElement.q1, lam, mu).ravel()
+    q, shape = _low_frequency_modes(dim, n)
+    nb_modes = int(np.prod(shape))
+    rng = np.random.default_rng(0)
+    v = rng.standard_normal((dim, nb_modes)) + 1j * rng.standard_normal(
+        (dim, nb_modes))
+
+    ref = np.ascontiguousarray(v.T).ravel()
+    getattr(linalg, f"apply_green_symbol_{dim}d")(
+        ref, 1, dim, stencil, q, shape, 1.0)
+    ref = ref.reshape(nb_modes, dim).T
+
+    # structure-of-arrays on the device: component stride nb_modes
+    got = cupy.asarray(v.astype(np.complex64))
+    q_device = [cupy.asarray(qd, dtype=np.float64) for qd in q]
+    kernel(got.data.ptr, nb_modes, 1, stencil,
+           [qd.data.ptr for qd in q_device], shape, 1.0)
+    got = cupy.asnumpy(got).astype(np.complex128)
+
+    scale = np.abs(ref).max(axis=0)
+    nonzero = scale > 0
+    assert nonzero.sum() == nb_modes - 1
+    rel = np.abs(got - ref).max(axis=0)[nonzero] / scale[nonzero]
+    assert rel.max() < 1e-4
+
+
 @pytest.mark.parametrize("dim,shape", [
     (2, (16, 16)), (3, (10, 10, 10)),
     # axis 0 halves to two modes, so a thread block spans more lines than it
@@ -1202,6 +1324,10 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     the host one is array-of-structures, and the kernel's thread blocks share
     the hoisted sums over axes 1 and 2 per axis-0 line. The short-axis-0 grids
     take the path where a block spans too many lines to share them.
+
+    The host reference is stored in double for both precisions: the stored
+    symbol is assembled in the field precision, which in single precision is
+    off by 2e-5 on the (2, 64) grid, against 2e-6 for the kernel.
     """
     skip_if_gpu_unavailable("gpu")
     import cupy
@@ -1218,7 +1344,7 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     host = muGrid.FFTEngine(shape, comm)
     device = muGrid.FFTEngine(shape, comm, device=create_device("gpu"))
     stored = make_reference_stiffness_preconditioner(
-        host, nb_components=dim, dtype=dtype, element=element,
+        host, nb_components=dim, dtype=np.float64, element=element,
         grid_spacing=spacing, lambda_ref=lam, mu_ref=mu,
         evaluate_symbol=False, name=f"stored-{tag}")
     evaluated = make_reference_stiffness_preconditioner(
@@ -1228,8 +1354,10 @@ def test_evaluated_symbol_on_device_matches_stored_on_host(comm, dim, shape,
     assert isinstance(stored, BlockFourierPreconditioner)
     assert isinstance(evaluated, AnalyticReferencePreconditioner)
 
-    r_h = host.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
-    z_h = host.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
+    r_h = host.real_space_field(f"r-{tag}", components=(dim,),
+                                dtype=np.float64)
+    z_h = host.real_space_field(f"z-{tag}", components=(dim,),
+                                dtype=np.float64)
     r_d = device.real_space_field(f"r-{tag}", components=(dim,), dtype=dtype)
     z_d = device.real_space_field(f"z-{tag}", components=(dim,), dtype=dtype)
     x = np.random.default_rng(0).standard_normal(r_h.p.shape).astype(dtype)
@@ -1281,3 +1409,41 @@ def test_evaluated_symbol_rejects_a_malformed_stencil(comm):
     with pytest.raises(ValueError, match="stencil must have shape"):
         AnalyticReferencePreconditioner(engine, np.zeros((3, 3, 2)),
                                         name="bad-stencil")
+
+
+def test_stored_symbol_is_accurate_and_compact_in_single_precision(comm):
+    """The stored reference-stiffness symbol for a float32 solve is built and
+    inverted in double, and stored as its upper triangle (audit finding S6).
+
+    It used to be assembled in single precision, where the low-frequency
+    phase sum cancels to O(S q^2): on the lowest modes of a 4096^2 grid the
+    float32 preconditioner was off from the float64 one by 4e-2 (7e-4 at
+    1024^2). And because rounding made the inverse look non-Hermitian, the
+    float32 symbol was always stored as the dense block, twice the memory.
+    """
+    n, dim = 1024, 2
+    out, hermitian = {}, {}
+    for dtype in (np.float64, np.float32):
+        tag = np.dtype(dtype).name
+        engine = muGrid.FFTEngine((n,) * dim, comm)
+        prec = make_reference_stiffness_preconditioner(
+            engine, nb_components=dim, dtype=dtype,
+            element=muGrid.FEMElement.q1, grid_spacing=(1.0 / n,) * dim,
+            lambda_ref=1.3, mu_ref=0.7, evaluate_symbol=False,
+            name=f"s6-{tag}")
+        r = engine.real_space_field(f"r-s6-{tag}", components=(dim,),
+                                    dtype=dtype)
+        z = engine.real_space_field(f"z-s6-{tag}", components=(dim,),
+                                    dtype=dtype)
+        x = np.asarray(engine.coords)[0]
+        r.p[...] = 0
+        for k in (1, 2, 3):
+            r.p[0] += np.cos(2 * np.pi * k * x).astype(dtype)
+        prec(r, z)
+        out[dtype] = np.asarray(z.p, dtype=np.float64)
+        hermitian[dtype] = prec._hermitian
+    a, b = out[np.float64], out[np.float32]
+    error = comm.max(float(np.abs(a - b).max()) if a.size else 0.0)
+    scale = comm.max(float(np.abs(a).max()) if a.size else 0.0)
+    assert error / scale < 1e-5
+    assert hermitian[np.float32]

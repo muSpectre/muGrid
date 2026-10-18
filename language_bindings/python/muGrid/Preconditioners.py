@@ -112,14 +112,24 @@ class JacobiPreconditioner(Preconditioner):
         are copied, later modification of the source has no effect.
     name : str, optional
         Prefix for the field holding the inverse diagonal.
+    communicator : muGrid.Communicator, optional
+        Communicator of the parallel run. With it, the diagonal check below is
+        collective, so every rank raises together; without it, a rank whose
+        own entries fail raises alone and the others block in their next
+        collective operation. Pass it under MPI.
 
     Raises
     ------
     ValueError
-        If any diagonal entry is zero.
+        If any diagonal entry is zero, negative or not finite. CG needs a
+        positive definite preconditioner, and the diagonal of a positive
+        definite operator is positive: a negative entry means the operator is
+        not positive definite, and dividing by it makes the preconditioner
+        indefinite.
     """
 
-    def __init__(self, diagonal, name="jacobi-preconditioner"):
+    def __init__(self, diagonal, name="jacobi-preconditioner",
+                 communicator=None):
         self._name = name
         values = getattr(diagonal, "s", None)  # muGrid field?
         if values is not None:
@@ -127,10 +137,15 @@ class JacobiPreconditioner(Preconditioner):
             values = values.get() if hasattr(values, "get") else np.array(values)
         else:
             values = np.asarray(diagonal, dtype=float)
-        if not (np.abs(values) > 0).all():
+        nb_bad = int(np.count_nonzero(~(np.isfinite(values) & (values > 0))))
+        if communicator is not None:
+            from .Parallel import Communicator
+
+            nb_bad = int(Communicator(communicator).sum(nb_bad))
+        if nb_bad > 0:
             raise ValueError(
-                "Jacobi preconditioner requires a non-singular diagonal "
-                "(got entries equal to zero)"
+                "Jacobi preconditioner requires a positive, finite diagonal; "
+                f"{nb_bad} entries are zero, negative or not finite"
             )
         self._is_scalar = values.ndim == 0
         self._inverse_diagonal = (
@@ -140,7 +155,10 @@ class JacobiPreconditioner(Preconditioner):
 
     def _inverse_diagonal_field(self, z):
         """Field holding D⁻¹ on z's collection (created on first use)."""
-        if self._field is None:
+        # One field per precision: a float32 solve needs a float32 D⁻¹ (the
+        # field used to be float64 always, so linalg.scal raised).
+        dtype = np.dtype(z.dtype)
+        if self._field is None or np.dtype(self._field.dtype) != dtype:
             values = self._inverse_diagonal
             # Spatial-only diagonals go into a single-component field that
             # linalg.scal broadcasts over z's components; values that do
@@ -152,11 +170,14 @@ class JacobiPreconditioner(Preconditioner):
                 components = ()
             except ValueError:
                 components = tuple(z.components_shape)
-            field = wrap_field(
-                z.collection.real_field(
-                    f"{self._name}-inverse-diagonal", components
-                )
-            )
+            from .Wrappers import _typed_field
+
+            field = wrap_field(_typed_field(
+                z.collection, f"{self._name}-inverse-diagonal-{dtype.name}",
+                components, "pixel", dtype,
+                {np.dtype(np.float64): "real_field",
+                 np.dtype(np.float32): "register_real32_field"},
+                "real_field"))
             # scal operates on the full buffer; zero ghost entries keep
             # the (later overwritten) ghost values of z finite.
             field.set_zero()
@@ -443,7 +464,8 @@ class BlockFourierPreconditioner(Preconditioner):
         if comm is not None:
             herm_scale = float(comm.max(herm_scale))
             herm_asym = float(comm.max(herm_asym))
-        self._hermitian = herm_scale == 0.0 or herm_asym <= 1e-10 * herm_scale
+        self._hermitian = herm_scale == 0.0 or herm_asym <= (
+            _hermitian_tol(blocks.dtype) * herm_scale)
 
         # Store the symbol at the solve precision (real diagonals, complex
         # off-diagonals / dense block): it is the largest persistent buffer, and
@@ -781,6 +803,18 @@ class AnalyticReferencePreconditioner(Preconditioner):
     :func:`make_reference_stiffness_preconditioner` picks this class on a
     device and the stored symbol on the host.
 
+    In single precision the low-frequency phase sum cancels O(S) terms to
+    O(S q²), and a symbol built in float32 alone lost the lowest modes (zeroed
+    outright from N ≈ 2048). On the host the symbol is therefore built and
+    inverted in double for either field precision; only the mode's components
+    are read and written in the field's. On a device a float32 field is
+    finished in single precision per mode, and redone in double only where an
+    a-posteriori test on the block says the single-precision result is off by
+    more than about 1e-4 -- the long wavelengths, about 0.05% of the modes for
+    an isotropic medium. That keeps the float32 apply at single-precision speed
+    on GPUs with weak double throughput (L40S, 512³: 45 ms, against 87 ms with
+    the symbol in double throughout).
+
     The per-mode cost would be nine times higher done naively. Modes along the
     fastest axis share the frequencies of every other axis, so the kernel
     hoists those sums out of that loop; without it the symbol build alone is
@@ -824,15 +858,22 @@ class AnalyticReferencePreconditioner(Preconditioner):
                 f"stencil must have shape (3,)*dim + (dim, dim) with dim 2 or "
                 f"3; got {stencil.shape}")
         self._dim = dim
-        # Real, and 243 numbers at most -- this is the whole operator.
-        self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=real_dtype)
+        # Real, and 243 numbers at most -- this is the whole operator. Kept in
+        # double for either field precision: the kernels build and invert the
+        # symbol in double wherever single precision is not enough, because
+        # there the low-frequency phase sum cancels to O(S q^2) and loses the
+        # long-wavelength modes this preconditioner exists for (relative error
+        # ~ eps * N^2).
+        self._stencil = np.ascontiguousarray(stencil.ravel(), dtype=np.float64)
 
         self._fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
         # One frequency table per axis rather than one frequency per mode: the
         # per-mode form would be 809 MB at 512³ in single precision, which is
         # most of what not storing the symbol saves. Read off the engine's own
         # meshgrid so the convention cannot drift -- muGrid makes axis 0 the
-        # half-complex one, unlike numpy.fft.rfftn.
+        # half-complex one, unlike numpy.fft.rfftn. Double, like the stencil;
+        # the device kernel reads these through raw addresses, so the dtype
+        # is load-bearing.
         #
         # A rank can own *no* Fourier modes -- more ranks than planes along the
         # split axis -- and then the meshgrid has a zero-length axis that
@@ -844,16 +885,16 @@ class AnalyticReferencePreconditioner(Preconditioner):
         for d in range(dim):
             if self._nb_modes == 0:
                 self._q.append(np.empty(self._fourier_shape[d],
-                                        dtype=real_dtype))
+                                        dtype=np.float64))
                 continue
             index = [0] * dim
             index[d] = slice(None)
             self._q.append(
-                np.ascontiguousarray(q[d][tuple(index)], dtype=real_dtype))
+                np.ascontiguousarray(q[d][tuple(index)], dtype=np.float64))
 
         self._work = engine.fourier_space_field(
             f"{name}-work", components=(dim,), dtype=complex_dtype)
-        self._normalisation = real_dtype.type(engine.normalisation)
+        self._normalisation = float(engine.normalisation)
 
         # The work field's view says where the transforms leave the data: a
         # cupy array means the device kernel, which takes device addresses.
@@ -910,21 +951,77 @@ class AnalyticReferencePreconditioner(Preconditioner):
             elif self._on_device:
                 # In place through the device address; strides as read off
                 # the view in __init__ (structure-of-arrays on a device).
-                self._kernel(self._work.s.data.ptr, self._stride_component,
-                             self._stride_mode, self._stencil, self._q_ptrs,
-                             list(self._fourier_shape), self._normalisation)
+                # The kernel takes raw addresses and runs on the current
+                # device, which muGrid's own calls restore to the caller's:
+                # select the buffer's.
+                import cupy
+
+                work = self._work.s
+                with cupy.cuda.Device(work.device.id):
+                    self._kernel(work.data.ptr, self._stride_component,
+                                 self._stride_mode, self._stencil,
+                                 self._q_ptrs, list(self._fourier_shape),
+                                 self._normalisation)
             else:
                 # The Fourier buffer is Fortran-ordered, so an order="F"
                 # ravel is a contiguous *view*: components fastest, then modes
                 # with axis 0 fastest, exactly the layout the kernel indexes.
                 # Nothing is copied and the kernel writes back through it.
-                flat = np.asarray(self._work.s).ravel(order="F")
+                work = np.asarray(self._work.s)
+                flat = work.ravel(order="F")
+                # A copy here would take the result and leave the field
+                # unchanged without an error.
+                assert np.shares_memory(flat, work)
                 self._kernel(flat, self._stride_component, self._stride_mode,
                              self._stencil, self._q,
                              list(self._fourier_shape), self._normalisation)
         with self._timed("ifft"):
             engine.ifft(self._work, z)
         return z
+
+
+#: Relative asymmetry below which a symbol assembled and inverted in double
+#: is taken for Hermitian (and stored as its upper triangle).
+_HERMITIAN_TOL_DOUBLE = 1e-10
+
+
+def _hermitian_tol(cdtype):
+    """Relative asymmetry that counts as rounding for blocks of `cdtype`:
+    1e-10 in double (as before) and 100 eps in single precision, where the
+    rounding of the entries alone exceeds 1e-10."""
+    return max(_HERMITIAN_TOL_DOUBLE, 100 * float(np.finfo(cdtype).eps))
+
+
+def _invert_symbol_slab(blocks, singular, normalisation, hermitian_tol):
+    """Invert a slab ``[..., n, n]`` of the symbol in double, in place.
+
+    The inversion is batched over the slab, never the whole symbol: at once it
+    would hold the double copy, np.linalg.inv's output and the masked gather
+    and scatter together, four or five symbol-sized arrays (~40 GB at 512^3).
+    The singular (zero-mode) blocks are made the identity for the inversion
+    and zeroed afterwards, the pseudo-inverse of the rigid-body null space.
+
+    A slab Hermitian to within `hermitian_tol` is made exactly Hermitian: its
+    entries and their conjugate partners then round to the same values when
+    cast to the solve precision, so BlockFourierPreconditioner can store the
+    upper triangle -- in single precision the rounding of a slightly
+    asymmetric double inverse used to defeat that test and keep the dense
+    block.
+    """
+    n = blocks.shape[-1]
+    blocks[singular] = np.eye(n, dtype=blocks.dtype)
+    blocks = np.linalg.inv(blocks)
+    # Fold in the inverse-transform normalisation while the slab is hot,
+    # instead of scaling the whole symbol afterwards (another copy).
+    blocks *= normalisation
+    blocks[singular] = 0.0
+    adjoint = np.conj(np.swapaxes(blocks, -1, -2))
+    scale = float(np.abs(blocks).max()) if blocks.size else 0.0
+    if scale == 0.0 or float(np.abs(blocks - adjoint).max()) <= (
+            hermitian_tol * scale):
+        blocks += adjoint
+        blocks *= 0.5
+    return blocks
 
 
 def make_reference_stiffness_preconditioner(
@@ -987,7 +1084,7 @@ def make_reference_stiffness_preconditioner(
         matching complex type) so the internal transforms pair with the solver's
         fields; ``apply_reference_stiffness`` is therefore invoked on fields of
         this precision too. The symbol itself is assembled and inverted in
-        double regardless, for accuracy.
+        double wherever single precision would lose accuracy.
     element, grid_spacing, lambda_ref, mu_ref : optional
         Name the reference operator instead of passing
         ``apply_reference_stiffness``: the symbol is then built from its
@@ -1085,14 +1182,28 @@ def make_reference_stiffness_preconditioner(
     bytes_per_index = int(np.prod(fourier_shape[1:], dtype=np.int64)) * n * n * 16
     slab = max(1, SYMBOL_INVERSION_SLAB_BYTES // max(bytes_per_index, 1))
 
+    # The q = 0 block is singular: the reference operator has the rigid-body
+    # translations in its null space. Invert everything else and project it out.
+    zero_mode = np.ones(fourier_shape, dtype=bool)
+    for d in range(dim):
+        zero_mode &= fourier_q[d] == 0.0
+
     if analytic:
-        # Slab at a time: stencil_symbol builds one array of the mode shape per
-        # stencil offset, so evaluating the whole grid at once would allocate
-        # 3^dim transients the size of the symbol.
+        # Built *and inverted* a slab at a time, in double, whatever the solve
+        # precision; only the inverse is stored at it. The stencil's rows sum
+        # to zero, so at low frequency the phase sum cancels O(S) terms down to
+        # O(S q^2): assembled in single precision the lowest modes carried a
+        # relative error of about eps * N^2 (3e-4 at N = 256, 0.13 at 4096),
+        # and inverting that afterwards in double could not recover it. Slabs
+        # also bound stencil_symbol's 3^dim transients of the mode shape.
         for lo in range(0, fourier_shape[0], slab):
             hi = min(lo + slab, fourier_shape[0])
-            K_hat[lo:hi] = stencil_symbol(
-                S, [fq[lo:hi] for fq in fourier_q], cdtype=complex_dtype)
+            K_hat[lo:hi] = _invert_symbol_slab(
+                stencil_symbol(S, [fq[lo:hi] for fq in fourier_q],
+                               cdtype=np.complex128),
+                zero_mode[lo:hi], engine.normalisation,
+                hermitian_tol=_HERMITIAN_TOL_DOUBLE).astype(
+                    complex_dtype, copy=False)
     else:
         # Global-origin pixel(s) in this rank's interior: the nodal coordinate is
         # exactly 0 in every direction only at global index 0 (coord = index / N).
@@ -1131,32 +1242,16 @@ def make_reference_stiffness_preconditioner(
             ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
             K_hat[..., :, beta] = np.moveaxis(ch, 0, -1)
 
-    # The q = 0 block is singular: the reference operator has the rigid-body
-    # translations in its null space. Invert everything else and project it out.
-    zero_mode = np.ones(fourier_shape, dtype=bool)
-    for d in range(dim):
-        zero_mode &= fourier_q[d] == 0.0
-
-    # Invert in double for accuracy, a slab at a time, in place. Inverting the
-    # whole array at once would hold the double copy, np.linalg.inv's output
-    # and (in the mask-indexed form this replaces) the boolean gather and its
-    # scatter all at the same moment -- four or five arrays the size of the
-    # symbol, ~40 GB at 512^3. A slab bounded by SLAB_BYTES costs that many
-    # bytes instead, and the zero mode is handled by making its block the
-    # identity before the inversion and zeroing it after, so no mask-indexed
-    # copy of the *whole* symbol is ever built.
-    eye = np.eye(n, dtype=np.complex128)
-    for lo in range(0, fourier_shape[0], slab):
-        hi = min(lo + slab, fourier_shape[0])
-        double_slab = K_hat[lo:hi].astype(np.complex128)
-        singular = zero_mode[lo:hi]
-        double_slab[singular] = eye
-        double_slab = np.linalg.inv(double_slab)
-        # Fold in the inverse-transform normalisation while the slab is still
-        # hot, instead of scaling the whole symbol afterwards (another copy).
-        double_slab *= engine.normalisation
-        double_slab[singular] = 0.0
-        K_hat[lo:hi] = double_slab.astype(complex_dtype, copy=False)
+        # The impulse response is the operator's own output, so it carries
+        # the operator's precision; invert it in double, a slab at a time, in
+        # place. It is Hermitian only to within that precision.
+        for lo in range(0, fourier_shape[0], slab):
+            hi = min(lo + slab, fourier_shape[0])
+            K_hat[lo:hi] = _invert_symbol_slab(
+                K_hat[lo:hi].astype(np.complex128), zero_mode[lo:hi],
+                engine.normalisation,
+                hermitian_tol=_hermitian_tol(complex_dtype)).astype(
+                    complex_dtype, copy=False)
 
     # [n, n, *fourier], the layout BlockFourierPreconditioner expects. moveaxis
     # returns a view, so this costs nothing.
@@ -1461,7 +1556,10 @@ class _MultigridLevel:
             self.inv_diag.s.shape)
         _fill_field(self.inv_diag, values)
 
-    def lambda_max(self, communicator=None, nb_it=100):
+    #: Relative change between power iterations at which lambda_max stops.
+    LAMBDA_MAX_RTOL = 1e-4
+
+    def lambda_max(self, communicator=None, nb_it=500):
         """Largest eigenvalue of ``D⁻¹K`` by power iteration.
 
         ``D⁻¹K`` is invariant under uniform refinement — ``D`` and ``K`` carry
@@ -1479,12 +1577,25 @@ class _MultigridLevel:
 
         linalg.scal(1.0 / norm(self.z), self.z)
         eigenvalue = 0.0
+        change = np.inf
         for _ in range(nb_it):
             self.apply(self.z, self.t)
             linalg.scal(self.inv_diag, self.t)
-            eigenvalue = norm(self.t)
+            previous, eigenvalue = eigenvalue, norm(self.t)
             linalg.copy(self.t, self.z)
             linalg.scal(1.0 / eigenvalue, self.z)
+            change = abs(eigenvalue - previous) / eigenvalue
+            if change < self.LAMBDA_MAX_RTOL:
+                break
+        else:
+            # Power iteration approaches lambda_max from below, and the damping
+            # SAFETY / lambda is only safe while it stays below 2 / lambda_max:
+            # an estimate low by more than 15% makes the smoother diverge.
+            warnings.warn(
+                f"lambda_max: power iteration did not converge in {nb_it} "
+                f"iterations (last relative change {change:.1e}); the "
+                "smoother damping may be too large. Pass omega explicitly or "
+                "raise nb_it.", RuntimeWarning, stacklevel=2)
         self.z.set_zero()
         self.t.set_zero()
         return eigenvalue
@@ -1587,7 +1698,11 @@ class MultigridReferencePreconditioner(Preconditioner):
 
         if element is None:
             element = _muGrid.FEMElement.q1
-        if communicator is not None and communicator.size > 1:
+        # The decomposition is the reliable signal: a parallel one without a
+        # communicator argument used to slip through and run the serial
+        # algorithm with rank-local reductions.
+        distributed = int(np.prod(list(decomposition.nb_subdivisions))) > 1
+        if distributed or (communicator is not None and communicator.size > 1):
             raise NotImplementedError(
                 "MultigridReferencePreconditioner is serial for now. The MPI "
                 "path needs nested power-of-two subdivisions pinned across "
@@ -2593,9 +2708,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         single = np.dtype(self._cdtype) == np.dtype(np.complex64)
         kernel = getattr(
             linalg, f"block_thomas_gpu_{dim}d" + ("_f32" if single else ""))
-        kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
-               a0.data.ptr, a2.data.ptr, scratch.data.ptr, out.data.ptr,
-               nz, nb_modes, self._head_length, nb_exc)
+        # Raw addresses: run on the buffers' device, not the current one.
+        with xp.cuda.Device(flat.device.id):
+            kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
+                   a0.data.ptr, a2.data.ptr, scratch.data.ptr, out.data.ptr,
+                   nz, nb_modes, self._head_length, nb_exc)
         return out.reshape(rhs.shape)
 
     def _build_pcr(self):
@@ -2603,7 +2720,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         The reduced system is block-circulant: every rank holds the same number
         of planes and the operator is uniform, so each rank's spike blocks are
-        *bit-identical* (verified, not assumed -- the constructor checks it).
+        *bit-identical* (verified, not assumed -- checked below on every rank).
         The elimination coefficients at every level are therefore the same on
         every rank and can be built here without communication, leaving only
         right-hand sides to exchange per apply.
@@ -2627,7 +2744,26 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         dim = self.dim
         m = 2 * dim
 
-        # A and C from this rank's spikes; identical everywhere by construction.
+        # A and C from this rank's spikes, identical everywhere by
+        # construction -- and checked: the coefficients below are built from
+        # the local spikes alone, so a rank whose spikes differed would
+        # eliminate with the wrong ones and the result would be silently
+        # wrong. Two fingerprints, reduced to min and max: identical blocks
+        # give identical floats on every rank.
+        comm = self._comm
+        if comm.size > 1:
+            spikes = self._spike_ends
+            weights = xp.arange(1, spikes.size + 1, dtype=np.float64).reshape(
+                spikes.shape)
+            prints = (float(xp.abs(spikes).sum()),
+                      float((xp.real(spikes) * weights).sum()))
+            for value in prints:
+                if comm.max(value) != comm.min(value):
+                    raise RuntimeError(
+                        "block-Thomas preconditioner: the spike blocks differ "
+                        "between ranks, so the parallel cyclic reduction "
+                        "would eliminate with wrong coefficients. The planes "
+                        "must be distributed evenly over the ranks.")
         V0, V1, W0, W1 = (self._spike_ends[..., i, :, :] for i in range(4))
         zero = xp.zeros_like(V0)
         # u_p = (L_p, R_p); L_p couples to R_{p-1} and L_{p+1}, likewise R_p.

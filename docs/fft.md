@@ -62,6 +62,13 @@ The `fft` method performs the forward transform (real to Fourier space) and
 `ifft` performs the inverse transform (Fourier to real space). See
 `examples/fft_roundtrip.py`.
 
+`ifft` is a complex-to-real transform: it assumes the Fourier field is the
+transform of real data (Hermitian symmetry on the half-complex axis, in
+particular real values at frequency zero and at an even Nyquist). For input
+that is not, the result is backend-specific -- multi-axis cuFFT/rocFFT C2R
+transforms may differ from pocketfft -- so project such data (e.g. take the
+real part of a full complex transform) rather than relying on it.
+
 ## 1D FFT
 
 For 1D problems (e.g., time series analysis, 1D signal processing), create a 1D
@@ -204,8 +211,18 @@ x, y = engine.coords
 # Coordinates with ghosts (larger array)
 xg, yg = engine.coordsg
 print(f"Without ghosts: {engine.coords.shape}")   # (2, local_nx, local_ny)
-print(f"With ghosts: {engine.coordsg.shape}")     # (2, local_nx+2, local_ny+2)
+print(f"With ghosts: {engine.coordsg.shape}")     # (2, local_nx+4, local_ny+2)
 ```
+
+!!! note
+    The engine pads the ghost layers along x so that the left count and the
+    stored row width are even: GPU real-to-complex transforms need the real
+    rows aligned like complex ones, and host engines are padded the same way
+    so host and device fields share a layout. Here the requested 1 + 1 x-ghosts
+    become 2 + 2. The extra layers hold valid, communicated ghost data, so
+    stencils see at least the ghosts they asked for -- but `.sg`/`.pg` and
+    `coordsg` are wider than requested along x. Read the actual counts from
+    `engine.real_space_collection.nb_ghosts_left`/`nb_ghosts_right`.
 
 ### MPI-parallel frequency arrays
 

@@ -371,9 +371,16 @@ promoted_t<T> norm_sq_host(const TypedField<T, HostSpace>& x) {
         const Index_t nb_components_per_pixel =
             x.get_nb_components() * x.get_nb_sub_pts();
         // Sum the interior directly; full-buffer-minus-ghosts cancels
-        // catastrophically when the interior values are small
-        return interior_vecdot(x.data(), x.data(), global_coll,
-                               nb_components_per_pixel);
+        // catastrophically when the interior values are small. For complex
+        // fields x^H x is real, but the summed conj products can carry a
+        // rounding imaginary part (FMA contraction); drop it.
+        const auto sum{interior_vecdot(x.data(), x.data(), global_coll,
+                                       nb_components_per_pixel)};
+        if constexpr (std::is_same_v<promoted_t<T>, std::complex<double>>) {
+            return promoted_t<T>{std::real(sum), 0};
+        } else {
+            return sum;
+        }
     }
     // LocalFieldCollection: no ghosts, use Eigen
     return full_norm_sq(x);
@@ -519,18 +526,7 @@ template <>
 std::array<Real, 3> pipelined_cg_dots<Real, HostSpace>(
     const TypedField<Real, HostSpace>& r, const TypedField<Real, HostSpace>& u,
     const TypedField<Real, HostSpace>& w) {
-    for (const auto* other : {&u, &w}) {
-        if (&other->get_collection() != &r.get_collection()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must belong to the same collection");
-        }
-        if (other->get_nb_components() != r.get_nb_components() ||
-            other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must have the same number of "
-                "components and sub-points");
-        }
-    }
+    internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
     const Index_t nb_components_per_pixel =
         r.get_nb_components() * r.get_nb_sub_pts();
@@ -606,6 +602,9 @@ std::array<Real, 3> pipelined_cg_dots<Real32, HostSpace>(
     const TypedField<Real32, HostSpace>& r,
     const TypedField<Real32, HostSpace>& u,
     const TypedField<Real32, HostSpace>& w) {
+    // The same operand checks as every other precision: without them a
+    // mismatched u or w was read past its end.
+    internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
     const Index_t nb_components_per_pixel =
         r.get_nb_components() * r.get_nb_sub_pts();
@@ -675,29 +674,35 @@ void cross_buffers(const T* a, const T* b, T* out, Index_t npix, bool soa) {
     }
 }
 
-// out[c] -= k[c] * sum_d(invk[d] * N[d]) for the npix three-vectors.
+// out[c] -= k[c] * sum_d(invk[d] * N[d]) for the npix three-vectors. The
+// projection is formed in double whatever the field precision, as on the
+// device (the single-precision host path used to accumulate in complex64).
 template <typename RT, typename CT>
 void leray_buffers(const RT* k, const RT* invk, const CT* N,
                    CT* out, Index_t npix, bool soa) {
+    using Acc = std::complex<double>;
+    auto project = [](const RT* K, const RT* IK, const CT* const NN[3],
+                      CT* const O[3]) {
+        const Acc s{static_cast<double>(IK[0]) * Acc(NN[0][0]) +
+                    static_cast<double>(IK[1]) * Acc(NN[1][0]) +
+                    static_cast<double>(IK[2]) * Acc(NN[2][0])};
+        for (int c{0}; c < 3; ++c) {
+            O[c][0] = CT(Acc(O[c][0]) - static_cast<double>(K[c]) * s);
+        }
+    };
     if (soa) {
-        const RT* k0 = k; const RT* k1 = k + npix; const RT* k2 = k + 2 * npix;
-        const RT* i0 = invk; const RT* i1 = invk + npix; const RT* i2 = invk + 2 * npix;
-        const CT* n0 = N; const CT* n1 = N + npix; const CT* n2 = N + 2 * npix;
-        CT* o0 = out; CT* o1 = out + npix; CT* o2 = out + 2 * npix;
         for (Index_t i{0}; i < npix; ++i) {
-            const CT s = i0[i] * n0[i] + i1[i] * n1[i] + i2[i] * n2[i];
-            o0[i] -= k0[i] * s;
-            o1[i] -= k1[i] * s;
-            o2[i] -= k2[i] * s;
+            const RT K[3]{k[i], k[npix + i], k[2 * npix + i]};
+            const RT IK[3]{invk[i], invk[npix + i], invk[2 * npix + i]};
+            const CT* const NN[3]{N + i, N + npix + i, N + 2 * npix + i};
+            CT* const O[3]{out + i, out + npix + i, out + 2 * npix + i};
+            project(K, IK, NN, O);
         }
     } else {
         for (Index_t i{0}; i < npix; ++i) {
-            const RT* K = k + 3 * i; const RT* IK = invk + 3 * i;
-            const CT* NN = N + 3 * i; CT* O = out + 3 * i;
-            const CT s = IK[0] * NN[0] + IK[1] * NN[1] + IK[2] * NN[2];
-            O[0] -= K[0] * s;
-            O[1] -= K[1] * s;
-            O[2] -= K[2] * s;
+            const CT* const NN[3]{N + 3 * i, N + 3 * i + 1, N + 3 * i + 2};
+            CT* const O[3]{out + 3 * i, out + 3 * i + 1, out + 3 * i + 2};
+            project(k + 3 * i, invk + 3 * i, NN, O);
         }
     }
 }
@@ -709,10 +714,9 @@ template <typename T>
 static void cross_host(const TypedField<T, HostSpace>& a,
                        const TypedField<T, HostSpace>& b,
                        TypedField<T, HostSpace>& out) {
-    const auto& coll = a.get_collection();
-    internal::check_three_vector("cross", a, coll);
-    internal::check_three_vector("cross", b, coll);
-    internal::check_three_vector("cross", out, coll);
+    internal::check_three_vector("cross", a, a);
+    internal::check_three_vector("cross", b, a);
+    internal::check_three_vector("cross", out, a);
     const Index_t npix = a.get_nb_entries();
     // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
     // compute. Skip it, including the aliasing check below: empty fields share a
@@ -764,11 +768,10 @@ void leray_project<HostSpace>(const TypedField<Real, HostSpace>& k,
                               const TypedField<Real, HostSpace>& invk,
                               const TypedField<Complex, HostSpace>& N,
                               TypedField<Complex, HostSpace>& out) {
-    const auto& coll = out.get_collection();
-    internal::check_three_vector("leray_project", k, coll);
-    internal::check_three_vector("leray_project", invk, coll);
-    internal::check_three_vector("leray_project", N, coll);
-    internal::check_three_vector("leray_project", out, coll);
+    internal::check_three_vector("leray_project", k, out);
+    internal::check_three_vector("leray_project", invk, out);
+    internal::check_three_vector("leray_project", N, out);
+    internal::check_three_vector("leray_project", out, out);
     // k, invk, N and out share a collection, hence a storage order.
     const Index_t npix = out.get_nb_entries();
     const bool soa =
@@ -782,11 +785,10 @@ void leray_project<HostSpace>(const TypedField<Real32, HostSpace>& k,
                               const TypedField<Real32, HostSpace>& invk,
                               const TypedField<Complex32, HostSpace>& N,
                               TypedField<Complex32, HostSpace>& out) {
-    const auto& coll = out.get_collection();
-    internal::check_three_vector("leray_project", k, coll);
-    internal::check_three_vector("leray_project", invk, coll);
-    internal::check_three_vector("leray_project", N, coll);
-    internal::check_three_vector("leray_project", out, coll);
+    internal::check_three_vector("leray_project", k, out);
+    internal::check_three_vector("leray_project", invk, out);
+    internal::check_three_vector("leray_project", N, out);
+    internal::check_three_vector("leray_project", out, out);
     const Index_t npix = out.get_nb_entries();
     const bool soa =
         (out.get_storage_order() == StorageOrder::StructureOfArrays);

@@ -37,6 +37,8 @@
 #include "core/types.hh"
 #include "core/exception.hh"
 #include "memory/gpu_runtime.hh"
+
+#include <map>
 #include "memory/device_alloc.hh"
 
 namespace muGrid {
@@ -67,21 +69,27 @@ namespace muGrid {
         }
 
         // Cached device scratch holding host-resident src data while the
-        // kernel accumulates it. Grows on demand; intentionally leaked at
-        // process exit (like the other muGrid device caches). Not thread-safe
-        // (reduce_ghosts runs in single-threaded MPI code).
-        void * scratch_ptr{nullptr};
-        std::size_t scratch_bytes{0};
+        // kernel accumulates it, one per device (the caller holds a
+        // DeviceGuard on the field's device; a single buffer would live on
+        // whichever GPU allocated it first). Grows on demand; intentionally
+        // leaked at process exit (like the other muGrid device caches). Not
+        // thread-safe (reduce_ghosts runs in single-threaded MPI code).
+        struct Scratch {
+            void * ptr{nullptr};
+            std::size_t bytes{0};
+        };
 
         void * get_scratch(std::size_t bytes) {
-            if (scratch_bytes < bytes) {
-                if (scratch_ptr != nullptr) {
-                    device_deallocate(scratch_ptr);
+            static std::map<int, Scratch> per_device;
+            Scratch & scratch{per_device[gpu_get_device()]};
+            if (scratch.bytes < bytes) {
+                if (scratch.ptr != nullptr) {
+                    device_deallocate(scratch.ptr);
                 }
-                scratch_ptr = device_allocate(bytes);
-                scratch_bytes = bytes;
+                scratch.ptr = device_allocate(bytes);
+                scratch.bytes = bytes;
             }
-            return scratch_ptr;
+            return scratch.ptr;
         }
 
         template <typename T>

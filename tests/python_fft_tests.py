@@ -608,12 +608,12 @@ class FFTFrequencyTest(unittest.TestCase):
         nx, ny, nz = nb_grid_pts
         engine = muGrid.FFTEngine(nb_grid_pts)
 
-        # Build reference from numpy
+        # Build reference from numpy: rfftfreq on the half-complex axis 0
+        # (an even Nyquist mode is +0.5), fftfreq on the others
         freq_ref = np.array(
-            np.meshgrid(*(np.fft.fftfreq(n) for n in nb_grid_pts), indexing="ij")
+            np.meshgrid(np.fft.rfftfreq(nx), np.fft.fftfreq(ny),
+                        np.fft.fftfreq(nz), indexing="ij")
         )
-        # Slice for half-complex (r2c) transform
-        freq_ref = freq_ref[:, : nx // 2 + 1, :, :]
 
         assert_allclose(engine.fftfreq, freq_ref)
 
@@ -1021,16 +1021,26 @@ class TestAxisByAxisBackend:
         engine = muGrid.FFTEngine([8, 8])
         assert engine.backend_name == "PocketFFT (axis-by-axis)"
 
-    @pytest.mark.parametrize("nb_grid_pts", [[8], [8, 6], [8, 6, 4]])
-    def test_single_precision_rejected(self, nb_grid_pts):
-        """fp32 transforms exist only on top of the N-D entry point."""
+    @pytest.mark.parametrize("nb_grid_pts", [[8], [8, 6], [7, 6, 5]])
+    def test_single_precision_runs_axis_by_axis(self, nb_grid_pts):
+        """fp32 transforms used to exist only on top of the N-D entry point
+        and threw here (audit finding F1); they now take the per-axis path,
+        which must agree with the fp64 transform to fp32 accuracy."""
         engine = muGrid.FFTEngine(nb_grid_pts)
         real32 = engine.real_space_field("real32", dtype=np.float32)
         fourier32 = engine.fourier_space_field("fourier32", dtype=np.complex64)
-        with pytest.raises(RuntimeError, match="N-dimensional support"):
-            engine.fft(real32, fourier32)
-        with pytest.raises(RuntimeError, match="N-dimensional support"):
-            engine.ifft(fourier32, real32)
+        real64 = engine.real_space_field("real64")
+        fourier64 = engine.fourier_space_field("fourier64")
+        values = np.random.default_rng(3).random(real64.p.shape)
+        real64.p[...] = values
+        real32.p[...] = values.astype(np.float32)
+        engine.fft(real64, fourier64)
+        engine.fft(real32, fourier32)
+        scale = np.abs(fourier64.p).max()
+        assert np.abs(fourier32.p - fourier64.p).max() < 1e-5 * scale
+        engine.ifft(fourier32, real32)
+        assert_allclose(np.asarray(real32.p) * engine.normalisation, values,
+                        rtol=1e-5, atol=1e-6)
 
 
 class TestFFTDtypeValidation:
@@ -1126,3 +1136,15 @@ class TestGhostCommunicationGuard:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_half_complex_axis_follows_rfftfreq():
+    """The half-complex axis 0 reports rfftfreq, so an even Nyquist mode is
+    +0.5 as in numpy and the C++ rfft_freq; it used to be folded to -0.5
+    (audit finding F6). The other axes follow fftfreq."""
+    engine = muGrid.FFTEngine([8, 6])
+    qx, qy = engine.fftfreq
+    np.testing.assert_array_equal(qx[:, 0], np.fft.rfftfreq(8))
+    np.testing.assert_array_equal(qy[0, :], np.fft.fftfreq(6))
+    iqx, _ = engine.ifftfreq
+    np.testing.assert_array_equal(iqx[:, 0], np.arange(5))
