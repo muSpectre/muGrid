@@ -532,7 +532,7 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 - **O4 — DOCUMENTED (follow-up PR): both defaults kept (changing either alters existing results); docstrings state them and how to get the other.**
   ~~**O4.** Generic and FEM transposes default to different weights (ratio
   Wfrac·∏h). Significant (leaky API).~~
-- **O5 — FIXED (follow-up PR): 6-tetrahedron Kuhn split; conformity test; `nb_quad_pts` 6.**
+- **O5 — NOT CHANGED, by design: the 5-tetrahedron split avoids the preferred diagonal of the 6-tetrahedron Kuhn split, and with it grid-anisotropy artefacts in calculations with plasticity. Non-conformity is the accepted price; documented in `fem_element.hh`.**
   ~~**O5.** 3D "P1 Kuhn" is a non-conforming, same-orientation 5-tet split
   (`fem_element.hh:97–126`). Minor; use 6-tet Kuhn or alternate.~~
 - **O6 — DOCUMENTED (follow-up PR): multigrid rediscretises, so only its rate is affected.**

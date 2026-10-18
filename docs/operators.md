@@ -106,7 +106,7 @@ shape functions. Each pixel/voxel is subdivided into simplicial elements
 | Dimension | Elements | Quadrature Points |
 |-----------|----------|-------------------|
 | 2D | 2 triangles per pixel | 2 (one per triangle) |
-| 3D | 6 tetrahedra per voxel (Kuhn) | 6 (one per tetrahedron) |
+| 3D | 5 tetrahedra per voxel | 5 (one per tetrahedron) |
 
 ### Creating the operator
 

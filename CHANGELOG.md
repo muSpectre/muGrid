@@ -138,10 +138,6 @@ v1.5.0 (08Oct26)
 - DOC: `GenericLinearOperator.transpose` defaults to unit weights (the bare
   `Bᵀ`), `FEMGradientOperator.transpose` to the physical quadrature weights
   (`Bᵀ W`); both docstrings now say so and how to get the other
-- BUG: The 3D P1 element split each voxel into 5 tetrahedra whose diagonals
-  crossed on opposite faces, so the piecewise-linear space was not conforming
-  across voxel faces. It is now the 6-tetrahedron Kuhn (Freudenthal) split
-  around the main diagonal; `nb_quad_pts` of 3D P1 operators is 6 (was 5)
 - BUG: `GenericLinearOperator.fourier()` summed the entries of a multi-
   component operator's symbol into one number; it now raises unless the
   operator is scalar

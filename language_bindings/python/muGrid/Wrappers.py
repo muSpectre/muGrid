@@ -1510,7 +1510,7 @@ class FEMGradientOperator:
 
     A hard-coded, optimized finite-element gradient operator. The element is
     bilinear/trilinear Q1 (one element per pixel/voxel, 2x2 or 2x2x2 Gauss
-    points) by default, or linear P1 simplices (2 triangles per pixel, 6 Kuhn
+    points) by default, or linear P1 simplices (2 triangles per pixel, 5
     tetrahedra per voxel, one quadrature point each). ``nb_quad_pts`` reports
     the count for the chosen element.
 

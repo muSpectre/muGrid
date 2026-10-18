@@ -260,9 +260,8 @@ conv_op.transpose(quadrature_field, nodal_field, quad_weights)
 
 Computes gradients at quadrature points from nodal displacements using linear
 finite element (P1) shape functions. In 2D each pixel is split into 2 triangles
-(2 quadrature points); in 3D each voxel into 6 tetrahedra (Kuhn triangulation
-around the main diagonal, 6 quadrature points), which keeps the P1 space
-conforming across voxel faces.
+(2 quadrature points); in 3D each voxel into 5 tetrahedra (Kuhn triangulation,
+5 quadrature points).
 
 The gradient at quadrature point q is:
 
@@ -337,8 +336,8 @@ This reduces memory from O(N × DOF²) for full K to O(N × 2) for spatially
 varying materials.
 
 **Element decomposition:** 2D uses 2 triangles per pixel (quadrature weights
-`[0.5, 0.5]`); 3D uses 6 tetrahedra per voxel (Kuhn triangulation, weights
-`1/6` each).
+`[0.5, 0.5]`); 3D uses 5 tetrahedra per voxel (Kuhn triangulation, weights
+`[1/3, 1/6, 1/6, 1/6, 1/6]`).
 
 All fields use **node-based indexing** with the same grid dimensions:
 

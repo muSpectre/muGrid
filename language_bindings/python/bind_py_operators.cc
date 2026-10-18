@@ -792,7 +792,7 @@ void add_fem_gradient_operator_2d(py::module & mod) {
 void add_fem_gradient_operator_3d(py::module & mod) {
     bind_fem_gradient_operator<FEMGradientOperator3D>(
         mod, "FEMGradientOperator3D",
-        "3D linear FEM gradient operator (6 Kuhn tetrahedra per voxel, 6 "
+        "3D linear FEM gradient operator (5 Kuhn tetrahedra per voxel, 5 "
         "quadrature points).");
     bind_fem_gradient_operator<FEMGradientOperatorQ1_3D>(
         mod, "FEMGradientOperatorQ1_3D",
@@ -910,7 +910,7 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
     py::enum_<FEMElementKind>(mod, "FEMElement",
                               "Finite element for the fused stiffness operator")
         .value("p1", FEMElementKind::P1,
-               "P1 linear simplices (2 triangles / 6 tetrahedra per pixel)")
+               "P1 linear simplices (2 triangles / 5 tetrahedra per pixel)")
         .value("q1", FEMElementKind::Q1,
                "Q1 (bilinear quad / trilinear hex) with Gauss quadrature");
 

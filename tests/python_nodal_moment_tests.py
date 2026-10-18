@@ -136,10 +136,9 @@ class NodalMomentCheck(unittest.TestCase):
         muGrid's sub-simplex decomposition. Independent of the quadrature."""
         from math import factorial
         simp = {2: [((0, 1, 2), 0.5), ((1, 2, 3), 0.5)],
-                # the 6 Kuhn tetrahedra around the main diagonal 0-7
-                3: [((0, 1, 3, 7), 1 / 6), ((0, 1, 5, 7), 1 / 6),
-                    ((0, 2, 3, 7), 1 / 6), ((0, 2, 6, 7), 1 / 6),
-                    ((0, 4, 5, 7), 1 / 6), ((0, 4, 6, 7), 1 / 6)]}
+                3: [((1, 2, 4, 7), 1 / 3), ((0, 1, 2, 4), 1 / 6),
+                    ((1, 2, 3, 7), 1 / 6), ((1, 4, 5, 7), 1 / 6),
+                    ((2, 4, 6, 7), 1 / 6)]}
         for dim, n in ((2, 7), (3, 5)):
             h = 0.4
             fc = muGrid.GlobalFieldCollection(
@@ -154,7 +153,7 @@ class NodalMomentCheck(unittest.TestCase):
                   else muGrid.NodalMomentOperator3D)(
                       [h] * dim, muGrid.FEMElement.p1)
             op.compute(rho, mom, grd)
-            self.assertEqual(op.nb_quad, 18 if dim == 2 else 162)
+            self.assertEqual(op.nb_quad, 18 if dim == 2 else 135)
             got = np.asarray(mom.p).reshape((3, -1)).sum(axis=1)
 
             off = lambda nd, d: (nd >> d) & 1  # noqa: E731

@@ -191,7 +191,7 @@ namespace muGrid {
     struct IsotropicStiffnessTraits<3> {
         static constexpr Index_t nb_nodes = 8;          //!< 8 corner nodes
         static constexpr Index_t nb_dofs_per_node = 3;  //!< ux, uy, uz
-        static constexpr Index_t nb_quad = 6;           //!< 6 tetrahedra
+        static constexpr Index_t nb_quad = 5;           //!< 5 tetrahedra
     };
 
 
@@ -327,7 +327,7 @@ namespace muGrid {
             IsotropicStiffnessTraits<Dim>::nb_dofs_per_node;
         //! Total DOFs per element
         static constexpr Index_t NB_ELEMENT_DOFS = NB_NODES * NB_DOFS_PER_NODE;
-        //! Number of quadrature points (2 triangles in 2D, 6 tetrahedra in 3D)
+        //! Number of quadrature points (2 triangles in 2D, 5 tetrahedra in 3D)
         static constexpr Index_t NB_QUAD =
             IsotropicStiffnessTraits<Dim>::nb_quad;
 
