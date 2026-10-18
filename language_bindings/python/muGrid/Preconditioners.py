@@ -2664,6 +2664,9 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         self._picked = picked
         self._nb_exc = nb_exc
         self._head_length = head_len
+        # Contiguous, kernel-shaped views of the factors for the device sweep,
+        # built on its first call and reused: they do not change after setup.
+        self._device_sweep_inputs = None
         # The full array is what this exists to get rid of.
         self.Dinv = None
 
@@ -2802,19 +2805,23 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         nb_modes = int(np.prod(self._mode_shape))
         nb_exc = max(self._nb_exc, 1)
 
+        if self._device_sweep_inputs is None:
+            single = np.dtype(self._cdtype) == np.dtype(np.complex64)
+            self._device_sweep_inputs = (
+                getattr(linalg, f"block_thomas_gpu_{dim}d"
+                        + ("_f32" if single else "")),
+                xp.ascontiguousarray(
+                    self._head.reshape(self._head_length, nb_modes, dim, dim)),
+                xp.ascontiguousarray(self._exc.reshape(nz, nb_exc, dim, dim)),
+                xp.ascontiguousarray(self._exc_index.astype(xp.int32)),
+                xp.ascontiguousarray(self.A[0].reshape(nb_modes, dim, dim)),
+                xp.ascontiguousarray(self.A[2].reshape(nb_modes, dim, dim)),
+            )
+        kernel, head, exc, index, a0, a2 = self._device_sweep_inputs
+
         flat = xp.ascontiguousarray(rhs.reshape(nz, nb_modes, dim))
-        head = xp.ascontiguousarray(
-            self._head.reshape(self._head_length, nb_modes, dim, dim))
-        exc = xp.ascontiguousarray(self._exc.reshape(nz, nb_exc, dim, dim))
-        index = xp.ascontiguousarray(self._exc_index.astype(xp.int32))
-        a0 = xp.ascontiguousarray(self.A[0].reshape(nb_modes, dim, dim))
-        a2 = xp.ascontiguousarray(self.A[2].reshape(nb_modes, dim, dim))
         scratch = xp.empty_like(flat)
         out = xp.empty_like(flat)
-
-        single = np.dtype(self._cdtype) == np.dtype(np.complex64)
-        kernel = getattr(
-            linalg, f"block_thomas_gpu_{dim}d" + ("_f32" if single else ""))
         # Raw addresses: run on the buffers' device, not the current one.
         with xp.cuda.Device(flat.device.id):
             kernel(flat.data.ptr, head.data.ptr, exc.data.ptr, index.data.ptr,
