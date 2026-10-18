@@ -1754,7 +1754,7 @@ class MultigridReferencePreconditioner(Preconditioner):
     (measured on one MI300A node at 128³ with
     ``examples/decomposition_baseline.py``: the slab's halo exchange took
     0.75-0.90x the time of a 3D Cartesian split at 2-16 ranks while moving up
-    to 2.23x the bytes; see ``docs/multigrid_preconditioner_plan.md``). Its
+    to 2.23x the bytes). Its
     liability is the rank ceiling and the halo volume, both of which bite
     only where messages stop being latency-bound.
 
@@ -1873,10 +1873,9 @@ class MultigridReferencePreconditioner(Preconditioner):
         distributed = int(np.prod(list(decomposition.nb_subdivisions))) > 1
         if distributed or (communicator is not None and communicator.size > 1):
             raise NotImplementedError(
-                "MultigridReferencePreconditioner is serial for now. The MPI "
-                "path needs nested power-of-two subdivisions pinned across "
-                "levels and a redundant coarsest level; see "
-                "docs/multigrid_preconditioner_plan.md, stage 4."
+                "MultigridReferencePreconditioner supports serial runs only. "
+                "A distributed V-cycle needs nested power-of-two subdivisions "
+                "pinned across levels and a redundant coarsest level."
             )
 
         nb_grid_pts = tuple(decomposition.nb_domain_grid_pts)
