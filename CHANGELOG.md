@@ -20,12 +20,12 @@ v1.5.0 (08Oct26)
   `MUGRID_GPU_AWARE_MPI=1`, or `MPICH_GPU_SUPPORT_ENABLED=1` on Cray MPICH --
   instead of always staging them through pageable host memory, which cost
   5 ms per apply on two MI300A and 17 ms on four at 256³. The interface step
-  folds `A2`/`A0` into
-  the reduced-system operators at setup -- one batched product per end per
-  apply instead of an einsum, a reshape, index selections and two products --
-  and under PCR each rank sends its neighbours `dim` numbers per mode instead
-  of `2 dim`. The zero mode's two nullspace projections are folded into its
-  stored inverse, so its solve is one matrix-vector product without reductions
+  folds `A2`/`A0` into the reduced-system operators at setup -- one batched
+  product per end per apply instead of an einsum, a reshape, index selections
+  and two products -- and under PCR each rank sends its neighbours `dim`
+  numbers per mode instead of `2 dim`. The zero mode's two nullspace
+  projections are folded into its stored inverse, so its solve is one
+  matrix-vector product without reductions
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.
