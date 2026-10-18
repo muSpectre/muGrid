@@ -2,5 +2,23 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "CI Python must have CuPy wheels (cupy-cuda12x); bump only once CuPy ships wheels for the new version.",
+      "matchDatasources": [
+        "github-releases",
+        "python-version",
+        "docker"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
+      "matchFileNames": [
+        ".github/workflows/coverage.yml",
+        ".github/workflows/gpu-tests.yml"
+      ],
+      "allowedVersions": "<3.15"
+    }
   ]
 }
