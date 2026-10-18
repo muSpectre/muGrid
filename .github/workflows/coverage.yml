@@ -185,7 +185,7 @@ jobs:
           source venv/bin/activate
           python3 -m pip install --upgrade pip
           python3 -m pip install numpy pytest pytest-cov gcovr \
-            "NuMPI[test]" cupy-cuda12x nvidia-nvjitlink-cu12 muTimer
+            "NuMPI[test]" "cupy-cuda12x[ctk]" nvidia-nvjitlink-cu12 muTimer
           CC=mpicc python3 -m pip install -v --no-binary mpi4py "mpi4py==4.0.3"
 
       # MPI is enabled so the multi-rank ctest runs (which oversubscribe the
