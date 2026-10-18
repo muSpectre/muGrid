@@ -429,11 +429,12 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   `apply_green_symbol_*` and `block_thomas_*`; a strided or wrong-dtype output
   comes back unchanged without error. Fix: `.noconvert()`, require writeable,
   check sizes (`nb_head == 0` indexes −1).~~
-- **S8. Minor**: Jacobi `_inverse_diagonal_field` (P:154) always float64, so a
+- **S8 — FIXED (follow-up PR): Jacobi D⁻¹ in the solve precision; PCR spike agreement checked across ranks; multigrid refuses a distributed decomposition; power iteration converges to 1e-4 or warns; pipelined `residual=`.**
+  ~~**S8. Minor**: Jacobi `_inverse_diagonal_field` (P:154) always float64, so a
   float32 solve raises; `_build_pcr` docstring (P:2606) claims a check that
   does not exist; `MultigridReferencePreconditioner` (P:1612) guards MPI only
   through the `communicator` argument (SUSPECTED); power iteration has no
-  convergence check; pipelined solver has no `residual=` argument.
+  convergence check; pipelined solver has no `residual=` argument.~~
 
 ### Linalg kernels and reductions
 
@@ -452,22 +453,29 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   SUSPECTED GPU). `scal(field, field)`, `cross`/`leray`, all GPU full-buffer
   ops (`linalg_gpu.cc:913, 949`): padded `pixels_strides` silently give wrong
   results on GPU while host Eigen paths throw. Shared `check_contiguous`.~~
-- **L4. GPU reduction scratch is process-global and kernels launch on the
+- **L4 — FIXED (follow-up PR): `DeviceGuard` in every field entry point, scratch per device. Reproduced as a memory access fault on MI300A; two-GPU tests on MI300A and L40S.**
+  ~~**L4. GPU reduction scratch is process-global and kernels launch on the
   current device** (significant, SUSPECTED, multi-GPU per process).
   `linalg_gpu.cc:739–756`; same in `ghost_accumulate_gpu.cc:62–75`. RAII
-  device guard from `field.get_device_id()`, scratch keyed by device.
-- **L5.** Host `leray_project` accumulates in complex64 for float32, GPU in
-  double (`linalg_host.cc:688/697`) — minor.
-- **L6.** Complex `norm_sq` can return a non-zero imaginary part (FMA
-  contraction) — return `Real`. Minor.
-- **L7.** Host/GPU asymmetry on SoA buffers; `eigen_pixel`/`eigen_sub_pt`
-  misread host SoA silently. Minor.
-- **L8.** Full-buffer GPU reductions launch `ceil(n/256)` blocks instead of
-  `reduction_blocks()` (`linalg_gpu.cc:832, 1067`). Minor/perf.
-- **L9.** `Iasymm<dim>` is the deviatoric projector, correct only for dim = 3
-  (unused); `ct_sqrt` accepts non-squares. Minor.
-- **L10.** `vecdot` docs omit conj(a)·b; float32 `axpy` coefficients rounded
-  to float32. Minor.
+  device guard from `field.get_device_id()`, scratch keyed by device.~~
+- **L5 — FIXED (follow-up PR): host accumulates in double.**
+  ~~**L5.** Host `leray_project` accumulates in complex64 for float32, GPU in
+  double (`linalg_host.cc:688/697`) — minor.~~
+- **L6 — FIXED (follow-up PR): imaginary part dropped (return type kept).**
+  ~~**L6.** Complex `norm_sq` can return a non-zero imaginary part (FMA
+  contraction) — return `Real`. Minor.~~
+- **L7 — FIXED (follow-up PR): per-pixel/sub-point Eigen maps refuse SoA storage.**
+  ~~**L7.** Host/GPU asymmetry on SoA buffers; `eigen_pixel`/`eigen_sub_pt`
+  misread host SoA silently. Minor.~~
+- **L8 — FIXED (follow-up PR): `reduction_blocks()` in both full-buffer reductions.**
+  ~~**L8.** Full-buffer GPU reductions launch `ceil(n/256)` blocks instead of
+  `reduction_blocks()` (`linalg_gpu.cc:832, 1067`). Minor/perf.~~
+- **L9 — FIXED (follow-up PR): `Iasymm` removes tr/dim; `ct_sqrt` callers already static_assert a square.**
+  ~~**L9.** `Iasymm<dim>` is the deviatoric projector, correct only for dim = 3
+  (unused); `ct_sqrt` accepts non-squares. Minor.~~
+- **L10 — DOCUMENTED (follow-up PR): conj(a)·b and the rounding of float32 `axpy` coefficients.**
+  ~~**L10.** `vecdot` docs omit conj(a)·b; float32 `axpy` coefficients rounded
+  to float32. Minor.~~
 
 ### FFT
 
@@ -475,22 +483,30 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   ~~**F1. Serial float32 FFT throws under `MUGRID_FFT_NO_ND=1`** (significant,
   CONFIRMED). `fft_engine.hh:196–203, 247–254`: fall through to the existing
   `fft_{1,2,3}d<Real32>` paths when `!supports_nd()`.~~
-- **F2.** Serial float64 2D never uses the N-D transform, contrary to
-  `docs/gpu.md:312`; on GPU ~2·nb_dof syncs + a copy. Minor.
-- **F3. cuFFT plan parameters cast to `int` without checks** (significant for
+- **F2 — FIXED (follow-up PR): serial float64 1D/2D use the N-D transform, falling back per axis where the backend cannot plan it (rocFFT, ghost-padded 32²).**
+  ~~**F2.** Serial float64 2D never uses the N-D transform, contrary to
+  `docs/gpu.md:312`; on GPU ~2·nb_dof syncs + a copy. Minor.~~
+- **F3 — FIXED (follow-up PR): every cuFFT plan int range-checked.**
+  ~~**F3. cuFFT plan parameters cast to `int` without checks** (significant for
   > ~1291³ single-GPU grids, SUSPECTED). `cufft_backend.cc`: use
-  `cufftMakePlanMany64` or range-check.
-- **F4.** Pencil heuristic can idle ranks (np 16 on (16,16,3) → 4 empty).
-  Minor.
-- **F5.** x-ghosts silently padded to even counts; `.sg` shape differs from
-  docs. Minor.
-- **F6.** Nyquist sign on the half-complex axis follows `fftfreq` (−0.5), not
-  `rfftfreq`; inconsistent with C++ `rfft_freq` and P:1930. Minor.
-- **F7.** GPU multi-axis C2R on non-Hermitian input undefined in cuFFT
-  (SUSPECTED). Minor.
-- **F8.** Slab fast-path probe catches every `RuntimeError`; a transient OOM
-  permanently downgrades the engine. Minor.
-- **F9.** Caches never evicted; `docs/architecture.md` AoS-only claim stale.
+  `cufftMakePlanMany64` or range-check.~~
+- **F4 — FIXED (follow-up PR): factorizations that leave a rank empty only win when nothing else fits.**
+  ~~**F4.** Pencil heuristic can idle ranks (np 16 on (16,16,3) → 4 empty).
+  Minor.~~
+- **F5 — DOCUMENTED (follow-up PR): the padding is deliberate (GPU alignment); docs/fft.md explains it.**
+  ~~**F5.** x-ghosts silently padded to even counts; `.sg` shape differs from
+  docs. Minor.~~
+- **F6 — FIXED (follow-up PR): half-complex axis follows rfftfreq (+0.5).**
+  ~~**F6.** Nyquist sign on the half-complex axis follows `fftfreq` (−0.5), not
+  `rfftfreq`; inconsistent with C++ `rfft_freq` and P:1930. Minor.~~
+- **F7 — DOCUMENTED (follow-up PR): C2R needs Hermitian input.**
+  ~~**F7.** GPU multi-axis C2R on non-Hermitian input undefined in cuFFT
+  (SUSPECTED). Minor.~~
+- **F8 — FIXED (follow-up PR): only `FFTPlanUnsupported` downgrades; other failures propagate.**
+  ~~**F8.** Slab fast-path probe catches every `RuntimeError`; a transient OOM
+  permanently downgrades the engine. Minor.~~
+- **F9 — DOCUMENTED (follow-up PR): cache lifetimes; stale AoS-only claim removed.**
+  ~~**F9.** Caches never evicted; `docs/architecture.md` AoS-only claim stale.~~
 
 ### Operators
 
@@ -513,18 +529,25 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
   ~~**O3. `GenericLinearOperator` drops |c| < 1e-14 (absolute)** (significant,
   CONFIRMED). `generic.hh:382`: identity × 1e-15 → zero; SI-unit micro-scale
   operators vanish. Drop exact zeros or use a relative tolerance.~~
-- **O4.** Generic and FEM transposes default to different weights (ratio
-  Wfrac·∏h). Significant (leaky API).
-- **O5.** 3D "P1 Kuhn" is a non-conforming, same-orientation 5-tet split
-  (`fem_element.hh:97–126`). Minor; use 6-tet Kuhn or alternate.
-- **O6.** Prolongation Galerkin-exact only for Q1 (P1: 0.26/0.50 rel. error
-  in RKP vs K_2h). Minor.
-- **O7.** `fourier()` sums over outputs/quad points (`generic.cc:622–660`).
-- **O8.** `LaplaceOperator`: no anisotropic h; sign div grad vs FE −h^d∇².
-- **O9.** Docs say P1, default Q1; stale `nb_quad`; `NodalMomentOperator` not
-  exported; float32 FEM gradient not reachable via wrapper.
-- **O10.** Duplicated validation; GPU stiffness matrices in process-global
-  `__constant__` memory (SUSPECTED race with concurrent streams/devices).
+- **O4 — DOCUMENTED (follow-up PR): both defaults kept (changing either alters existing results); docstrings state them and how to get the other.**
+  ~~**O4.** Generic and FEM transposes default to different weights (ratio
+  Wfrac·∏h). Significant (leaky API).~~
+- **O5 — FIXED (follow-up PR): 6-tetrahedron Kuhn split; conformity test; `nb_quad_pts` 6.**
+  ~~**O5.** 3D "P1 Kuhn" is a non-conforming, same-orientation 5-tet split
+  (`fem_element.hh:97–126`). Minor; use 6-tet Kuhn or alternate.~~
+- **O6 — DOCUMENTED (follow-up PR): multigrid rediscretises, so only its rate is affected.**
+  ~~**O6.** Prolongation Galerkin-exact only for Q1 (P1: 0.26/0.50 rel. error
+  in RKP vs K_2h). Minor.~~
+- **O7 — FIXED (follow-up PR): `fourier()` refuses non-scalar operators.**
+  ~~**O7.** `fourier()` sums over outputs/quad points (`generic.cc:622–660`).~~
+- **O8 — DOCUMENTED (follow-up PR): sign convention and isotropy; anisotropic grids via the generic or FEM operators.**
+  ~~**O8.** `LaplaceOperator`: no anisotropic h; sign div grad vs FE −h^d∇².~~
+- **O9 — FIXED (follow-up PR): docstrings, `NodalMomentOperator` export, `FEMGradientOperator(dtype=np.float32)`.**
+  ~~**O9.** Docs say P1, default Q1; stale `nb_quad`; `NodalMomentOperator` not
+  exported; float32 FEM gradient not reachable via wrapper.~~
+- **O10 — FIXED with L4: constant uploads now go to the field's device; muGrid uses one stream, so no concurrent-stream race.**
+  ~~**O10.** Duplicated validation; GPU stiffness matrices in process-global
+  `__constant__` memory (SUSPECTED race with concurrent streams/devices).~~
 
 ### MPI, fields and I/O
 
@@ -548,16 +571,20 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
 - **M5 — FIXED** (follow-up PR): narrowing reads raise; widening ones still convert.
   ~~**M5. NetCDF reads narrow dtype silently** (significant, CONFIRMED).
   `file_io_netcdf.cc:244, 971–994, 2307`: compare `nc_inq_vartype`.~~
-- **M6. Python GPU reductions ignore GPU-aware-MPI detection** (significant,
-  SUSPECTED). `Parallel.py` `_sum_gpu`, `_max_gpu`, `_allreduce_scalar`.
-- **M7.** `compute_axes_order` mis-breaks stride ties for size-1 axes. Minor.
-- **M8.** "SoA" means row-major pixels on host, column-major on device;
+- **M6 — FIXED (follow-up PR): host staging unless `Communicator.gpu_aware_mpi`; stream synchronised first.**
+  ~~**M6. Python GPU reductions ignore GPU-aware-MPI detection** (significant,
+  SUSPECTED). `Parallel.py` `_sum_gpu`, `_max_gpu`, `_allreduce_scalar`.~~
+- **M7 — FIXED (follow-up PR): strict ordering; size-1 axes ignored for contiguity.**
+  ~~**M7.** `compute_axes_order` mis-breaks stride ties for size-1 axes. Minor.~~
+- **M8 — FIXED (follow-up PR): the ghost exchange refuses non-column-major pixels.**
+  ~~**M8.** "SoA" means row-major pixels on host, column-major on device;
   `communicate_ghosts` assumes column-major (FIXME at
-  `cartesian_decomposition.cc:245`). Minor.
-- **M9. Minor**: Python `CartesianDecomposition` default subdivisions throw;
+  `cartesian_decomposition.cc:245`). Minor.~~
+- **M9 — FIXED/DOCUMENTED (follow-up PR): automatic default subdivisions, NetCDF request count in Index_t; coords semantics, extents and MPI-on-import documented.**
+  ~~**M9. Minor**: Python `CartesianDecomposition` default subdivisions throw;
   `coords` fractional not physical and ghosts wrap; `nb_grid_pts` local vs
   global naming; NetCDF local write narrows `num_requests`; `import muGrid`
-  always initialises MPI in MPI builds.
+  always initialises MPI in MPI builds.~~
 
 ### Tests
 
@@ -579,3 +606,6 @@ P = `language_bindings/python/muGrid/Preconditioners.py`.
    — done.
 4. ~~S6, S7, O3, M5 (silent precision/data loss at interfaces)~~ — done.
 5. ~~L1–L3, O2, M2–M4 (input validation / out-of-bounds)~~ — done.
+6. Everything else in section 4 — fixed or documented (follow-up PR). Not
+   done: a P1-consistent (Kuhn-edge) prolongation (O6) and an anisotropic
+   `LaplaceOperator` (O8), both features rather than defects.
