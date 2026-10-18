@@ -44,6 +44,8 @@
 
 #include "Eigen/Dense"
 
+#include <algorithm>
+#include <cmath>
 #include <vector>
 #include <optional>
 #include <span>
@@ -166,10 +168,14 @@ namespace muGrid {
             TypedFieldBase<Real32> & quadrature_point_field) const override;
 
         /**
-         * Evaluates the discretised divergence of quadrature_point_field into
-         * nodal_field, weights corresponds to Gaussian quadrature weights. If
-         * weights are omitted, this returns some scaled version of discretised
-         * divergence.
+         * Evaluates the transpose of apply() into nodal_field, with each
+         * quadrature point scaled by its entry of `weights` (one per
+         * quadrature point). Without weights every quadrature point counts
+         * once: the result is the bare matrix transpose Bᵀ. That differs from
+         * FEMGradientOperator::transpose(), whose default is the
+         * quadrature-weighted Bᵀ W with W = Wfrac · cell volume -- this
+         * operator knows a stencil but no grid spacing, so it cannot supply W.
+         * Pass the FEM operator's quadrature weights here to get its result.
          * @param quadrature_point_field input field of which to take
          * the divergence. Defined on quadrature points.
          * @param nodal_field output field into which divergence is written
@@ -185,10 +191,8 @@ namespace muGrid {
                        const std::vector<Real> & weights = {}) const final;
 
         /**
-         * Evaluates the discretised divergence of quadrature_point_field and
-         * adds the result to nodal_field, weights corresponds to Gaussian
-         * quadrature weights. If weights are omitted, this returns some scaled
-         * version of discretised divergence.
+         * As transpose(), scaled by alpha and added to nodal_field (Bᵀ with
+         * unit weights by default; see transpose()).
          * @param quadrature_point_field input field of which to take
          * the divergence. Defined on quadrature points.
          * @param alpha scaling factor for the increment
@@ -378,8 +382,23 @@ namespace muGrid {
         Dim_t spatial_dim_;
         Index_t nb_stencil_pts_;
 
-        //! Tolerance for considering operator values as zero
-        static constexpr Real zero_tolerance = 1e-14;
+        /**
+         * Coefficients at most this fraction of the largest one are dropped
+         * from the sparse operator. Relative, so it removes rounding noise in
+         * the coefficient tables without depending on the units: an absolute
+         * 1e-14 made an operator in SI units at the micrometre scale (or the
+         * identity times 1e-15) vanish entirely.
+         */
+        static constexpr Real relative_zero_tolerance = 1e-14;
+
+        //! Absolute threshold below which a coefficient counts as zero.
+        Real zero_threshold() const {
+            Real max_abs{0};
+            for (const Real & value : this->coefficients_) {
+                max_abs = std::max(max_abs, std::abs(value));
+            }
+            return relative_zero_tolerance * max_abs;
+        }
 
         //! Cached sparse operators for reuse (two orderings for optimal access)
         //! Row-major: groups by quad index (optimal for apply - write locality)

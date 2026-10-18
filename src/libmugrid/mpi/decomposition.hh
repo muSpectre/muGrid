@@ -21,8 +21,10 @@ namespace muGrid {
         communicate_ghosts(const std::string & field_name) const = 0;
 
         //! accumulate ghost buffer contributions back to the interior domain.
-        //! This is the adjoint operation of communicate_ghosts and is needed
-        //! for transpose operations (e.g., divergence) with periodic BCs.
+        //! This is the adjoint operation of communicate_ghosts, for code that
+        //! scatters into ghost buffers. muGrid's operators do not: their
+        //! transposes gather from communicated input ghosts and write only
+        //! owned points, so their results must not be reduced.
         //! After the operation, ghost buffers are zeroed.
         virtual void reduce_ghosts(const Field & field) const = 0;
 

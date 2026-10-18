@@ -51,6 +51,139 @@ using muGrid::operator<<;
 
 namespace muGrid {
 
+  namespace {
+    //! Name of a NetCDF external type, for error messages.
+    std::string netcdf_type_name(const nc_type & type) {
+      switch (type) {
+      case NC_BYTE:
+        return "NC_BYTE";
+      case NC_CHAR:
+        return "NC_CHAR";
+      case NC_SHORT:
+        return "NC_SHORT";
+      case NC_INT:
+        return "NC_INT";
+      case NC_FLOAT:
+        return "NC_FLOAT";
+      case NC_DOUBLE:
+        return "NC_DOUBLE";
+      case NC_UBYTE:
+        return "NC_UBYTE";
+      case NC_USHORT:
+        return "NC_USHORT";
+      case NC_UINT:
+        return "NC_UINT";
+      case NC_INT64:
+        return "NC_INT64";
+      case NC_UINT64:
+        return "NC_UINT64";
+      default:
+        return "nc_type " + std::to_string(type);
+      }
+    }
+
+    /**
+     * Whether every value of external type `stored` is exactly representable
+     * in `memory`: the same type, a wider one of the same kind, an unsigned
+     * integer into a wider signed one, or an integer into a floating type
+     * whose mantissa holds it (16 bits into float, 32 into double).
+     */
+    bool reads_losslessly(const nc_type & stored, const nc_type & memory) {
+      if (stored == memory) {
+        return true;
+      }
+      enum class Kind { Signed, Unsigned, Floating, Other };
+      auto kind = [](const nc_type & type) {
+        switch (type) {
+        case NC_BYTE:
+        case NC_SHORT:
+        case NC_INT:
+        case NC_INT64:
+          return Kind::Signed;
+        case NC_UBYTE:
+        case NC_USHORT:
+        case NC_UINT:
+        case NC_UINT64:
+          return Kind::Unsigned;
+        case NC_FLOAT:
+        case NC_DOUBLE:
+          return Kind::Floating;
+        default:
+          return Kind::Other;
+        }
+      };
+      auto bytes = [](const nc_type & type) -> int {
+        switch (type) {
+        case NC_BYTE:
+        case NC_UBYTE:
+          return 1;
+        case NC_SHORT:
+        case NC_USHORT:
+          return 2;
+        case NC_INT:
+        case NC_UINT:
+        case NC_FLOAT:
+          return 4;
+        case NC_INT64:
+        case NC_UINT64:
+        case NC_DOUBLE:
+          return 8;
+        default:
+          return 0;
+        }
+      };
+      const Kind from{kind(stored)}, to{kind(memory)};
+      if (from == Kind::Other || to == Kind::Other) {
+        return false;
+      }
+      if (to == Kind::Floating) {
+        if (from == Kind::Floating) {
+          return bytes(memory) >= bytes(stored);
+        }
+        // integers: float holds 24 mantissa bits, double 53
+        return bytes(stored) <= (bytes(memory) == 4 ? 2 : 4);
+      }
+      if (from == Kind::Floating) {
+        return false;  // a fraction into an integer
+      }
+      if (from == to) {
+        return bytes(memory) >= bytes(stored);
+      }
+      // unsigned into a strictly wider signed integer; never signed into
+      // unsigned
+      return from == Kind::Unsigned && bytes(memory) > bytes(stored);
+    }
+
+    /**
+     * Throw unless the variable `var_id`, as stored in the file, can be read
+     * into the field or buffer of type `expected` without loss.
+     *
+     * Reads convert to the field type (PnetCDF natively, the serial backend
+     * through its typed get calls). That is exact for widening -- a float
+     * variable into a double field -- but a double variable read into a float
+     * field came back rounded, and a float one into an integer field
+     * truncated, without an error. Such reads are refused.
+     */
+    void check_stored_type(int netcdf_id, int var_id, const std::string & name,
+                           const nc_type & expected) {
+      nc_type stored{};
+      const int status{ncmu_inq_vartype(netcdf_id, var_id, &stored)};
+      if (status != NC_NOERR) {
+        throw FileIOError(ncmu_strerror(status));
+      }
+      if (!reads_losslessly(stored, expected)) {
+        throw FileIOError(
+            "The variable '" + name + "' is stored as " +
+            netcdf_type_name(stored) +
+            " in the NetCDF file but registered as " +
+            netcdf_type_name(expected) +
+            ", which cannot hold every value of it: reading would round or "
+            "truncate. Register a field of the stored type (or a wider "
+            "one) to read it.");
+      }
+    }
+  }  // namespace
+
   FileIONetCDF::FileIONetCDF(const std::string & file_name,
                              const FileIOBase::OpenMode & open_mode,
                              Communicator comm)
@@ -255,6 +388,7 @@ namespace muGrid {
       if (status != NC_NOERR) {
         throw FileIOError(ncmu_strerror(status));
       }
+      check_stored_type(this->netcdf_id, var_id, name, data_type);
       var.register_id(var_id);
       // Take the fill value the file declares, if it declares one of the
       // variable's type (files written before muGrid 1.5.0 have none).
@@ -1022,6 +1156,8 @@ namespace muGrid {
           }
           throw FileIOError(ncmu_strerror(status));
         }
+        check_stored_type(this->netcdf_id, var_id, var->get_name(),
+                          var->get_data_type());
         var->register_id(var_id);
       }
     }
@@ -2791,7 +2927,7 @@ namespace muGrid {
       // to NetCDF dimension order plus a single varn_all would scale better at
       // the cost of re-implementing the index map.
       const size_t nb_requests{
-          static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
+          static_cast<size_t>(comm.max(static_cast<Index_t>(num_requests)))};
       const std::vector<IOSize_t> empty_start(ndims, 0);
       const std::vector<IOSize_t> empty_count(ndims, 0);
       for (size_t i = 0; i < nb_requests; i++) {
@@ -2869,7 +3005,7 @@ namespace muGrid {
       // (non-collective) call per local pixel. See NetCDFVarBase::write() for
       // the full rationale.
       const size_t nb_requests{
-          static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
+          static_cast<size_t>(comm.max(static_cast<Index_t>(num_requests)))};
       const std::vector<IOSize_t> empty_start(ndims, 0);
       const std::vector<IOSize_t> empty_count(ndims, 0);
       for (size_t i = 0; i < nb_requests; i++) {

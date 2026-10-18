@@ -145,7 +145,8 @@ namespace fem_gradient_kernels {
     };
     template <typename T, class E>
     struct DivParams {
-        Index_t nb[E::SpatialDim];
+        Index_t lo[E::SpatialDim];  //!< first owned node (= left ghosts)
+        Index_t n[E::SpatialDim];   //!< owned nodes
         Index_t nstride[E::SpatialDim];
         Index_t gstride[E::SpatialDim];
         Index_t gsq, gsd;
@@ -194,16 +195,16 @@ namespace fem_gradient_kernels {
         if constexpr (po == (Index_t(1) << Dim)) {
             return T(0);
         } else {
-            bool ok = true;
+            // c is owned, so the element c - po lies in [lo - 1, lo + n - 1],
+            // inside the buffer: the transpose ghost requirement guarantees
+            // a left ghost layer.
             Index_t base = 0;
             for (Index_t d = 0; d < Dim; ++d) {
-                Index_t cd = c[d] - static_cast<Index_t>((po >> d) & 1);
-                if (cd < 0 || cd >= P.nb[d] - 1) ok = false;
-                base += cd * P.gstride[d];
+                base += (c[d] - static_cast<Index_t>((po >> d) & 1)) *
+                        P.gstride[d];
             }
-            T here = ok ? div_node<T, E, po>(g, base, P.gsq, P.gsd, P.coeff)
-                        : T(0);
-            return here + div_gather<T, E, po + 1>(g, c, P);
+            return div_node<T, E, po>(g, base, P.gsq, P.gsd, P.coeff) +
+                   div_gather<T, E, po + 1>(g, c, P);
         }
     }
 
@@ -218,8 +219,10 @@ namespace fem_gradient_kernels {
         if constexpr (Dim == 3) {
             c[2] = global_thread_z();
         }
+        // One thread per owned node; the ghost nodes are not written.
         for (Index_t d = 0; d < Dim; ++d) {
-            if (c[d] >= P.nb[d]) return;
+            if (c[d] >= P.n[d]) return;
+            c[d] += P.lo[d];
         }
         T contrib = div_gather<T, E>(g, c, P);
         Index_t idx = 0;
@@ -276,15 +279,21 @@ namespace fem_gradient_kernels {
     }
 
     template <class E, typename T>
-    void fem_divergence_gpu(const T * grad, T * nodal, const Index_t * nb,
-                            const Index_t * nstride, const Index_t * gstride,
-                            Index_t gsq, Index_t gsd, const T * h,
-                            const T * quad_weights, T alpha,
+    void fem_divergence_gpu(const T * grad, T * nodal, const Index_t * lo,
+                            const Index_t * nb, const Index_t * nstride,
+                            const Index_t * gstride, Index_t gsq, Index_t gsd,
+                            const T * h, const T * quad_weights, T alpha,
                             bool increment) {
         constexpr Index_t Dim = E::SpatialDim;
+        for (Index_t d = 0; d < Dim; ++d) {
+            if (nb[d] == 0) {
+                return;  // empty subdomain
+            }
+        }
         DivParams<T, E> P;
         for (Index_t d = 0; d < Dim; ++d) {
-            P.nb[d] = nb[d];
+            P.lo[d] = lo[d];
+            P.n[d] = nb[d];
             P.nstride[d] = nstride[d];
             P.gstride[d] = gstride[d];
         }
@@ -325,7 +334,7 @@ namespace fem_gradient_kernels {
         Index_t, Index_t, const T *, T, bool);                                 \
     template void fem_divergence_gpu<E, T>(                                    \
         const T *, T *, const Index_t *, const Index_t *, const Index_t *,     \
-        Index_t, Index_t, const T *, const T *, T, bool);
+        const Index_t *, Index_t, Index_t, const T *, const T *, T, bool);
     MUGRID_INSTANTIATE_FEM_GPU(P1Tri2D, Real)
     MUGRID_INSTANTIATE_FEM_GPU(P1Tet3D, Real)
     MUGRID_INSTANTIATE_FEM_GPU(Q1Quad2D, Real)

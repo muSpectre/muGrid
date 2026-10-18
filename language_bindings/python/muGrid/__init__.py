@@ -117,6 +117,7 @@ from .Wrappers import (  # noqa: F401, E402, E305
     IsotropicStiffnessOperator3D,
     LaplaceOperator,
     LocalFieldCollection,
+    NodalMomentOperator,
     NodalMomentOperator2D,
     NodalMomentOperator3D,
 )
@@ -333,6 +334,7 @@ __all__ = [
     "IsotropicStiffnessOperator",
     "IsotropicStiffnessOperator2D",
     "IsotropicStiffnessOperator3D",
+    "NodalMomentOperator",
     "NodalMomentOperator2D",
     "NodalMomentOperator3D",
     "GridTransfer",

@@ -345,10 +345,12 @@ namespace muGrid {
       return 0.5 * (outer_under(I, I) + outer_over(I, I));
     }
 
-    //! compile-time fourth-order asymmetriser
+    //! compile-time fourth-order deviatoric projector (symmetric part minus
+    //! the spherical part); the name is historical. The spherical part is
+    //! tr/dim -- it was hard-coded to 1/3, correct only in 3D.
     template <Dim_t dim>
     constexpr inline Tens4_t<dim> Iasymm() {
-      return Matrices::Isymm<dim>() - (1.0 / 3.0) * Matrices::Itrac<dim>();
+      return Matrices::Isymm<dim>() - (1.0 / dim) * Matrices::Itrac<dim>();
     }
 
     namespace internal {

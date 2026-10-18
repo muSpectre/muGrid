@@ -105,7 +105,10 @@ void add_decomposition(py::module & mod) {
 
             This is the adjoint (transpose) of ``communicate_ghosts()``. It sums
             contributions from ghost regions back into the interior domain values.
-            Used for transpose operations like divergence (adjoint of gradient).
+            For code that scatters into ghost buffers. muGrid's operator
+            transposes (e.g. the FEM divergence) do not: they gather from the
+            communicated input ghosts and write only owned points, so their
+            results must not be reduced.
 
             Parameters
             ----------

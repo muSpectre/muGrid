@@ -392,6 +392,21 @@ BOOST_AUTO_TEST_CASE(test_fft_engine_backend_name) {
               (axis ? "PocketFFT (axis-by-axis)" : "PocketFFT"));
 }
 
+  //! The pencil grid must give every rank data in real and Fourier space
+  //! when some factorization allows it: 16 ranks on (16, 16, 3) used to pick
+  //! P1 = 4 > Nz = 3 and leave four ranks empty (audit F4).
+  BOOST_AUTO_TEST_CASE(process_grid_leaves_no_rank_empty) {
+    int p1{0}, p2{0};
+    select_process_grid(16, DynGridIndex{16, 16, 3}, p1, p2);
+    BOOST_CHECK_EQUAL(p1 * p2, 16);
+    BOOST_CHECK_LE(p1, 3);    // Z planes (real space)
+    BOOST_CHECK_LE(p2, 9);    // half-complex X (Fourier space)
+    // slab still preferred whenever it fits
+    select_process_grid(4, DynGridIndex{16, 16, 8}, p1, p2);
+    BOOST_CHECK_EQUAL(p1, 4);
+    BOOST_CHECK_EQUAL(p2, 1);
+  }
+
 BOOST_AUTO_TEST_SUITE_END()
 
 }  // namespace muGrid

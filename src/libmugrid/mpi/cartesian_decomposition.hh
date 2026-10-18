@@ -71,8 +71,9 @@ namespace muGrid {
         void communicate_ghosts(const std::string & field_name) const override;
 
         //! accumulate ghost buffer contributions back to the interior domain.
-        //! This is the adjoint operation of communicate_ghosts and is needed
-        //! for transpose operations (e.g., divergence) with periodic BCs.
+        //! This is the adjoint operation of communicate_ghosts, for code that
+        //! scatters into ghost buffers (muGrid's operator transposes do not;
+        //! see decomposition.hh).
         //! Each ghost slice is added to the interior slice it aliases, on
         //! whichever rank owns it; halos wider than a neighbour's interior
         //! are relayed through the intermediate ranks. After the operation,
@@ -163,6 +164,11 @@ namespace muGrid {
         //! reject them up front.
         void check_field_is_of_this_collection(
             const Field & field, const std::string & operation) const;
+
+        //! Throw unless the field's pixels are column-major (first axis
+        //! fastest, possibly padded), the layout the ghost exchange slices.
+        void check_ghost_layout(const Field & field,
+                                const std::string & operation) const;
     };
 }  // namespace muGrid
 

@@ -36,6 +36,7 @@
 #include "bind_py_declarations.hh"
 
 #include "mpi/communicator.hh"
+#include "mpi/gpu_aware_mpi.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -64,6 +65,12 @@ void add_communicator(py::module & mod) {
 #endif
       .def_property_readonly_static(
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
+      // Whether MPI may be handed device pointers (MUGRID_GPU_AWARE_MPI, else
+      // the MPI library's own report); the C++ ghost exchange and transposes
+      // stage through the host otherwise, and so must Python reductions.
+      .def_property_readonly_static(
+          "gpu_aware_mpi",
+          [](py::object) { return muGrid::mpi_is_gpu_aware(); })
       .def_property_readonly("rank", &muGrid::Communicator::rank)
       .def_property_readonly("size", &muGrid::Communicator::size)
       .def("barrier", &muGrid::Communicator::barrier)
@@ -112,6 +119,29 @@ void add_communicator(py::module & mod) {
                      const Uint & arg) { return comm.min(arg); })
       .def("min", [](muGrid::Communicator & comm,
                      const Index_t & arg) { return comm.min(arg); })
+      // Scalar reductions with the MPI datatype fixed by the method name.
+      // The overloaded `sum`/`min`/`max` above are chosen by pybind11 from
+      // the *value*: an int beyond 32 bits falls through to the double
+      // overload (rounded above 2^53), a complex is cast to its real part,
+      // and two ranks whose values pick different overloads disagree on the
+      // datatype of one collective. The Python wrapper calls these with the
+      // type taken from the dtype instead.
+      .def("_sum_float64", [](muGrid::Communicator & comm,
+                              const Real & arg) { return comm.sum(arg); })
+      .def("_sum_int64", [](muGrid::Communicator & comm,
+                            const Index_t & arg) { return comm.sum(arg); })
+      .def("_sum_complex128",
+           [](muGrid::Communicator & comm, const Complex & arg) {
+             return comm.sum(arg);
+           })
+      .def("_max_float64", [](muGrid::Communicator & comm,
+                              const Real & arg) { return comm.max(arg); })
+      .def("_max_int64", [](muGrid::Communicator & comm,
+                            const Index_t & arg) { return comm.max(arg); })
+      .def("_min_float64", [](muGrid::Communicator & comm,
+                              const Real & arg) { return comm.min(arg); })
+      .def("_min_int64", [](muGrid::Communicator & comm,
+                            const Index_t & arg) { return comm.min(arg); })
       .def("all", [](muGrid::Communicator & comm,
                      const bool & arg) { return comm.all(arg); })
       .def("any", [](muGrid::Communicator & comm,

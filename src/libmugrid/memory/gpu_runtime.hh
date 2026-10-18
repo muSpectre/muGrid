@@ -255,6 +255,37 @@ namespace muGrid {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace muGrid {
 
+    /**
+     * Make `device` current for the lifetime of the guard, then restore the
+     * caller's device.
+     *
+     * Kernels, runtime allocations and the reduction scratch all act on the
+     * *current* device. Field allocation selects the field's device and leaves
+     * it selected, so with fields on two GPUs of one process the current
+     * device is whichever was allocated last, and an operation on a field of
+     * the other GPU launched its kernels on the wrong one (a memory access
+     * fault on MI300A). Every entry point that launches work for a field
+     * takes one of these with the field's device.
+     */
+    class DeviceGuard {
+       public:
+        explicit DeviceGuard(int device) : previous{gpu_get_device()} {
+            if (device != this->previous) {
+                gpu_set_device(device);
+            }
+        }
+        DeviceGuard(const DeviceGuard &) = delete;
+        DeviceGuard & operator=(const DeviceGuard &) = delete;
+        ~DeviceGuard() {
+            if (gpu_get_device() != this->previous) {
+                gpu_set_device(this->previous);
+            }
+        }
+
+       private:
+        int previous;
+    };
+
 // Guarded on the *device compiler*, not on MUGRID_ENABLE_CUDA/HIP. Those say
 // the build has GPU support; they say nothing about which compiler is reading
 // this header. Only the .cc files listed under set_source_files_properties(...

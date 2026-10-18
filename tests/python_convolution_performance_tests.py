@@ -432,7 +432,7 @@ def run_laplace_solver(nb_grid_pts, use_device=False):
 
     # Determine memory location
     if use_device:
-        device = muGrid.Device.cuda()
+        device = muGrid.Device.gpu()
     else:
         device = muGrid.Device.cpu()
 
@@ -714,7 +714,7 @@ def run_quad_triangle_mugrid(nb_grid_pts, use_device=False):
 
     # Determine memory location
     if use_device:
-        device = muGrid.Device.cuda()
+        device = muGrid.Device.gpu()
     else:
         device = muGrid.Device.cpu()
 
@@ -842,7 +842,7 @@ def test_quad_triangle_device_vs_host():
     # Run on device with same input
     # Recreate the field collection and use same init_field
     if HAS_CUPY:
-        device = muGrid.Device.cuda()
+        device = muGrid.Device.gpu()
     else:
         device = muGrid.Device.cpu()
 
@@ -949,7 +949,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
             sub_pts={"quad": nb_quad_pts},
             nb_ghosts_left=nb_ghosts,
             nb_ghosts_right=nb_ghosts,
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         # Create fields
@@ -1010,7 +1010,7 @@ class DeviceConvolutionPerformanceTests(unittest.TestCase):
             sub_pts={"quad": nb_quad_pts},
             nb_ghosts_left=nb_ghosts,
             nb_ghosts_right=nb_ghosts,
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
 
         # Create fields
@@ -1100,7 +1100,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
                 sub_pts={"quad": nb_quad_pts},
                 nb_ghosts_left=nb_ghosts,
                 nb_ghosts_right=nb_ghosts,
-                device=muGrid.Device.cuda(),
+                device=muGrid.Device.gpu(),
             )
             nodal_device = fc_device.real_field("nodal", nb_components)
             quad_device = fc_device.real_field(
@@ -1185,7 +1185,7 @@ class HostDeviceComparisonTests(unittest.TestCase):
             sub_pts={"quad": nb_quad_pts},
             nb_ghosts_left=nb_ghosts,
             nb_ghosts_right=nb_ghosts,
-            device=muGrid.Device.cuda(),
+            device=muGrid.Device.gpu(),
         )
         nodal_device = fc_device.real_field("nodal", nb_components)
         quad_device = fc_device.real_field(

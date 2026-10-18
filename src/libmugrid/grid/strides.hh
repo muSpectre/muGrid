@@ -225,9 +225,19 @@ namespace muGrid {
             std::iota(axes_order.begin(), axes_order.end(), 0);
             std::sort(axes_order.begin(), axes_order.end(),
                       [&shape, &strides](const Dim_t & a, const Dim_t & b) {
-                          return (strides[a] == 1 and strides[b] == 1 and
-                                  shape[a] < shape[b]) or
-                                 strides[a] < strides[b];
+                          // A strict weak ordering: by stride, ties (which
+                          // a size-1 axis can create at any stride) by size,
+                          // then by index. Breaking only stride-1 ties left
+                          // e.g. shape (4, 1, 3), strides (1, 4, 4) in an
+                          // unspecified order, and the wrong one made a
+                          // contiguous buffer look non-contiguous.
+                          if (strides[a] != strides[b]) {
+                              return strides[a] < strides[b];
+                          }
+                          if (shape[a] != shape[b]) {
+                              return shape[a] < shape[b];
+                          }
+                          return a < b;
                       });
             return axes_order;
         }
@@ -240,9 +250,19 @@ namespace muGrid {
             std::iota(axes_order.begin(), axes_order.end(), 0);
             std::sort(axes_order.begin(), axes_order.end(),
                       [&shape, &strides](const Dim_t & a, const Dim_t & b) {
-                          return (strides[a] == 1 and strides[b] == 1 and
-                                  shape[a] < shape[b]) or
-                                 strides[a] < strides[b];
+                          // A strict weak ordering: by stride, ties (which
+                          // a size-1 axis can create at any stride) by size,
+                          // then by index. Breaking only stride-1 ties left
+                          // e.g. shape (4, 1, 3), strides (1, 4, 4) in an
+                          // unspecified order, and the wrong one made a
+                          // contiguous buffer look non-contiguous.
+                          if (strides[a] != strides[b]) {
+                              return strides[a] < strides[b];
+                          }
+                          if (shape[a] != shape[b]) {
+                              return shape[a] < shape[b];
+                          }
+                          return a < b;
                       });
             return axes_order;
         }
@@ -278,6 +298,11 @@ namespace muGrid {
             Index_t stride{1};
             bool is_contiguous{true};
             for (Index_t i{0}; i < dim; ++i) {
+                // A size-1 axis is never stepped along, so its stride does not
+                // matter for contiguity.
+                if (nb_grid_pts[axes[i]] == 1) {
+                    continue;
+                }
                 is_contiguous &= strides[axes[i]] == stride;
                 stride *= nb_grid_pts[axes[i]];
             }

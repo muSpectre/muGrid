@@ -447,6 +447,28 @@ namespace muGrid {
     }
 
     /**
+     * @brief Throws unless `weights` is empty or has one entry per
+     *        quadrature point.
+     *
+     * The transpose kernels index the weights by quadrature point, so a
+     * shorter vector was read past its end and a longer one silently
+     * truncated.
+     *
+     * @param weights The per-quadrature-point weights passed to transpose().
+     * @param operator_name Name used in the error message.
+     */
+    void check_transpose_weights(const std::vector<Real> & weights,
+                                 const std::string & operator_name) const {
+      if (!weights.empty() &&
+          static_cast<Index_t>(weights.size()) != this->get_nb_quad_pts()) {
+        throw RuntimeError(operator_name + ": transpose weights must have one "
+                           "entry per quadrature point (" +
+                           std::to_string(this->get_nb_quad_pts()) +
+                           "), got " + std::to_string(weights.size()));
+      }
+    }
+
+    /**
      * @brief Throws if a field collection's ghost buffers are too small for
      *        this operator.
      *

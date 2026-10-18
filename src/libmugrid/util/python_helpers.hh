@@ -187,9 +187,14 @@ namespace muGrid {
 
         for (auto && pix : iter_pixels.coordinates()) {
             for (Index_t i = 0; i < dim; ++i) {
-                // pix[i] is the global coordinate
-                // fft_freqind converts position to frequency index
-                Int freq_index = fft_freqind(pix[i], nb_domain_grid_pts[i]);
+                // pix[i] is the global coordinate. Axis 0 is the half-complex
+                // (r2c) axis: its index *is* the frequency, as in numpy's
+                // rfftfreq and the C++ rfft_freq, so an even Nyquist mode is
+                // +0.5. fft_freqind would fold it to -0.5. The other axes
+                // follow fftfreq.
+                Int freq_index =
+                    (i == 0) ? static_cast<Int>(pix[i])
+                             : fft_freqind(pix[i], nb_domain_grid_pts[i]);
                 ptr[i] = normalize_fftfreq<T>(freq_index, nb_domain_grid_pts[i]);
             }
             ptr += dim;

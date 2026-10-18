@@ -76,7 +76,8 @@ rocFFTBackend::rocFFTBackend() {
 }
 
 void rocFFTBackend::check_rocfft_result(rocfft_status result,
-                                        const char * operation) {
+                                        const char * operation,
+                                        bool plan_creation) {
   if (result != rocfft_status_success) {
     std::stringstream error;
     error << "rocFFT error during " << operation << ": ";
@@ -108,6 +109,12 @@ void rocFFTBackend::check_rocfft_result(rocfft_status result,
     default:
       error << "unknown error code " << static_cast<int>(result);
       break;
+    }
+    // rocFFT reports a layout it cannot plan as an invalid-* status or a
+    // general failure (the batched, strided slab case); the engine may fall
+    // back on those.
+    if (plan_creation && result != rocfft_status_invalid_work_buffer) {
+      throw FFTPlanUnsupported(error.str());
     }
     throw RuntimeError(error.str());
   }
@@ -147,7 +154,7 @@ RocfftCachedPlan rocFFTBackend::create_plan(
   // Create plan description for advanced data layout
   rocfft_plan_description description = nullptr;
   rocfft_status status = rocfft_plan_description_create(&description);
-  check_rocfft_result(status, "plan description creation");
+  check_rocfft_result(status, "plan description creation", true);
 
   status = rocfft_plan_description_set_data_layout(
       description, in_array_type, out_array_type,
@@ -160,7 +167,7 @@ RocfftCachedPlan rocFFTBackend::create_plan(
   status = rocfft_plan_create(&cached.plan, placement, transform_type,
                               precision, lengths.size(),
                               lengths.data(), batch, description);
-  check_rocfft_result(status, "plan creation");
+  check_rocfft_result(status, "plan creation", true);
 
   // Destroy the description (no longer needed after plan creation)
   rocfft_plan_description_destroy(description);
