@@ -1,12 +1,12 @@
 /**
- * @file   convolution_operator_base.hh
+ * @file   linear.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  * @author Martin Ladecký <m.ladecky@gmail.com>
  *
  * @date   16 Jun 2020
  *
- * @brief  Interface for gradient (and divergence) operators
+ * @brief  Interface for linear stencil operators (gradient/divergence pairs)
  *
  * Copyright © 2020 Till Junge, Martin Ladecký
  *
@@ -90,22 +90,35 @@ namespace muGrid {
    * @class LinearOperator
    * @brief Base class for gradient and divergence operations.
    *
-   * This class defines the interface for performing gradient and divergence
-   * operations in the context of finite element analysis. It provides the
-   * foundational structure for implementing these operations on various types
-   * of fields and supports both nodal and quadrature point evaluations.
+   * A LinearOperator is a translation-invariant stencil B mapping an input
+   * field u (typically nodal, `get_nb_input_components()` values per pixel)
+   * to an output field B u (typically at quadrature points,
+   * `get_nb_output_components()` x `get_nb_quad_pts()` values per pixel):
    *
-   * @details The class is designed to be inherited by specific implementations
-   * that define the actual computational logic for gradient and divergence
-   * operations. It includes constructors, a destructor, and assignment
-   * operators to manage object lifecycle and ensure proper resource management.
+   *     (B u)_{p,q,c} = sum_{s in stencil} sum_{c'} B_{q,c,c'}(s) u_{p+s,c'},
+   *
+   * where p is a pixel, q a quadrature point, c/c' output/input components
+   * and s ranges over the box [offset, offset + stencil_shape - 1]
+   * (get_offset(), get_stencil_shape()). apply() evaluates B u;
+   * transpose() evaluates the (optionally weighted) adjoint Bᵀ W y with
+   * W = diag(weights) over quadrature points, which for a gradient B is the
+   * discrete (weak) divergence. For K = Bᵀ W C B type operators this pair
+   * is all that is needed.
+   *
+   * @details Operators assume nothing about boundary conditions: input
+   * values outside the subdomain are read from ghost layers that the caller
+   * fills beforehand (periodic images, neighbouring ranks), and every pixel
+   * whose stencil lies inside the ghosted buffer is computed. The ghost
+   * layers each operation needs are reported by the get_*_ghost_requirement
+   * methods and validated against the field collection before each
+   * application. Cost per application is O(nnz(B) x number of pixels).
    */
   class LinearOperator {
    public:
     /**
      * @brief Default constructor.
      *
-     * Initializes a new instance of the GradientOperator class. This
+     * Initializes a new instance of the LinearOperator class. This
      * constructor is defaulted, indicating that it performs no special
      * actions other than initializing the object.
      */
@@ -114,8 +127,8 @@ namespace muGrid {
     /**
      * @brief Copy constructor (deleted).
      *
-     * Disables the copy construction of GradientOperator instances.
-     * This ensures that a GradientOperator object cannot be copied,
+     * Disables the copy construction of LinearOperator instances.
+     * This ensures that a LinearOperator object cannot be copied,
      * enforcing unique ownership of its resources.
      */
     LinearOperator(const LinearOperator & other) = delete;
@@ -123,7 +136,7 @@ namespace muGrid {
     /**
      * @brief Move constructor.
      *
-     * Enables the move semantics for GradientOperator instances. This
+     * Enables the move semantics for LinearOperator instances. This
      * allows the efficient transfer of resources from one object to another
      * without copying.
      */
@@ -140,7 +153,7 @@ namespace muGrid {
     /**
      * @brief Copy assignment operator (deleted).
      *
-     * Disables the copy assignment of GradientOperator instances.
+     * Disables the copy assignment of LinearOperator instances.
      * This prevents the accidental or intentional copying of an instance,
      * enforcing unique ownership of its resources.
      */
@@ -150,7 +163,7 @@ namespace muGrid {
     /**
      * @brief Move assignment operator.
      *
-     * Enables the move assignment of GradientOperator instances, allowing
+     * Enables the move assignment of LinearOperator instances, allowing
      * resources to be transferred between objects without copying.
      */
     LinearOperator & operator=(LinearOperator && other) = default;
@@ -159,7 +172,8 @@ namespace muGrid {
      * @brief Applies the gradient operation.
      *
      * This method evaluates the gradient of a field defined at nodal points and
-     * writes the result into a field defined at quadrature points.
+     * writes the result into a field defined at quadrature points:
+     * quadrature_point_field = B nodal_field (see the class description).
      *
      * @param nodal_field The input field from which the gradient is computed.
      *                    Defined on nodal points.
@@ -184,7 +198,8 @@ namespace muGrid {
      * @brief Applies the gradient operation with increment.
      *
      * Evaluates the gradient of a field defined at nodal points and adds the
-     * result to a field defined at quadrature points.
+     * result to a field defined at quadrature points:
+     * quadrature_point_field += alpha B nodal_field.
      *
      * @param nodal_field The input field from which the gradient is computed.
      *                    Defined on nodal points.
@@ -209,7 +224,10 @@ namespace muGrid {
      * @brief Applies the discretised divergence operation.
      *
      * Evaluates the discretised divergence of a field defined at quadrature
-     * points and writes the result into a field defined at nodal points.
+     * points and writes the result into a field defined at nodal points:
+     * nodal_field = Bᵀ W quadrature_point_field, with W = diag(weights)
+     * over quadrature points (W = I when the implementation applies no
+     * weights; see the warning below).
      *
      * @param quadrature_point_field The input field from which the divergence
      * is computed. Defined on quadrature points.
@@ -243,7 +261,8 @@ namespace muGrid {
      * @brief Applies the discretised divergence operation with increment.
      *
      * Evaluates the discretised divergence of a field defined at quadrature
-     * points and adds the result to a field defined at nodal points.
+     * points and adds the result to a field defined at nodal points:
+     * nodal_field += alpha Bᵀ W quadrature_point_field.
      *
      * @param quadrature_point_field The input field from which the divergence
      * is computed. Defined on quadrature points.
@@ -407,10 +426,10 @@ namespace muGrid {
      * extra requirements (e.g. component-count checks) run those after calling
      * this.
      *
-     * Lifting this here removes the per-operator `validate_fields` copy that
-     * each Laplace / FEM-gradient / stiffness operator carried, and keeps the
-     * runtime check tied to get_spatial_dim()/the ghost requirement so it
-     * cannot drift from what the operator reports.
+     * The Laplace, FEM-gradient and stiffness operators all validate through
+     * this one function, which reads get_spatial_dim() and the ghost
+     * requirement, so the runtime check cannot drift from what the operator
+     * reports.
      *
      * @param input          Operator input field.
      * @param output         Operator output field.
@@ -451,7 +470,7 @@ namespace muGrid {
      *        quadrature point.
      *
      * The transpose kernels index the weights by quadrature point, so a
-     * shorter vector was read past its end and a longer one silently
+     * shorter vector would be read past its end and a longer one silently
      * truncated.
      *
      * @param weights The per-quadrature-point weights passed to transpose().

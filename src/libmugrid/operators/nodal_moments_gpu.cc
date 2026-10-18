@@ -43,6 +43,10 @@ namespace muGrid {
 
         // Tile of the 3D kernel. Compile-time so the kernel can size its
         // shared-memory staging buffer; the launcher uses the same values.
+        // 8 x 8 x 4 = 256 threads (3D) and 16 x 16 = 256 threads (2D), with
+        // halo tiles of 10 x 10 x 6 and 18 x 18 values (4.8 kB / 2.6 kB in
+        // double).
+        // TODO: rationale for the 8 x 8 x 4 and 16 x 16 tile shapes?
         constexpr int MOMENT_TILE_X = 8;
         constexpr int MOMENT_TILE_Y = 8;
         constexpr int MOMENT_TILE_Z = 4;
@@ -54,10 +58,11 @@ namespace muGrid {
          *
          * MomentQuadrature computes its entries constexpr, but from `Real`
          * (double). Evaluating them as double inside a float32 kernel would
-         * issue every inner-loop term on the fp64 pipe -- the cost the fused
-         * stiffness kernel's geometry tables were moved off in v1.1.1. So the
-         * table is materialised once, at T's precision, in registers/constant
-         * cache via a constexpr array.
+         * issue every inner-loop term on the fp64 pipe, which on most GPUs
+         * has a fraction of the fp32 throughput (the fused stiffness kernel
+         * keeps float32 copies of its geometry tables for the same reason).
+         * So the table is materialised once, at T's precision, in
+         * registers/constant cache via a constexpr array.
          */
         template <typename T, class Q>
         struct QuadTable {
@@ -80,6 +85,14 @@ namespace muGrid {
         /**
          * @brief 3D kernel: one thread per node, which also owns the cell of
          *        the same index.
+         *
+         * Thread i writes M_k(cell i) = V Σ_q w_q rho_q^k over its own cell
+         * and ∂/∂rho_i Σ_e M_k(e) = V Σ_{e ∋ i} Σ_q w_q k rho_q^(k-1) N_q(i)
+         * over the 2^Dim cells sharing node i (V the cell volume, k = 2..4).
+         * Each cell's quadrature is therefore evaluated 2^Dim times (once per
+         * corner thread): redundant arithmetic in exchange for writes that
+         * never collide, so no atomics and no ghost reduction. Cost
+         * O(2^Dim · NbQuad · NbNodes) per node.
          *
          * The node values this thread needs span [-1, +1] around it, and
          * neighbouring threads' spans overlap heavily -- each node is read by
@@ -167,6 +180,8 @@ namespace muGrid {
                                              fem_node_offset(n, 2))));
                     u[n] = s_rho[sidx];
                 }
+                // TODO: rationale for `#pragma unroll 1` on the quadrature
+                // loop (code size / register pressure?)
                 #pragma unroll 1
                 for (int q = 0; q < static_cast<int>(Q::NbQuad); ++q) {
                     T rho_q{};

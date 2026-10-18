@@ -12,6 +12,19 @@
  * views. Operations follow the Array API specification where applicable:
  * https://data-apis.org/array-api/latest/
  *
+ * Notation used throughout: a field holds, per pixel, `n_c` scalar entries
+ * (components times sub-points). Its buffer covers the local subdomain
+ * including ghost layers; the *interior* `Ω` is the set of pixels of the
+ * local subdomain without ghosts. Reductions (vecdot, norm_sq, axpy_norm_sq,
+ * pipelined_cg_dots) sum over `Ω` only, so that summing the local results
+ * over all MPI ranks counts every grid point exactly once -- ghost pixels
+ * duplicate data owned by a neighbouring rank. Updates (axpy, scal, axpby,
+ * copy, cross, leray_project) act on the whole buffer: the buffer is
+ * contiguous, so a single flat loop is cheaper than skipping ghosts, and the
+ * ghost entries are refilled by the next ghost communication anyway. Every
+ * operation is O(N) in the number of buffer entries and streams each operand
+ * once (except where noted).
+ *
  * Copyright © 2024 Lars Pastewka
  *
  * µGrid is free software; you can redistribute it and/or
@@ -90,14 +103,18 @@ using reduction_result_t = typename reduction_result<T>::type;
  *
  * In a single pass over the interior region (reading r, u and w once each),
  * returns the three inner products needed per pipelined-CG iteration:
- *   {0} = (r, u)   {1} = (w, u)   {2} = (r, r)
- * as local (not MPI-reduced) values. On the GPU this is one kernel launch and
- * one device->host copy, replacing the three separate reductions (and three
- * blocking copies) that standard preconditioned CG performs per iteration.
+ *   {0} = Σ_{i∈Ω} r_i u_i   {1} = Σ_{i∈Ω} w_i u_i   {2} = Σ_{i∈Ω} r_i²
+ * as local (not MPI-reduced) values, accumulated in double. On the GPU this
+ * is one kernel launch and one device->host copy, where three separate
+ * reductions would cost three launches and three blocking copies; the
+ * copies are synchronisation points, so fusing them is what makes the
+ * pipelined variant cheaper per iteration.
  *
- * Ghost regions are excluded, matching vecdot()/norm_sq().
+ * Ghost regions are excluded, matching vecdot()/norm_sq(). Fields on a
+ * LocalFieldCollection (which has no ghosts) are summed over their whole
+ * buffer.
  *
- * @tparam T Scalar type (Real)
+ * @tparam T Scalar type (Real or Real32; there is no complex variant)
  * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
  * @return The three products in reduction_result_t<T> (double precision for a
  *         single-precision field; see reduction_result)
@@ -109,7 +126,19 @@ std::array<reduction_result_t<T>, 3> pipelined_cg_dots(
 
 /**
  * Vector dot product on interior pixels only (excludes ghost regions).
- * Computes sum_i(a[i] * b[i]) for all interior pixels and all components.
+ * Computes `Σ_{i∈Ω} Σ_c conj(a[c, i]) b[c, i]` over all interior pixels and
+ * all components; `conj` is the identity for real fields, so the product is
+ * bilinear for real and sesquilinear (conjugate-linear in `a`) for complex
+ * fields, as in the Array API.
+ *
+ * The sum runs over the interior directly, never as full-buffer sum minus
+ * ghost contribution: ghost pixels may hold large stale values (stencil
+ * operators write into them), and the subtraction would then cancel
+ * catastrophically, leaving an absolute error of order
+ * `eps · ||ghosts||²` that can exceed a small converged residual and even
+ * make a squared norm negative. Single-precision entries are widened to
+ * double before they are multiplied, and the sum is accumulated in double
+ * (see reduction_result).
  *
  * This function iterates only over the interior region of the field,
  * excluding ghost cells. This is essential for MPI-parallel computations
@@ -201,10 +230,11 @@ void copy(const TypedField<T, MemorySpace>& src,
           TypedField<T, MemorySpace>& dst);
 
 /**
- * Squared L2 norm on interior pixels: sum_i(x[i]^2)
+ * Squared L2 norm on interior pixels: `Σ_{i∈Ω} Σ_c |x[c, i]|²`
  *
- * Convenience function, equivalent to vecdot(x, x).
- * Only iterates over interior region (excludes ghosts).
+ * Convenience function, equivalent to vecdot(x, x). Only iterates over the
+ * interior region (excludes ghosts). For complex fields the result is
+ * returned as a Complex whose imaginary part is zero (or rounding-level).
  *
  * @tparam T Scalar type (Real, Complex, etc.)
  * @tparam MemorySpace Memory space (HostSpace, CUDASpace, ROCmSpace)
@@ -217,13 +247,16 @@ template <typename T, typename MemorySpace>
 reduction_result_t<T> norm_sq(const TypedField<T, MemorySpace>& x);
 
 /**
- * Fused AXPY + norm_sq: y = alpha * x + y, returns ||y||² (interior only)
+ * Fused AXPY + norm_sq: y = alpha * x + y, returns `Σ_{i∈Ω} |y_i|²`
+ * (interior only)
  *
- * This fused operation computes both the AXPY update and the squared norm
- * of the result in a single pass through memory. This is more efficient
- * than separate axpy() + norm_sq() calls because:
- * - axpy + norm_sq: 2 reads of x, 2 reads of y, 1 write of y
+ * Where the update and the reduction cover the same entries -- device
+ * fields without ghosts -- both are done in a single pass through memory:
+ * - axpy + norm_sq: 1 read of x, 2 reads of y, 1 write of y
  * - axpy_norm_sq:   1 read of x, 1 read of y, 1 write of y
+ * On the host (Eigen's vectorised AXPY followed by the reduction) and for
+ * fields with ghosts (full-buffer update, interior-only reduction) the two
+ * steps are separate passes, with the same result.
  *
  * The AXPY operates on the FULL buffer, while the norm is computed only
  * over interior pixels (excludes ghost regions for MPI correctness).
@@ -333,7 +366,9 @@ void leray_project(const TypedField<Real, MemorySpace>& k,
                    TypedField<Complex, MemorySpace>& out);
 
 //! Single-precision (Real32/Complex32) overloads of the field-valued scal and
-//! the Leray projection (the spectral-solver / preconditioner kernels).
+//! the Leray projection (the spectral-solver / preconditioner kernels). The
+//! Leray contraction `Σ_d invk[d] N[d]` is formed in double on host and
+//! device; the field-valued scal is a plain elementwise product.
 template <typename MemorySpace>
 void scal(const TypedField<Real32, MemorySpace>& alpha,
           TypedField<Complex32, MemorySpace>& x);
@@ -353,7 +388,7 @@ namespace internal {
     //! operations, the field-valued scal, cross and leray_project -- takes
     //! element i for pixel i; on a collection with padded pixel strides it
     //! would silently read and write the padding. (The host's Eigen-based
-    //! operations refuse such fields through eigen_vec() already.)
+    //! operations refuse such fields through eigen_vec().)
     template <typename AnyField>
     void check_contiguous(const char* op, const AnyField& f) {
         const auto& coll{f.get_collection()};

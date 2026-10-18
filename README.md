@@ -46,13 +46,15 @@ To install µGrid, run
 
     pip install muGrid
 
-Note that on most platforms this will install a binary wheel, that was
+Note that on most platforms this will install a binary wheel that was
 compiled with a minimal configuration. To compile for your specific platform
 use
 
     pip install -v --no-binary muGrid muGrid
 
-which will compile the code. µGrid will autodetect
+which will compile the code (see the
+[installation guide](https://muspectre.github.io/muGrid/installation/) for
+compiler requirements and build options). µGrid will autodetect
 [MPI](https://www.mpi-forum.org/).
 GPU support ([CUDA](https://developer.nvidia.com/cuda)/[ROCm](https://www.amd.com/en/developer/resources/rocm-hub.html))
 is off by default and must be enabled explicitly at build time (see the

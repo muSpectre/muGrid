@@ -61,7 +61,8 @@ namespace muGrid {
                 return std::array<T, Dim>{ret(val, I)...};
             }
 
-            //! compute the stride in a direction of a column-major grid
+            //! compute the stride in a direction of a column-major grid,
+            //! s_k = prod_{i < k} N_i (first axis fastest)
             template <Dim_t Dim>
             constexpr Index_t
             col_major_stride(const GridIndex<Dim> & nb_grid_pts,
@@ -76,7 +77,8 @@ namespace muGrid {
                 return ret_val;
             }
 
-            //! compute the stride in a direction of a row-major grid
+            //! compute the stride in a direction of a row-major grid,
+            //! s_k = prod_{i > k} N_i (last axis fastest)
             template <Dim_t Dim>
             constexpr Index_t
             row_major_stride(const GridIndex<Dim> & nb_grid_pts,
@@ -218,7 +220,8 @@ namespace muGrid {
             }
         }
 
-        //! compute the order of the axes given strides, fastest first
+        //! compute the order of the axes given strides, fastest first, i.e.
+        //! the permutation pi with s_{pi(0)} <= s_{pi(1)} <= ...
         template <class T>
         T compute_axes_order(const T & shape, const T & strides) {
             T axes_order(shape.size());
@@ -227,10 +230,14 @@ namespace muGrid {
                       [&shape, &strides](const Dim_t & a, const Dim_t & b) {
                           // A strict weak ordering: by stride, ties (which
                           // a size-1 axis can create at any stride) by size,
-                          // then by index. Breaking only stride-1 ties left
-                          // e.g. shape (4, 1, 3), strides (1, 4, 4) in an
-                          // unspecified order, and the wrong one made a
-                          // contiguous buffer look non-contiguous.
+                          // then by index. All ties must be broken
+                          // deterministically, and a size-1 axis must sort
+                          // before a longer axis of equal stride: for shape
+                          // (4, 1, 3), strides (1, 4, 4) the order must be
+                          // (0, 1, 2): with (0, 2, 1),
+                          // get_coord_from_axes_order would peel off the
+                          // size-1 axis as the slowest one and assign it the
+                          // coordinate of axis 2.
                           if (strides[a] != strides[b]) {
                               return strides[a] < strides[b];
                           }
@@ -252,10 +259,14 @@ namespace muGrid {
                       [&shape, &strides](const Dim_t & a, const Dim_t & b) {
                           // A strict weak ordering: by stride, ties (which
                           // a size-1 axis can create at any stride) by size,
-                          // then by index. Breaking only stride-1 ties left
-                          // e.g. shape (4, 1, 3), strides (1, 4, 4) in an
-                          // unspecified order, and the wrong one made a
-                          // contiguous buffer look non-contiguous.
+                          // then by index. All ties must be broken
+                          // deterministically, and a size-1 axis must sort
+                          // before a longer axis of equal stride: for shape
+                          // (4, 1, 3), strides (1, 4, 4) the order must be
+                          // (0, 1, 2): with (0, 2, 1),
+                          // get_coord_from_axes_order would peel off the
+                          // size-1 axis as the slowest one and assign it the
+                          // coordinate of axis 2.
                           if (strides[a] != strides[b]) {
                               return strides[a] < strides[b];
                           }
@@ -267,14 +278,18 @@ namespace muGrid {
             return axes_order;
         }
 
-        //! check whether strides represent a contiguous buffer
+        //! check whether strides represent a contiguous buffer: with the axes
+        //! sorted fastest first (pi = compute_axes_order) and size-1 axes
+        //! skipped, s_{pi(0)} = 1 and s_{pi(k+1)} = s_{pi(k)} N_{pi(k)}.
+        //! Empty grids (zero volume) and 0-d grids count as contiguous.
         template <class T>
         bool is_buffer_contiguous(const T & nb_grid_pts, const T & strides) {
             Index_t dim{static_cast<Index_t>(nb_grid_pts.size())};
             if (dim == 0) {
                 return true;
             }
-            // Forward declare - will be in index_ops.hh
+            // Local copy of CcoordOps::compute_volume, which lives in
+            // index_ops.hh (that header includes this one)
             auto compute_volume = [](const T & lengths) {
                 typename std::remove_cv<typename std::remove_reference<
                     decltype(lengths[0])>::type>::type vol{};
@@ -333,7 +348,8 @@ namespace muGrid {
         }
 
         //-----------------------------------------------------------------------//
-        //! get the buffer size required to store a grid given its strides
+        //! get the buffer size required to store a grid given its strides,
+        //! max_k N_k s_k (the slowest axis spans the whole buffer)
         template <size_t dim>
         constexpr size_t get_buffer_size(const GridIndex<dim> & nb_grid_pts,
                                          const GridIndex<dim> & strides) {

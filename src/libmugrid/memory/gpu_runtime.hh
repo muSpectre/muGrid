@@ -59,11 +59,10 @@ inline constexpr gpuError_t gpuSuccess{cudaSuccess};
 //
 // Every launch is immediately followed by a check of the pending runtime
 // error: a `<<<>>>` launch reports configuration and "no kernel image for
-// device" failures synchronously through cudaGetLastError(). Without this
-// check those failures are swallowed — e.g. a library built for the wrong
-// GPU architecture launches nothing, runtime-API calls (cudaMemcpy/memset)
-// keep working, and reductions silently return 0. Mirrors the manual check
-// already used by the stiffness operators; see gpu_assert_last_error below.
+// device" failures synchronously through cudaGetLastError(), and nothing
+// else surfaces them: a library built for the wrong GPU architecture
+// launches nothing while runtime-API calls (cudaMemcpy/memset) keep working,
+// so reductions would silently return 0. See gpu_assert_last_error below.
 #define GPU_LAUNCH_KERNEL(kernel, grid, block, ...)         \
     do {                                                    \
         kernel<<<grid, block>>>(__VA_ARGS__);               \
@@ -86,10 +85,10 @@ inline constexpr gpuError_t gpuSuccess{cudaSuccess};
 // Host-callable runtime API (valid in any translation unit).
 //
 // Every call is routed through gpu_check (throws) or gpu_check_nothrow so a
-// failing runtime call is reported at its own call site instead of being
-// discarded. Discarding was doubly harmful: the failure was lost, and because
-// the pending-error state is sticky it would resurface at the next kernel
-// launch's gpu_assert_last_error and be misreported as a kernel-launch failure.
+// failing runtime call is reported at its own call site. The check also
+// clears the pending-error state, which is sticky: an unchecked failure would
+// resurface at the next kernel launch's gpu_assert_last_error and be
+// misreported as a kernel-launch failure.
 // GPU_MALLOC is the one exception: it stays raw because gpu_malloc_checked
 // wraps it with an allocation-specific message.
 #define GPU_CHECK(call) \
@@ -262,10 +261,11 @@ namespace muGrid {
      * Kernels, runtime allocations and the reduction scratch all act on the
      * *current* device. Field allocation selects the field's device and leaves
      * it selected, so with fields on two GPUs of one process the current
-     * device is whichever was allocated last, and an operation on a field of
-     * the other GPU launched its kernels on the wrong one (a memory access
-     * fault on MI300A). Every entry point that launches work for a field
-     * takes one of these with the field's device.
+     * device is whichever was allocated last. An operation on a field of the
+     * other GPU must therefore select that field's device explicitly, or its
+     * kernels run on the wrong GPU and fault on the foreign pointer. Every
+     * entry point that launches work for a field takes one of these with the
+     * field's device.
      */
     class DeviceGuard {
        public:

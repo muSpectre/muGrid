@@ -5,7 +5,7 @@
  *
  * @date   18 Dec 2024
  *
- * @brief  Distributed FFT engine with pencil decomposition
+ * @brief  Distributed FFT engine with slab or pencil decomposition
  *
  * Copyright (c) 2024 Lars Pastewka
  *
@@ -54,18 +54,33 @@
 namespace muGrid {
 
 /**
- * Distributed FFT engine using pencil (2D) decomposition.
+ * Distributed FFT engine using slab or pencil decomposition.
  *
  * This class provides distributed FFT operations on structured grids with
- * MPI parallelization. It uses pencil decomposition which allows efficient
- * scaling to large numbers of ranks.
+ * MPI parallelization. In 3D it uses a slab decomposition (Z split across
+ * P ranks, one transpose) when P <= Nz and a pencil decomposition (Y and Z
+ * split across P2 x P1 ranks, two transposes) otherwise; pencils keep every
+ * rank busy up to P = min(Nz, Ny) * min(Ny, Nx/2+1) instead of P = Nz. See
+ * FFTEngineBase for the layouts.
+ *
+ * The forward transform is the unnormalised real-to-complex DFT
+ * F(k) = sum_x f(x) exp(-2 pi i sum_alpha k_alpha x_alpha / N_alpha); only
+ * the half-complex range 0 <= k_0 <= Nx/2 is stored, since
+ * F(-k) = conj(F(k)) for real f. It is computed as a sequence of 1D passes,
+ * r2c along X, then c2c along Y and Z, interleaved with MPI transposes that
+ * make the next axis local. The inverse runs the adjoint sequence and ends
+ * with c2r along X; ifft(fft(f)) = N f with N = prod_alpha N_alpha, see
+ * normalisation(). When the transformed axes are all local (serial engine,
+ * or the X-Y plane of a slab) a backend with N-D support performs them in one
+ * planned call instead.
  *
  * Key features:
- * - Supports 2D and 3D grids
+ * - Supports 1D (serial only), 2D and 3D grids
  * - Handles arbitrary ghost buffer configurations in real space
  * - No ghosts in Fourier space (hard assumption)
  * - Compile-time memory space selection (Host, CUDA, HIP)
  * - Unnormalized transforms (like FFTW)
+ * - Batched over all per-pixel degrees of freedom (components x sub-points)
  *
  * The engine owns field collections for both real and Fourier space, and
  * work buffers for intermediate results during the distributed FFT.
@@ -80,7 +95,7 @@ class FFTEngine : public FFTEngineBase {
   using WorkBuffer = Array<Complex, MemorySpace>;
 
   /**
-   * Construct an FFT engine with pencil decomposition.
+   * Construct an FFT engine with slab or pencil decomposition.
    *
    * @param nb_domain_grid_pts  Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
    * @param comm                MPI communicator (default: serial)
@@ -89,6 +104,8 @@ class FFTEngine : public FFTEngineBase {
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
    * @param device              Device for field memory allocation (optional,
    *                            default uses memory space's default device)
+   * @param decomposition       "auto" (default), "pencil" or "slab"; see
+   *                            select_process_grid()
    */
   FFTEngine(const DynGridIndex & nb_domain_grid_pts,
             const Communicator & comm = Communicator(),
@@ -145,9 +162,10 @@ class FFTEngine : public FFTEngineBase {
 
   /**
    * Transforms batch over all per-pixel degrees of freedom: the component
-   * and sub-point axes are both pure batch axes (issue #192 was these paths
-   * batching over the component count only, which scrambles fields with
-   * more than one sub-point). Input and output must agree in both counts
+   * and sub-point axes are both pure batch axes, so a field with several
+   * sub-points is transformed as nb_components * nb_sub_pts independent
+   * scalar fields (batching over the component count alone would mix the
+   * sub-points of neighbouring pixels). Input and output must agree in both counts
    * strictly -- not just in their product -- so field shapes keep their
    * meaning across the transform. Returns the batch size
    * nb_dof_per_pixel = nb_components * nb_sub_pts.
@@ -208,8 +226,8 @@ class FFTEngine : public FFTEngineBase {
     // Single-precision path (real input is Real32). The serial (non-decomposed)
     // layout uses the backend N-D transform when it has one (no work
     // buffers/transpose); otherwise -- a backend without N-D support, e.g.
-    // under MUGRID_FFT_NO_ND=1, which used to throw here -- and on the
-    // MPI-decomposed layout it uses the templated per-axis path.
+    // under MUGRID_FFT_NO_ND=1 -- and on the MPI-decomposed layout it uses
+    // the templated per-axis path.
     if (input.get_type_descriptor() == TypeDescriptor::Real32) {
       if (this->try_serial_nd<Real32, Complex32>(input, output, true)) {
       } else if (this->spatial_dim == 1) {
@@ -732,9 +750,10 @@ class FFTEngine : public FFTEngineBase {
         // Slab fast path (P2 == 1: X and Y are both local). Transform the two
         // local axes (Y, and the half-complex X last) in a single planned
         // rank-2 r2c per component, batched over the local Z planes, written
-        // straight into the Y-pencil layout. This replaces the per-Z-plane
-        // r2c-X loop, the X<->Y copy and the per-Z-plane c2c-Y loop with one
-        // native cuFFT/rocFFT/pocketFFT N-D transform per component.
+        // straight into the Y-pencil layout. Compared with the pencil path
+        // below this saves the per-Z-plane r2c-X loop, the X<->Y copy and the
+        // per-Z-plane c2c-Y loop: one native cuFFT/rocFFT/pocketFFT N-D
+        // transform per component.
         std::vector<Index_t> shape{local_real[2], Ny, Nx};
         std::vector<Index_t> axes{1, 2};
         std::vector<Index_t> in_strides{in_z_dist, in_y_dist, in_x_stride};
@@ -1208,7 +1227,7 @@ class FFTEngine : public FFTEngineBase {
         // Slab fast path (P2 == 1: X and Y both local). Fuse the inverse Y
         // (c2c) and X (c2r, half-complex) transforms into one planned rank-2
         // c2r per component, batched over the local Z planes, reading the
-        // Y-pencil and writing the real output directly. Replaces the c2c-Y
+        // Y-pencil and writing the real output directly, in place of the c2c-Y
         // loop, the X<->Y copy and the c2r-X loop (mirrors the forward path).
         std::vector<Index_t> shape{local_real[2], Ny, Nx};
         std::vector<Index_t> axes{1, 2};
@@ -1292,10 +1311,11 @@ class FFTEngine : public FFTEngineBase {
       if (backend->supports_nd()) {
         // Fast path: single planned inverse transform over all three axes plus
         // the component batch (mirrors the forward fast path). `shape` is the
-        // real-space (output) extent; the c2r (x) axis is last. pocketfft's
-        // multi-axis c2r stages the non-real axes into its own temporary, so
-        // the const Fourier input is not modified and no work-buffer copy is
-        // needed. Output strides fold in the destination ghost layout.
+        // real-space (output) extent; the c2r (x) axis is last. The backends'
+        // c2r_nd leave the const Fourier input unmodified (pocketfft's
+        // multi-axis c2r stages the non-real axes into its own temporary, the
+        // GPU backends stage through a scratch buffer), so no work-buffer
+        // copy is needed. Output strides fold in the destination ghost layout.
         std::vector<Index_t> shape{nb_dof, Nz, Ny, Nx};
         std::vector<Index_t> axes{1, 2, 3};
         std::vector<Index_t> in_strides{in_comp_factor, in_z_dist, in_y_dist,

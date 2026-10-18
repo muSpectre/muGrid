@@ -438,7 +438,8 @@ namespace muGrid {
      * @param collection reference to the holding field collection.
      * @param components_shape number of components to store per quadrature
      * point
-     * @param storage_oder in-memory storage order of the components
+     * @param sub_division tag of the sub-division scheme
+     * @param unit physical unit of this field
      */
     TypedField(const std::string & unique_name, FieldCollection & collection,
                const Shape_t & components_shape,
@@ -611,9 +612,12 @@ namespace muGrid {
    * This function handles layout conversion between AoS (Array of Structures,
    * used by host/CPU) and SoA (Structure of Arrays, used by device/GPU).
    *
-   * For same-space copies (host-host or device-device), a fast byte copy is
-   * used. For cross-space copies (host-device or device-host), layout
-   * conversion is performed so that the logical field values are preserved.
+   * When both fields have the same storage order, a byte copy is used.
+   * Otherwise (host AoS <-> device SoA) the values are permuted through a
+   * host buffer so that the logical field values are preserved:
+   * AoS entry pixel * nb_dof_per_pixel + dof maps to SoA entry
+   * soa_dof(dof) * nb_buffer_pixels + pixel (see the dof permutation in the
+   * body). A storage-order mismatch within one memory space throws.
    */
   template <typename T, typename DstSpace, typename SrcSpace>
   void deep_copy(TypedFieldBase<T, DstSpace> & dst,
@@ -654,8 +658,9 @@ namespace muGrid {
     //   SoA (device): dof = c_rowmajor * nb_sub_pts + s
     //                 (components row-major, sub-point between comps and pixels)
     // These coincide only for scalar / single-axis components with one
-    // sub-point, which is why a host->device->host round trip (and the existing
-    // 1-D test) cannot detect a wrong permutation.
+    // sub-point, so a host->device->host round trip of such a field cannot
+    // detect a wrong permutation; only multi-axis components or several
+    // sub-points exercise it.
     const auto components_shape = src.get_components_shape();
     const Index_t nb_comp_dims =
         static_cast<Index_t>(components_shape.size());

@@ -75,10 +75,10 @@ namespace muGrid {
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         /**
-         * Memory allocator for device (CUDA/HIP) space. The CUDA and HIP
-         * variants were byte-identical apart from the memset spelling, so they
-         * share a single implementation that routes through the gpu_runtime.hh
-         * shim.
+         * Memory allocator for device (CUDA/HIP) space. A single
+         * implementation serves both backends: the only backend-specific
+         * call (memset) goes through the GPU_MEMSET macro of the
+         * gpu_runtime.hh shim.
          */
         template <typename T>
         struct DeviceAllocator {
@@ -251,8 +251,9 @@ namespace muGrid {
         /**
          * Set the buffer's profiling label and requesting memory space (e.g.
          * "cuda:0"). Called by the owning Field before (re)allocation so the
-         * allocation profiler can attribute the buffer to a named field. A
-         * no-op unless built with MUGRID_PROFILE_ALLOCATIONS.
+         * allocation profiler can attribute the buffer to a named field. The
+         * label is only used while the profiler is recording (enable() or
+         * the environment variable MUGRID_PROFILE_ALLOCATIONS=1).
          */
         void set_label(const std::string & label, const std::string & space) {
             label_ = label;
@@ -305,7 +306,8 @@ namespace muGrid {
     };
 
     /**
-     * @brief Resize a Array (free function for compatibility)
+     * @brief Resize an Array (free-function form of Array::resize; does
+     * not preserve existing data)
      */
     template <typename T, typename MemorySpace>
     void resize(Array<T, MemorySpace> & arr, std::size_t new_size) {
@@ -370,8 +372,9 @@ namespace muGrid {
         }
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         else if constexpr (std::is_same_v<MemorySpace, DefaultDeviceSpace>) {
-            // No device-side scalar fill yet; stage the value on the host and
-            // copy across.
+            // There is no device-side scalar fill kernel; stage the value on
+            // the host and copy across (one host-to-device transfer of
+            // size() elements).
             if (dst.size() > 0) {
                 Array<T, HostSpace> tmp(dst.size());
                 for (std::size_t i = 0; i < tmp.size(); ++i) {

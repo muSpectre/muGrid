@@ -7,20 +7,30 @@
  *
  * @brief  Dimension-templated fused isotropic linear-elastic stiffness operator
  *
- * Computes K @ u = B^T C B @ u for isotropic linear elastic materials,
- * exploiting K = 2μ G + λ V where G and V are geometry-only matrices shared by
- * all voxels (so spatially-varying materials cost O(N × 2) rather than
- * O(N × NB_ELEMENT_DOFS²)). The 2D (linear triangles) and 3D (linear
- * tetrahedra) operators shared their entire interface, validation and device
- * dispatch, differing only in the dimension, the element counts and the
- * geometry of G/V. They are unified here into a single
- * `template <Dim_t Dim> IsotropicStiffnessOperator`, which inherits the
- * `MaterialOperator` interface (Phase 5c) so the λ/μ-carrying signature and the
- * stencil/ghost metadata are declared once. The two genuinely dimension-
- * specific operations — `precompute_matrices` and `apply_impl` (host + device)
- * — remain as explicit specializations in isotropic_stiffness_2d.cc /
- * isotropic_stiffness_3d.cc / isotropic_stiffness_gpu.cc. The historical class
- * names remain as type aliases so no binding or downstream code changes.
+ * Computes f = K u = Bᵀ C B u for isotropic linear elastic materials with
+ * per-pixel Lamé fields λ(x), μ(x) on a regular grid of d-dimensional pixels
+ * (d = 2, 3), each pixel being one finite element with 2^d corner nodes.
+ * For an isotropic material C = 2μ I_sym + λ (δ ⊗ δ) the element stiffness
+ * splits as
+ *
+ *     K_e = 2μ_e G + λ_e V,
+ *     G = Σ_q w_q B_qᵀ I_sym B_q,       (uᵀ G v = Σ_q w_q ε(u)_q : ε(v)_q)
+ *     V = Σ_q w_q (B_qᵀ m)(mᵀ B_q),     (uᵀ V v = Σ_q w_q tr ε(u)_q tr ε(v)_q)
+ *
+ * where B_q is the strain-displacement matrix at quadrature point q, w_q the
+ * physical quadrature weight and m the Voigt identity. G and V depend only on
+ * the grid spacing h_α and the element, so they are identical for every pixel
+ * and precomputed once; a spatially varying material then needs two scalars
+ * per pixel instead of a full (2^d·d)² element matrix, i.e. O(N) material
+ * storage for N pixels, and one application costs O(N (2^d·d)²) flops.
+ *
+ * The operator is a single `template <Dim_t Dim> IsotropicStiffnessOperator`
+ * implementing the `MaterialOperator` interface, so the λ/μ-carrying signature
+ * and the stencil/ghost metadata are declared once. The dimension-specific
+ * operations (`precompute_matrices` and the `*_impl` kernels, host and device)
+ * are explicit specializations in isotropic_stiffness_2d.cc,
+ * isotropic_stiffness_3d.cc and isotropic_stiffness_gpu.cc. The names
+ * IsotropicStiffnessOperator2D/3D are type aliases of the two instantiations.
  *
  * Copyright © 2025 Lars Pastewka
  *
@@ -178,6 +188,11 @@ namespace muGrid {
     /**
      * @struct IsotropicStiffnessTraits
      * @brief Dimension-varying element counts of the stiffness operator.
+     *
+     * `nb_quad` is the quadrature-point count of the P1 element (one point
+     * per simplex). The element actually used is chosen at run time
+     * (FEMElementKind) and its count is stored separately (Q1: 4 in 2D, 8 in
+     * 3D; see fem_element.hh).
      */
     template <Dim_t Dim>
     struct IsotropicStiffnessTraits;
@@ -185,13 +200,13 @@ namespace muGrid {
     struct IsotropicStiffnessTraits<2> {
         static constexpr Index_t nb_nodes = 4;          //!< 4 corner nodes
         static constexpr Index_t nb_dofs_per_node = 2;  //!< ux, uy
-        static constexpr Index_t nb_quad = 2;           //!< 2 triangles
+        static constexpr Index_t nb_quad = 2;           //!< P1: 2 triangles
     };
     template <>
     struct IsotropicStiffnessTraits<3> {
         static constexpr Index_t nb_nodes = 8;          //!< 8 corner nodes
         static constexpr Index_t nb_dofs_per_node = 3;  //!< ux, uy, uz
-        static constexpr Index_t nb_quad = 5;           //!< 5 tetrahedra
+        static constexpr Index_t nb_quad = 5;           //!< P1: 5 tetrahedra
     };
 
 
@@ -218,12 +233,14 @@ namespace muGrid {
          * differ only in the stride bookkeeping that follows. Checks that both
          * the displacement/force field and the material (λ, μ) field live on a
          * GlobalFieldCollection with at least one ghost layer on every side,
-         * and that their computable regions agree. The dimension is handled by
-         * a loop over the @p Dim axes rather than hard-coded `[0], [1], [2]`
-         * index checks, so the rule lives in one place.
+         * and that their computable regions agree. The checks loop over the
+         * @p Dim axes, so one rule covers 2D and 3D.
          *
-         * @param disp_coll collection of the displacement/force field
-         * @param mat_coll  collection of the material (λ, μ) fields
+         * @param disp_coll collection of the displacement/force (nodal) field
+         * @param mat_coll  collection of the per-pixel fields (λ, μ, or the
+         *                  sensitivity outputs g_shear/g_vol)
+         * @return the two collections and the computable region
+         *         N_α^with-ghosts − 2 per axis
          * @throws RuntimeError if any check fails
          */
         template <Dim_t Dim>
@@ -307,10 +324,23 @@ namespace muGrid {
     /**
      * @class IsotropicStiffnessOperator
      * @brief Fused stiffness operator for isotropic linear elastic materials
-     *        (2D linear triangles / 3D linear tetrahedra).
+     *        on P1 (2 triangles / 5 tetrahedra per pixel) or Q1 (bilinear
+     *        quadrilateral / trilinear hexahedron) elements.
      *
-     * Computes force = K @ displacement with K = 2μ G + λ V. G and V are
-     * precomputed once at construction from the grid spacing.
+     * Computes force = K displacement, assembled from the element matrices
+     * K_e = 2μ_e G + λ_e V of the pixels incident to each node. G and V are
+     * precomputed once at construction from the grid spacing and the element.
+     *
+     * Assembly is a gather: each node sums the contributions of its 2^d
+     * incident elements (offsets −1/0 per axis), so every output value is
+     * written by exactly one thread/iteration and no atomics or scatter
+     * conflicts arise. This requires one ghost layer on each side of every
+     * axis for both the nodal fields and the per-pixel Lamé fields; the
+     * ghosts must be filled beforehand (periodicity, MPI). Each node
+     * evaluates only its d rows of each of its 2^d incident K_e, i.e.
+     * 2^d · d · (2^d·d) = (2^d·d)² multiply-adds per matrix (G and V), so
+     * one application costs
+     * O(N (2^d·d)²) for N nodes.
      */
     template <Dim_t Dim>
     class IsotropicStiffnessOperator : public MaterialOperator {
@@ -336,7 +366,12 @@ namespace muGrid {
             std::array<Real, NB_ELEMENT_DOFS * NB_ELEMENT_DOFS>;
 
         /**
-         * @brief Construct with grid spacing (length Dim); precomputes G and V.
+         * @brief Construct with grid spacing (length Dim); precomputes G, V
+         *        and the element-averaged gradient D̄.
+         *
+         * @param grid_spacing pixel size h_α per axis (length Dim)
+         * @param element      finite element (default Q1)
+         * @throws RuntimeError if grid_spacing.size() != Dim
          */
         explicit IsotropicStiffnessOperator(
             const std::vector<Real> & grid_spacing,
@@ -357,6 +392,9 @@ namespace muGrid {
         ~IsotropicStiffnessOperator() override = default;
 
         // ---- Host interface (overrides MaterialOperator) ----
+        // apply: force = K(λ, μ) u; apply_increment: force += α K(λ, μ) u.
+        // Nodes in the computable region (with-ghosts minus one layer per
+        // side) are written; the outermost ghost layer of force is untouched.
         void apply(const TypedFieldBase<Real> & displacement,
                    const TypedFieldBase<Real> & lambda,
                    const TypedFieldBase<Real> & mu,
@@ -421,6 +459,14 @@ namespace muGrid {
         //! a uniform macroscopic strain E_macro), with no global strain/stress
         //! field. The homogenization right-hand side is the negative of this.
         //! E_macro is the (symmetric) Dim×Dim macro strain, row-major.
+        //!
+        //! Since B u* = E_macro for the affine displacement u*(x) = E_macro x,
+        //! the result equals K u* = Σ_e (2μ_e G u*_e + λ_e V u*_e). u*_e is the
+        //! same for every element (relative to its origin), so Gu = G u*_e and
+        //! Vu = V u*_e are formed once and the kernel only gathers
+        //! 2μ_e Gu + λ_e Vu from the 2^d incident elements of each node:
+        //! O(N 2^d d) work, no displacement read. The force field is
+        //! overwritten (not incremented) on the computable region.
         void apply_macro_rhs(const TypedFieldBase<Real> & lambda,
                              const TypedFieldBase<Real> & mu,
                              const std::array<Real, Dim * Dim> & E_macro,
@@ -436,11 +482,20 @@ namespace muGrid {
             this->apply_macro_rhs_impl<Real32>(lambda, mu, E_macro, force);
         }
 
-        //! Volume-averaged stress integral ∫ σ dV over the local subdomain,
-        //! where σ = C(λ, μ):(E_macro + sym(∇u)). Returns the Dim×Dim tensor
+        //! Stress volume integral ∫ σ dV over the local subdomain, where
+        //! σ = C(λ, μ):(E_macro + sym(∇u)). Returns the Dim×Dim tensor
         //! (row-major) as a local, un-reduced volume integral: the caller sums
         //! across MPI ranks and divides by the total volume. Computes the
         //! element strain locally, so no global strain/stress field is needed.
+        //!
+        //! Per owned pixel e: ḡ_e = D̄ u_e is the element-averaged displacement
+        //! gradient, and the contribution is
+        //! |Ω_e| (2μ_e E_e + λ_e tr(E_e) δ) with E_e = E_macro + sym(ḡ_e),
+        //! |Ω_e| = ∏ h_α. This is exact for P1 and Q1 because σ is linear in
+        //! ∇u and C is constant on each element, so ∫_e σ = C : ∫_e ε.
+        //! Only owned pixels (not ghosts/padding) are summed, so the sum over
+        //! ranks counts every pixel once. The sum is accumulated in double
+        //! regardless of the field precision. O(N 2^d d²) work.
         std::array<Real, Dim * Dim>
         average_stress(const TypedFieldBase<Real> & displacement,
                        const TypedFieldBase<Real> & lambda,
@@ -461,7 +516,8 @@ namespace muGrid {
         }
 
         //! Assemble the diagonal of the system matrix, diag(K), into the nodal
-        //! field @p diagonal (same shape as displacement/force). This is the
+        //! field @p diagonal (same shape as displacement/force; overwritten on
+        //! the computable region). This is the
         //! Jacobi preconditioner ingredient of the Green-Jacobi (J-FFT) scheme:
         //! since K = 2μ G + λ V per element, the nodal diagonal is
         //! Σ_e (2μ_e G[r,r] + λ_e V[r,r]) with r the node's local DOF in each
@@ -492,6 +548,14 @@ namespace muGrid {
         //! so this kernel is material-model-agnostic (the caller applies the
         //! chain rule). Passing the costate macro strain equal to ∂f/∂⟨σ⟩ folds
         //! the explicit objective term and the adjoint term into one call.
+        //!
+        //! Here aₑ = u*(forward_macro)ₑ + forward_dispₑ and
+        //! bₑ = u*(costate_macro)ₑ + costate_dispₑ are the total element DOF
+        //! vectors (u* the affine displacement of the macro strain). The
+        //! bilinear forms are evaluated with the same G, V as K, so the result
+        //! is the exact derivative of the discrete aᵀ K(λ, μ) b with respect to
+        //! 2μ_e and λ_e. g_shear/g_vol live on the per-pixel (material)
+        //! collection; only owned pixels are written. O(N (2^d d)²) work.
         void
         compute_sensitivity(const TypedFieldBase<Real> & forward_disp,
                             const std::array<Real, Dim * Dim> & forward_macro,
@@ -639,9 +703,11 @@ namespace muGrid {
         }
 #endif
 
-        //! Precomputed G = Σ_q w_q B_q^T B_q (shear stiffness geometry).
+        //! Precomputed G = Σ_q w_q B_qᵀ I_sym B_q (shear stiffness geometry,
+        //! coefficient 2μ), row-major (NB_ELEMENT_DOFS)², DOF index n·Dim + i.
         const ElementMatrix & get_G() const { return G_matrix; }
-        //! Precomputed V = Σ_q w_q (B_q^T m)(m^T B_q) (volumetric geometry).
+        //! Precomputed V = Σ_q w_q (B_qᵀ m)(mᵀ B_q) (volumetric geometry,
+        //! coefficient λ), same layout as G.
         const ElementMatrix & get_V() const { return V_matrix; }
 
         //! Spatial dimension.
@@ -675,9 +741,10 @@ namespace muGrid {
         }
 
        public:
-        //! Element-averaged gradient operator D̄[j*NB_NODES+n] = scale[j]
-        //! Σ_q w_q B[q][j][n], so ḡ_ij = Σ_n D̄[j][n] u[n,i]. Used by
-        //! average_stress.
+        //! Element-averaged gradient operator
+        //! D̄[j*NB_NODES+n] = (1/h_j) Σ_q Wfrac_q B[q][j][n] (fractional weights,
+        //! Σ_q Wfrac_q = 1), so ḡ_ij = Σ_n D̄[j][n] u[n,i] is the mean of ∂_j u_i
+        //! over the element. Used by average_stress.
         using GradientAverage = std::array<Real, Dim * NB_NODES>;
         const GradientAverage & get_Dbar() const { return Dbar_matrix; }
 
@@ -688,8 +755,10 @@ namespace muGrid {
         GradientAverage Dbar_matrix;  //!< element-averaged gradient operator
 
         //! Selected element's reference data, copied from the traits at
-        //! construction (fem_element.hh). B is flattened [q][d][n]. Only
-        //! precompute_matrices() consumes these, so runtime storage is free.
+        //! construction (fem_element.hh). B is the reference (unit-cell)
+        //! shape-function gradient flattened [q][d][n]; Wfrac are the
+        //! quadrature weights as fractions of the element volume. Only
+        //! precompute_matrices() consumes these; the kernels use G, V, D̄.
         std::vector<Real> elem_B;
         std::vector<Real> elem_Wfrac;
         Index_t elem_nb_quad{0};
@@ -734,6 +803,7 @@ namespace muGrid {
 
         //! Build the constant per-element vectors Gu = G u* and Vu = V u* of
         //! the affine displacement u* with ∇u* = E_macro (used by macro RHS).
+        //! Only the first NB_ELEMENT_DOFS entries of Gu, Vu are written.
         void macro_rhs_vectors(const std::array<Real, Dim * Dim> & E_macro,
                                ElementMatrix & Gu, ElementMatrix & Vu) const {
             std::array<Real, NB_ELEMENT_DOFS> u_star{};
@@ -781,8 +851,9 @@ namespace muGrid {
             }
         }
 
-        //! Node offsets within an element [node][dim] (binary indexing); shared
-        //! by the affine-displacement construction above.
+        //! Node offsets within an element [node][dim] (binary indexing: bit d
+        //! of the node index is its offset along axis d); shared by the
+        //! affine-displacement constructions above.
         static constexpr std::array<std::array<Index_t, Dim>, NB_NODES>
         node_offset_table() {
             std::array<std::array<Index_t, Dim>, NB_NODES> tbl{};
@@ -814,6 +885,7 @@ namespace muGrid {
         //! Host macro-RHS / stress-average (dimension-specific; explicit
         //! specialization in isotropic_stiffness_{2,3}d.cc). E_macro stays in
         //! double; the kernel-side per-element vectors are converted to T.
+        //! The stress integral is returned in double.
         template <typename T>
         void apply_macro_rhs_impl(const TypedFieldBase<T> & lambda,
                                   const TypedFieldBase<T> & mu,
@@ -908,9 +980,10 @@ namespace muGrid {
     // translation unit that instantiates the operator must see that these
     // members are specialized elsewhere (and not implicitly instantiated from
     // the — intentionally undefined — primary template). precompute_matrices is
-    // a plain member specialization; the apply/transpose impls are member
-    // templates on the scalar type T (instantiated for Real and Real32 in the
-    // .cc files). One declaration per (Dim, space) covers both precisions.
+    // a plain member specialization; the *_impl kernels (apply, uniform apply,
+    // macro RHS, stress average, diagonal, sensitivity) are member templates
+    // on the scalar type T (instantiated for Real and Real32 in the .cc
+    // files). One declaration per (Dim, space) covers both precisions.
     // The field-base type is passed as a single object-like macro (TFB): the
     // host one is `TypedFieldBase<T>`, the device one carries its own comma as
     // `TypedFieldBase<T, DefaultDeviceSpace>`. Passing it as one already-formed
@@ -967,9 +1040,9 @@ namespace muGrid {
 #undef MUGRID_TFB_HOST
 #undef MUGRID_TFB_DEVICE
 
-    //! 2D fused isotropic stiffness operator. Preserves the historical name.
+    //! 2D fused isotropic stiffness operator (name used by the bindings).
     using IsotropicStiffnessOperator2D = IsotropicStiffnessOperator<2>;
-    //! 3D fused isotropic stiffness operator. Preserves the historical name.
+    //! 3D fused isotropic stiffness operator (name used by the bindings).
     using IsotropicStiffnessOperator3D = IsotropicStiffnessOperator<3>;
 
 }  // namespace muGrid

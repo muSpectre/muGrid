@@ -51,10 +51,10 @@
 #include <vector>
 
 namespace muGrid {
-    //! forward declaration of the `muSpectre::Field`
+    //! forward declaration of the `muGrid::Field`
     class Field;
 
-    //! forward declaration of the `muSpectre::TypedField`
+    //! forward declaration of the `muGrid::TypedField`
     template <typename T, typename MemorySpace = HostSpace>
     class TypedField;
 
@@ -68,7 +68,7 @@ namespace muGrid {
     //! forward declaration of the field collection
     class FieldCollection;
 
-    //! forward declacation of the field's destructor-functor
+    //! forward declaration of the field's destructor-functor
     template <class DefaultDestroyable>
     struct FieldDestructor {
         //! deletes the held field
@@ -90,7 +90,7 @@ namespace muGrid {
 
     /**
      * Base class for both `muGrid::GlobalFieldCollection` and
-     * `muGrid::LocalFieldCollection`. Manages the a group of fields with the
+     * `muGrid::LocalFieldCollection`. Manages a group of fields with the
      * same domain of validity (i.e., global fields, or local fields defined on
      * the same pixels).
      */
@@ -125,11 +125,14 @@ namespace muGrid {
          * @param storage_order Storage order of the pixels vs subdivision
          * portion of the field. In a column-major storage order, the pixel
          * subdivision (i.e. the components of the field) are stored next to
-         * each other in memory, file in a row-major storage order for each
+         * each other in memory, while in a row-major storage order for each
          * component the pixels are stored next to each other in memory. (This
          * is also sometimes called the array of structures vs. structure of
          * arrays storage order.) Important: The pixels or subpoints have their
-         * own storage order that is not affected by this setting.
+         * own storage order that is not affected by this setting. Ignored
+         * for device collections, which always use StructureOfArrays (see
+         * CUDASpace in memory/memory_space.hh for the rationale).
+         * @param device where to allocate field memory
          */
         FieldCollection(
             ValidityDomain domain, Dim_t spatial_dimension,
@@ -171,7 +174,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         template <typename T>
         Field & register_field(const std::string & unique_name,
@@ -194,8 +197,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         template <typename T>
         Field & register_field(const std::string & unique_name,
@@ -223,9 +225,7 @@ namespace muGrid {
          *
          * @param sub_division_tag unique identifier of the subdivision scheme
          *
-         * @param unit phyiscal unit of this field
-         *
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         template <typename T>
         Field_ptr
@@ -243,7 +243,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field &
         register_real_field(const std::string & unique_name,
@@ -258,8 +258,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field &
         register_real_field(const std::string & unique_name,
@@ -276,7 +275,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field &
         register_complex_field(const std::string & unique_name,
@@ -291,8 +290,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field &
         register_complex_field(const std::string & unique_name,
@@ -309,7 +307,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field &
         register_int_field(const std::string & unique_name,
@@ -324,8 +322,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field &
         register_int_field(const std::string & unique_name,
@@ -342,7 +339,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field &
         register_uint_field(const std::string & unique_name,
@@ -357,8 +354,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field &
         register_uint_field(const std::string & unique_name,
@@ -458,8 +454,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         template <typename T>
         Field & field(const std::string & unique_name,
@@ -483,7 +478,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field & real_field(const std::string & unique_name,
                            const Index_t & nb_components,
@@ -497,8 +492,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field & real_field(const std::string & unique_name,
                            const Shape_t & components_shape,
@@ -514,7 +508,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field & complex_field(const std::string & unique_name,
                               const Index_t & nb_components,
@@ -528,8 +522,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field & complex_field(const std::string & unique_name,
                               const Shape_t & components_shape,
@@ -545,7 +538,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field & int_field(const std::string & unique_name,
                           const Index_t & nb_components,
@@ -559,8 +552,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field & int_field(const std::string & unique_name,
                           const Shape_t & components_shape,
@@ -576,7 +568,7 @@ namespace muGrid {
          * (e.g., 4 for a two-dimensional second-rank tensor, or 1 for a scalar
          * field)
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
+         * @param unit physical unit of this field
          */
         Field & uint_field(const std::string & unique_name,
                            const Index_t & nb_components,
@@ -590,8 +582,7 @@ namespace muGrid {
          * @param components_shape number of components to store per quadrature
          * point
          * @param sub_division_tag unique identifier of the subdivision scheme
-         * @param unit phyiscal unit of this field
-         * @param storage_oder in-memory storage order of the components
+         * @param unit physical unit of this field
          */
         Field & uint_field(const std::string & unique_name,
                            const Shape_t & components_shape,
@@ -708,8 +699,8 @@ namespace muGrid {
         Index_t get_nb_buffer_pixels() const;
 
         /**
-         * Check whether the number of subdivision points peir pixel/voxel has
-         * been set for a given tags
+         * Check whether the number of subdivision points per pixel/voxel has
+         * been set for a given tag
          */
         bool has_nb_sub_pts(const std::string & tag) const;
 
@@ -736,7 +727,7 @@ namespace muGrid {
         Dim_t get_spatial_dim() const;
 
         /**
-         * return the domain of validity (i.e., wher the fields are defined
+         * return the domain of validity (i.e., whether the fields are defined
          * globally
          * (`muGrid::FieldCollection::ValidityDomain::Global`) or locally
          * (`muGrid::FieldCollection::ValidityDomain::Local`)
@@ -775,13 +766,13 @@ namespace muGrid {
 
         /**
          * return an iterable proxy to the collection which allows to
-         * efficiently iterate over the indices fo the collection's pixels
+         * efficiently iterate over the indices of the collection's pixels
          */
         PixelIndexIterable get_pixel_indices() const;
 
         /**
          * return an iterable proxy to the collection which allows to iterate
-         * over the indices fo the collection's quadrature points
+         * over the indices of the collection's quadrature points
          */
         IndexIterable get_sub_pt_indices(const std::string & tag) const;
 
@@ -930,7 +921,7 @@ namespace muGrid {
         //! total number of pixels for the buffer (including padding regions)
         Index_t nb_buffer_pixels{Unknown};
 
-        //! storage oder
+        //! storage order of the components (AoS or SoA)
         StorageOrder storage_order;
 
         //! device for all fields in this collection
@@ -1001,7 +992,7 @@ namespace muGrid {
     /**
      * Iterate class for iterating over quadrature point indices of a field
      * collection (i.e. the iterate you get when iterating over the result of
-     * `muGrid::FieldCollection::get_quad_pt_indices`).
+     * `muGrid::FieldCollection::get_sub_pt_indices`).
      */
     class FieldCollection::IndexIterable {
        public:

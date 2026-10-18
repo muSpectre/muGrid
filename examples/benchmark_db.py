@@ -269,6 +269,88 @@ def render_configs(rows, study):
 
 
 # --------------------------------------------------------------------------- #
+# Page rendering: provenance and commands
+# --------------------------------------------------------------------------- #
+# Metadata every reported benchmark result should state but that the database
+# does not record. The pages flag each of them with a TODO marker so a reader
+# (and a future schema change) can see what is missing.
+UNRECORDED_METADATA = [
+    ("Compiler", "compiler and version"),
+    ("Libraries", "key library versions (FFT backend, Eigen, pybind11, NumPy)"),
+    ("MPI", "MPI implementation and version"),
+    ("GPU runtime", "CUDA/ROCm version"),
+    ("Nodes", "node count and ranks per node"),
+]
+
+
+def todo_metadata(field):
+    """HTML comment flagging a metadata field that the database lacks."""
+    return f"<!-- TODO: benchmark metadata missing: {field} -->"
+
+
+def _code_version(row):
+    """`version (commit …)` for a row, flagging missing or dirty provenance."""
+    version = row.get("version")
+    commit = row.get("commit")
+    if not version and not commit:
+        return "not recorded " + todo_metadata("code version (commit)")
+    parts = [f"`{version}`" if version else ""]
+    if commit and commit != "unknown":
+        parts.append(f"(commit `{commit}`")
+        if str(row.get("dirty")) in ("1", "1.0", "True"):
+            parts[-1] += ", uncommitted changes in the working tree)"
+        else:
+            parts[-1] += ")"
+    return " ".join(p for p in parts if p)
+
+
+def provenance_markdown(rows, study_titles=None):
+    """Markdown block per measurement run (rows sharing one `timestamp`).
+
+    Lists the run date, the studies and precisions it contributes to the page,
+    the code version, the CPU/GPU recorded with the run, and a TODO marker for
+    every metadata field the database does not record (`UNRECORDED_METADATA`).
+    `study_titles` maps study keys to the headings used on the page.
+    """
+    study_titles = study_titles or {}
+    runs = {}
+    for r in rows:
+        runs.setdefault(r.get("timestamp") or "", []).append(r)
+    blocks = []
+    for ts in sorted(runs):
+        rr = runs[ts]
+        r0 = rr[0]
+        studies = sorted({study_titles.get(r["study"], r["study"])
+                          for r in rr})
+        precisions = [p for p in PRECISIONS
+                      if any(norm_precision(r) == p for r in rr)]
+        title = f"Run {ts}" if ts else "Run (date not recorded)"
+        lines = [f'!!! info "{title}"',
+                 f"    - **Results:** {', '.join(studies)} "
+                 f"({', '.join(PRECISION_LABEL[p] for p in precisions)})"]
+        if not ts:
+            lines.append(f"    - **Date:** not recorded "
+                         f"{todo_metadata('run timestamp')}")
+        lines.append(f"    - **Code version:** {_code_version(r0)}")
+        lines.append(f"    - **CPU:** {r0.get('cpu') or 'not recorded'}")
+        lines.append(f"    - **GPU:** {r0.get('gpu') or 'not recorded'}")
+        for label, field in UNRECORDED_METADATA:
+            lines.append(f"    - **{label}:** not recorded "
+                         f"{todo_metadata(field)}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def config_command(script, args, device, nranks):
+    """Command line of one data point, as the benchmark drivers launch it."""
+    cmd = f"python examples/{script} {args}".replace("{device}", device)
+    if nranks > 1:
+        cmd = (f"OMPI_MCA_rmaps_base_oversubscribe=1 mpiexec -n {nranks} "
+               + cmd)
+    return cmd
+
+
+# --------------------------------------------------------------------------- #
 # CSV I/O
 # --------------------------------------------------------------------------- #
 def _migrate_header(path):

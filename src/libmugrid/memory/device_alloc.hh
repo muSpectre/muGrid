@@ -99,8 +99,8 @@ namespace muGrid {
      * AllocationProfiler under that label, so library scratch buffers and
      * externally-routed allocations (e.g. cupy) become visible at this single
      * chokepoint. Field buffers pass null: they are recorded (with their field
-     * name) by the owning Field's Array instead, so recording each buffer
-     * exactly once. Pass a descriptive label for scratch (e.g.
+     * name) by the owning Field's Array instead, so that each buffer is
+     * recorded exactly once. Pass a descriptive label for scratch (e.g.
      * "fft-nd-scratch").
      */
     void * device_allocate(std::size_t bytes, const char * label = nullptr);

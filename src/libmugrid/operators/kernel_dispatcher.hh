@@ -1,5 +1,5 @@
 /**
- * @file   convolution_kernels.hh
+ * @file   kernel_dispatcher.hh
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -49,12 +49,20 @@ namespace muGrid {
     /**
      * @brief Dispatch convolution kernel to appropriate backend based on memory space
      *
+     * Host spaces run the sequential, x-vectorized kernels of
+     * convolution_kernels_cpu.hh; device spaces launch the one-thread-per-
+     * pixel kernels of convolution_kernels_gpu.hh (only when compiled by
+     * nvcc/hipcc). The selection is made at compile time (`if constexpr`).
+     *
      * @tparam MemorySpace The memory space where the data resides
      */
     template<typename MemorySpace>
     struct KernelDispatcher {
         /**
          * @brief Forward convolution: quad_data += alpha * Op * nodal_data
+         *
+         * The sparse operator's coefficients are double and are cast to T
+         * inside the kernels.
          */
         template <typename T>
         static void apply_convolution(

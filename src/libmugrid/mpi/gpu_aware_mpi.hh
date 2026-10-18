@@ -47,11 +47,12 @@ namespace muGrid {
      * True if the MPI library can take device pointers directly
      * (GPU-aware MPI). The result is determined once and cached:
      *
-     * 1. The environment variable ``MUGRID_GPU_AWARE_MPI`` (``1``/``0``)
-     *    overrides any detection — use it for MPI stacks whose support
-     *    cannot be queried, or to force the host-staging fallback.
+     * 1. The environment variable ``MUGRID_GPU_AWARE_MPI`` (any boolean
+     *    accepted by environment_flag(), e.g. ``1``/``0``) overrides any
+     *    detection — use it for MPI stacks whose support cannot be
+     *    queried, or to force the host-staging fallback.
      * 2. Open MPI is queried via ``MPIX_Query_cuda_support()`` /
-     *    ``MPIX_Query_rocm_support()`` where available.
+     *    ``MPIX_Query_rocm_support()`` where ``mpi-ext.h`` declares them.
      * 3. Otherwise the conservative answer is false: device buffers are
      *    bounced through host staging, which is correct with any MPI.
      */

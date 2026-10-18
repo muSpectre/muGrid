@@ -88,20 +88,10 @@ inline bool has_ghosts(const GlobalFieldCollection& coll) {
 }
 
 /**
- * Compute the dot product over the interior (non-ghost) region by summing
- * the interior directly.
- *
- * Do NOT compute this as full-buffer product minus ghost contribution: the
- * ghost buffers hold large stale data (stencil operators write results into
- * ghost pixels), so the subtraction cancels catastrophically once the
- * interior values are small. This destroyed converged CG residuals — the
- * reported squared norm carried an absolute error of order
- * eps * ||ghosts||^2 and could even go negative.
- */
-/**
- * The interior traversal below addresses dofs as
- * pixel_offset * nb_components_per_pixel + c, which is only valid for
- * array-of-structures storage. Scalar fields are layout-independent.
+ * Throw unless the interior traversal of interior_vecdot and
+ * interior_three_dots is valid for this layout. The traversal addresses
+ * dofs as pixel_offset * nb_components_per_pixel + c, which is only valid
+ * for array-of-structures storage. Scalar fields are layout-independent.
  */
 inline void check_interior_reduction_layout(const GlobalFieldCollection& coll,
                                             Index_t nb_components_per_pixel,
@@ -118,6 +108,19 @@ inline void check_interior_reduction_layout(const GlobalFieldCollection& coll,
     }
 }
 
+/**
+ * Dot product `Σ_{i∈Ω} Σ_c conj(a[c, i]) b[c, i]` over the interior
+ * (non-ghost) region Ω, summed directly over the interior.
+ *
+ * It must not be computed as full-buffer product minus ghost contribution:
+ * the ghost buffers can hold large stale data (stencil operators write
+ * results into ghost pixels), so the subtraction cancels catastrophically
+ * once the interior values are small. The result would carry an absolute
+ * error of order eps * ||ghosts||^2, which swamps a converged CG residual
+ * and can make a squared norm negative.
+ *
+ * Accumulates in promoted_t<T> (double for single-precision fields).
+ */
 template <typename T>
 promoted_t<T> interior_vecdot(const T* a_data, const T* b_data,
                               const GlobalFieldCollection& coll,
@@ -246,7 +249,7 @@ std::array<promoted_t<T>, 3> interior_three_dots(
 
 /**
  * Full contiguous-buffer reductions with promoted accumulation (see
- * promoted<T>): Eigen evaluates the cast lazily, so a single-precision
+ * promoted_t<T>): Eigen evaluates the cast lazily, so a single-precision
  * reduction still streams fp32 from memory but accumulates in double.
  */
 template <typename T>
@@ -397,8 +400,9 @@ promoted_t<T> axpy_norm_sq_host(T alpha, const TypedField<T, HostSpace>& x,
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
 
-    // Use Eigen's optimized vectorized operations (two passes, but fast)
-    // A true single-pass fusion would require breaking Eigen's vectorization
+    // Two passes: Eigen's vectorised AXPY, then the reduction. A single-pass
+    // fusion would need a hand-written loop in place of Eigen's
+    // vectorised expression.
     y.eigen_vec() += alpha * x.eigen_vec();
 
     const auto& coll = x.get_collection();
@@ -602,8 +606,9 @@ std::array<Real, 3> pipelined_cg_dots<Real32, HostSpace>(
     const TypedField<Real32, HostSpace>& r,
     const TypedField<Real32, HostSpace>& u,
     const TypedField<Real32, HostSpace>& w) {
-    // The same operand checks as every other precision: without them a
-    // mismatched u or w was read past its end.
+    // The same operand checks as every other precision: the traversal takes
+    // its extent from r, so a u or w with fewer entries would be read past
+    // its end.
     internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
     const Index_t nb_components_per_pixel =
@@ -676,7 +681,8 @@ void cross_buffers(const T* a, const T* b, T* out, Index_t npix, bool soa) {
 
 // out[c] -= k[c] * sum_d(invk[d] * N[d]) for the npix three-vectors. The
 // projection is formed in double whatever the field precision, as on the
-// device (the single-precision host path used to accumulate in complex64).
+// device, so host and device agree and the contraction keeps double
+// accuracy for single-precision fields.
 template <typename RT, typename CT>
 void leray_buffers(const RT* k, const RT* invk, const CT* N,
                    CT* out, Index_t npix, bool soa) {

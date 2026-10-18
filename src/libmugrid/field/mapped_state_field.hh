@@ -130,7 +130,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map with corresponding
-     * `muSpectre::StateField` you wish to iterate over pixel by pixel or
+     * `muGrid::StateField` you wish to iterate over pixel by pixel or
      * quadrature point by quadrature point with statically sized
      * `Eigen::Matrix` iterates
      *
@@ -151,7 +151,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map with corresponding
-     * `muSpectre::StateField` you wish to iterate over pixel by pixel or
+     * `muGrid::StateField` you wish to iterate over pixel by pixel or
      * quadrature point by quadrature point with statically sized `Eigen::Array`
      * iterates
      *
@@ -172,7 +172,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map of scalars with
-     * corresponding `muSpectre::StateField` you wish to iterate over.
+     * corresponding `muGrid::StateField` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -188,7 +188,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map of first-rank with
-     * corresponding `muSpectre::StateNField` you wish to iterate over.
+     * corresponding `muGrid::StateField` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -206,7 +206,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map of first-rank with
-     * corresponding `muSpectre::StateNField` you wish to iterate over.
+     * corresponding `muGrid::StateField` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -223,7 +223,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map of second-rank with
-     * corresponding `muSpectre::StateField` you wish to iterate over.
+     * corresponding `muGrid::StateField` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`
@@ -240,7 +240,7 @@ namespace muGrid {
 
     /**
      * Alias of `muGrid::MappedStateField` for a map of fourth-rank with
-     * corresponding `muSpectre::StateField` you wish to iterate over.
+     * corresponding `muGrid::StateField` you wish to iterate over.
      *
      * @tparam T scalar type stored in the field, must be one of `muGrid::Real`,
      * `muGrid::Int`, `muGrid::Uint`, `muGrid::Complex`

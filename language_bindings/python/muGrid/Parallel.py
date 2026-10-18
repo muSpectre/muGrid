@@ -113,7 +113,8 @@ class CommunicatorWrapper:
     - For serial execution (size=1): GPU arrays are returned directly without
       forcing synchronization or device-to-host copies.
     - For MPI parallel execution: Uses GPU-aware MPI when available to perform
-      reductions directly on GPU memory.
+      reductions directly on GPU memory, and stages through host memory
+      otherwise.
 
     The wrapper delegates all other operations to the underlying C++ Communicator.
     """
@@ -262,9 +263,9 @@ class CommunicatorWrapper:
         Device pointers go to MPI only when it is GPU-aware
         (`_muGrid.Communicator.gpu_aware_mpi`: MUGRID_GPU_AWARE_MPI, else the
         MPI library's own report), as in the C++ ghost exchange; otherwise the
-        values are staged through the host. Handing device buffers to an MPI
-        that is not GPU-aware made it read them as host memory -- a crash, or
-        wrong sums. Either way the current stream is synchronised first: MPI
+        values are staged through the host, because an MPI that is not
+        GPU-aware reads device pointers as host memory (a crash, or wrong
+        sums). Either way the current stream is synchronised first: MPI
         does not order itself after the kernel that produced `arr`.
         """
         cp = _get_cupy()
@@ -415,7 +416,8 @@ class CommunicatorWrapper:
         array
             Gathered array containing data from all processes
         """
-        # For now, delegate to C++ implementation (requires CPU array)
+        # Delegated to the C++ implementation, which requires a host array;
+        # device arrays are copied to the host first.
         if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
             import warnings
 
@@ -484,9 +486,9 @@ class CommunicatorWrapper:
             return getattr(a, op)()
         dtype = np.dtype(a.dtype if hasattr(a, "dtype") else np.float64)
         if np.issubdtype(dtype, np.integer):
-            # +-inf does not exist in an integer type: converting it raised
-            # OverflowError on the empty rank only, and the other ranks then
-            # waited forever in the Allreduce.
+            # +-inf does not exist in an integer type: converting it would
+            # raise OverflowError on the empty rank only, while the other
+            # ranks wait forever in the Allreduce.
             info = np.iinfo(dtype)
             identity = {"sum": 0, "min": info.max, "max": info.min}[op]
         else:
@@ -524,10 +526,11 @@ class CommunicatorWrapper:
     def _reduce_host_scalar(self, value, op):
         """Reduce one host scalar with the MPI datatype taken from its dtype.
 
-        Going through ``float()`` dropped the imaginary part of complex values
-        and rounded integers beyond 2^53; picking the C++ overload by value
-        could also make two ranks use different datatypes in one collective.
-        The dtype kind is the same on every rank, so this cannot."""
+        Converting through ``float()`` would drop the imaginary part of
+        complex values and round integers beyond 2^53; picking the C++
+        overload by value could make two ranks use different datatypes in one
+        collective. The dtype kind is the same on every rank, so dispatching
+        on it keeps the collective consistent."""
         value = np.asarray(value)
         kind = value.dtype.kind
         if kind == "c":
@@ -576,10 +579,8 @@ class CommunicatorWrapper:
     def reduction(self):
         """A NuMPI-compatible reduction object with `.sum/.min/.max/.mean`.
 
-        Lets code that used ``NuMPI.Tools.Reduction(comm)`` switch to
-        ``muGrid.Communicator(comm).reduction`` with no other change. The
-        methods have full-array global-reduction semantics (see
-        `reduce_sum` etc.)."""
+        A drop-in for ``NuMPI.Tools.Reduction(comm)``: the methods have
+        full-array global-reduction semantics (see `reduce_sum` etc.)."""
         return _Reduction(self)
 
     # Delegate other attributes to the C++ communicator
@@ -650,13 +651,26 @@ def Communicator(communicator=None):
 
     Parameters
     ----------
-    communicator: mpi4py or muGrid communicator object
-        The bare MPI communicator. (Default: _muGrid.Communicator())
+    communicator : mpi4py.MPI.Comm, _muGrid.Communicator, CommunicatorWrapper or None, optional
+        ``None`` (default) gives a serial communicator. A
+        ``CommunicatorWrapper`` is returned unchanged; a bare
+        ``_muGrid.Communicator`` is wrapped (without an mpi4py handle, so
+        :meth:`CommunicatorWrapper.isum` is blocking and device reductions
+        are unavailable). Any object with ``Get_size`` (mpi4py interface) of
+        size 1 gives a serial communicator, and of larger size is wrapped
+        together with its mpi4py handle.
 
     Returns
     -------
     CommunicatorWrapper
         A wrapped communicator with GPU-aware reduction operations
+
+    Raises
+    ------
+    RuntimeError
+        If a multi-rank mpi4py communicator is passed to a build without MPI
+        support, if mpi4py cannot be imported in an MPI build, or if the
+        object has no ``Get_size`` method.
 
     Warns
     -----
@@ -684,10 +698,9 @@ def Communicator(communicator=None):
     if isinstance(communicator, _muGrid.Communicator):
         return CommunicatorWrapper(communicator, mpi_comm=None)
 
-    # Now we need to do some magic. See if the communicator that was passed
-    # conforms with the mpi4py interface, i.e. it has a method 'Get_size'.
-    # The present magic enables using either mpi4py or stub implementations
-    # of the same interface.
+    # Duck-type the communicator: anything conforming to the mpi4py
+    # interface, i.e. with a method 'Get_size', is accepted, so either mpi4py
+    # or a stub implementation of the same interface works.
     if hasattr(communicator, "Get_size"):
         # If the size of the communicator group is 1, just return a
         # communicator that contains just the present process.

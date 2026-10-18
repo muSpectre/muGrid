@@ -58,6 +58,21 @@ namespace muGrid {
  * transpose configurations, and field collection management. It is
  * inherited by the templated FFTEngine<MemorySpace> which adds the
  * memory-space-specific FFT execution logic.
+ *
+ * Decomposition (P = P1 * P2 ranks, see select_process_grid):
+ * - Real space: X local, Y split across P2, Z split across P1 (3D), i.e.
+ *   local blocks [Nx, Ny/P2, Nz/P1] ("Z-pencils" in the pencil case, or
+ *   Z-slabs [Nx, Ny, Nz/P1] when P2 = 1). The real-space collection carries
+ *   the user's ghost layers and doubles as the domain decomposition.
+ * - Fourier space: half-complex X of length Fx = Nx/2 + 1 split across P2,
+ *   Y split across P1, Z local: [Fx/P2, Ny/P1, Nz] ("X-pencils"); in 2D
+ *   [Fx/P2, Ny]. No ghosts.
+ * The forward transform is r2c along X, X<->Y transpose (row communicator,
+ * skipped if it has one rank), c2c along Y, Y<->Z transpose (column
+ * communicator, 3D), c2c along Z; the inverse runs the adjoint sequence with
+ * c2r last. Every 1D transform pass costs O(N log N_alpha) for
+ * N = prod_alpha N_alpha points, every transpose moves O(N / P) data per
+ * rank.
  */
 class FFTEngineBase : public CartesianDecomposition {
  public:
@@ -65,7 +80,7 @@ class FFTEngineBase : public CartesianDecomposition {
   using SubPtMap_t = FieldCollection::SubPtMap_t;
 
   /**
-   * Construct an FFT engine base with pencil decomposition.
+   * Construct an FFT engine base and its slab or pencil decomposition.
    *
    * @param nb_domain_grid_pts  Global grid dimensions [Nx, Ny] or [Nx, Ny, Nz]
    * @param comm                MPI communicator (default: serial)
@@ -73,6 +88,12 @@ class FFTEngineBase : public CartesianDecomposition {
    * @param nb_ghosts_right     Ghost cells on high-index side of each dimension
    * @param nb_sub_pts          Number of sub-points per pixel (optional)
    * @param device              Where to allocate field memory
+   * @param decomposition       "auto" (default), "pencil" or "slab"; see
+   *                            select_process_grid()
+   *
+   * The left ghost count and the storage width along X are padded to even
+   * numbers (see the constructor implementation), so the real-space
+   * collection may carry one more ghost layer along X than requested.
    */
   FFTEngineBase(const DynGridIndex & nb_domain_grid_pts,
                 const Communicator & comm = Communicator(),
@@ -94,12 +115,16 @@ class FFTEngineBase : public CartesianDecomposition {
   // === Transform operations (virtual, implemented by derived class) ===
 
   /**
-   * Forward FFT: real space -> Fourier space.
+   * Forward FFT: real space -> Fourier space (unnormalised),
+   * F(k) = sum_x f(x) exp(-2 pi i sum_alpha k_alpha x_alpha / N_alpha),
+   * stored on the half-complex grid 0 <= k_0 <= Nx/2.
    */
   virtual void fft(const Field & input, Field & output) = 0;
 
   /**
-   * Inverse FFT: Fourier space -> real space.
+   * Inverse FFT: Fourier space -> real space (unnormalised),
+   * f(x) = sum_k F(k) exp(+2 pi i sum_alpha k_alpha x_alpha / N_alpha), so
+   * ifft(fft(f)) = N f; multiply by normalisation() = 1/N to recover f.
    */
   virtual void ifft(const Field & input, Field & output) = 0;
 
@@ -151,6 +176,7 @@ class FFTEngineBase : public CartesianDecomposition {
 
   // === Geometry queries ===
 
+  //! Normalisation factor 1 / prod_alpha N_alpha of an fft/ifft round trip
   Real normalisation() const { return this->norm_factor; }
 
   const DynGridIndex & get_nb_fourier_grid_pts() const {
@@ -165,10 +191,14 @@ class FFTEngineBase : public CartesianDecomposition {
     return this->fourier_subdomain_locations;
   }
 
+  //! Process grid {P1, P2}: P1 splits Z (real) / Y (Fourier), P2 splits
+  //! Y (real) / half-complex X (Fourier)
   std::array<int, 2> get_process_grid() const {
     return {this->proc_grid_p1, this->proc_grid_p2};
   }
 
+  //! This rank's coordinates {p1, p2} in the process grid
+  //! (rank = p2 * P1 + p1)
   std::array<int, 2> get_process_coords() const {
     return {this->proc_coord_p1, this->proc_coord_p2};
   }
@@ -224,8 +254,12 @@ class FFTEngineBase : public CartesianDecomposition {
 
   // === Subcommunicators ===
 #ifdef WITH_MPI
-  Communicator row_comm;  //!< Communicator for ranks with same p1 (3D only)
-  Communicator col_comm;  //!< Communicator for ranks with same p2
+  //! Communicator for ranks with the same p1 (size P2); carries the X<->Y
+  //! transpose in 2D and 3D
+  Communicator row_comm;
+  //! Communicator for ranks with the same p2 (size P1); carries the Y<->Z
+  //! transpose (3D)
+  Communicator col_comm;
   //! Handles of the MPI_Comm_split-created subcommunicators above. The
   //! engine owns them and frees them in the destructor (the Communicator
   //! wrapper does not own its handle); MPI context IDs are a finite
@@ -253,10 +287,11 @@ class FFTEngineBase : public CartesianDecomposition {
   //! Fourier-space field collection (final X-pencil layout)
   std::unique_ptr<GlobalFieldCollection> fourier_collection;
 
-  //! Work buffer collection for Z-pencils
+  //! Work buffer collection for Z-pencils: the r2c output along X,
+  //! [Fx, Ny/P2, Nz/P1]
   std::unique_ptr<GlobalFieldCollection> work_zpencil;
 
-  //! Work buffer collection for Y-pencils (3D only)
+  //! Work buffer collection for Y-pencils (3D only), [Fx/P2, Ny, Nz/P1]
   std::unique_ptr<GlobalFieldCollection> work_ypencil;
 
   // === Geometry ===

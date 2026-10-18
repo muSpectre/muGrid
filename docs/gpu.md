@@ -6,55 +6,14 @@ on GPU fields are executed on the GPU.
 
 ## Building with GPU support
 
-To build µGrid with GPU support, enable the appropriate CMake option:
-
-```bash
-# For CUDA
-cmake -DMUGRID_ENABLE_CUDA=ON ..
-
-# For ROCm/HIP
-cmake -DMUGRID_ENABLE_HIP=ON ..
-```
-
-You can also specify the GPU architectures to target:
-
-```bash
-# CUDA architectures (e.g., 70=V100, 80=A100, 90=H100)
-cmake -DMUGRID_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="70;80;90" ..
-
-# HIP architectures (e.g., gfx906=MI50, gfx90a=MI200)
-cmake -DMUGRID_ENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES="gfx906;gfx90a" ..
-```
-
-!!! warning "Match the architecture to your device"
-    The architecture list must include your device's compute capability, or use
-    `-DCMAKE_CUDA_ARCHITECTURES=native` to target the build host's GPU. A binary
-    built only for an architecture the device cannot run **raises a
-    `RuntimeError` on the first kernel launch**: µGrid checks every launch, so a
-    mismatch fails loudly rather than leaving hand-written kernels as silent
-    no-ops. Without that check the runtime-API calls keep working while the
-    hand-written kernels do nothing, so reductions simply return zero.
-
-## Installing CuPy
-
-To work with GPU fields from Python, you need to install [CuPy](https://cupy.dev/).
-See the [CuPy installation guide](https://docs.cupy.dev/en/stable/install.html) for
-detailed instructions. A quick summary:
-
-```bash
-# For CUDA 11.x
-pip install cupy-cuda11x
-
-# For CUDA 12.x
-pip install cupy-cuda12x
-
-# For ROCm
-pip install cupy-rocm-5-0  # or appropriate ROCm version
-```
+GPU support is enabled at configure time with `MUGRID_ENABLE_CUDA=ON` (NVIDIA)
+or `MUGRID_ENABLE_HIP=ON` (AMD); Python access to device arrays needs
+[CuPy](https://cupy.dev/). Build options, architecture selection and the CuPy
+packages are described under [Installation](installation.md#gpu-support).
 
 ## Checking GPU availability
 
-Before using GPU features, you can check if µGrid was compiled with GPU support:
+The module flags report whether µGrid was compiled with GPU support:
 
 ```python
 import muGrid
@@ -64,29 +23,25 @@ print(f"ROCm available: {muGrid.has_rocm}")
 print(f"Any GPU backend: {muGrid.has_gpu}")
 ```
 
-The `has_gpu` flag is `True` if either CUDA or ROCm support is available.
+`has_gpu` is `True` if either backend was compiled in. Whether a GPU can
+actually be used at run time is reported by `muGrid.is_gpu_available()`, which
+attempts a small device allocation.
 
 ## Device selection
 
 Field collections can be created on a specific device using the `device` parameter.
 The device can be specified as a simple string or as a `Device` object.
 
-String values:
-
-- `"cpu"` or `"host"`: Allocate fields in CPU memory (default)
-- `"gpu"` or `"device"`: Allocate on default GPU (auto-detects CUDA or ROCm)
-- `"gpu:N"`: Allocate on default GPU with device ID N
-- `"cuda"`: Allocate fields on CUDA GPU (device 0)
-- `"cuda:N"`: Allocate on CUDA GPU with device ID N
-- `"rocm"`: Allocate on ROCm GPU (device 0)
-- `"rocm:N"`: Allocate on ROCm GPU with device ID N
+The accepted strings (`"cpu"`, `"gpu"`, `"gpu:N"`, `"cuda:N"`, `"rocm:N"`, …)
+are listed in the [Python API](python.md#device-strings). `"gpu"` selects the
+compiled backend and keeps scripts portable between NVIDIA and AMD systems.
 
 Here is an example of creating a field collection on the GPU:
 
 ```python
 import muGrid
 
-# Create a GPU field collection using auto-detection (recommended)
+# Create a GPU field collection on the compiled backend
 fc = muGrid.GlobalFieldCollection([64, 64], device="gpu")
 
 # Or explicitly specify CUDA
@@ -195,7 +150,7 @@ cupy.cuda.set_allocator(cupy.cuda.MemoryPool(cupy.cuda.malloc_managed).malloc)
 # ... and µGrid draws from that same pool.
 muGrid.use_cupy_allocator()
 
-# A large double-precision grid that overflows the coarse-grained window now
+# A large double-precision grid that overflows the coarse-grained window
 # allocates from the full unified HBM:
 fc = muGrid.GlobalFieldCollection([512, 512, 512], device="gpu")
 ```
@@ -295,59 +250,50 @@ between the NVIDIA (CUDA/cuFFT) and AMD (ROCm/rocFFT) backends.
 
 ### NVIDIA GPUs (cuFFT)
 
-On NVIDIA GPUs µGrid uses the cuFFT library and issues **whole multidimensional
-transforms** natively (`cufftPlanMany`): a serial 2D or 3D real-to-complex /
-complex-to-real transform is planned and executed in a single call rather than
-driven axis by axis with a work buffer and per-plane loops. This brings the
-serial 3D GPU FFT to within ~10 % of raw cuFFT.
+On NVIDIA GPUs µGrid uses cuFFT. A serial 2D or 3D real-to-complex /
+complex-to-real transform is issued as one planned multidimensional transform
+(`cufftPlanMany`) rather than axis by axis, which avoids intermediate work
+buffers and per-plane kernel launches.
 
-cuFFT has one **documented restriction** —
+cuFFT has one documented restriction:
 
 > *"Strides on the real part of real-to-complex and complex-to-real transforms
 > are not supported."*
 
-— so µGrid lays out its buffers with the real (innermost) axis at unit stride
-(the real-space ghost buffers are padded accordingly). With that arrangement:
+µGrid therefore lays out device buffers with the real (innermost) axis at unit
+stride: device fields use structure-of-arrays storage, in which each component
+is contiguous (see [Architecture](architecture.md#storage-order)). With that
+arrangement:
 
 - **Serial** 2D and 3D transforms run as a single planned N-D cuFFT transform.
 - **MPI-parallel** transforms also run on cuFFT. In a *slab* decomposition the
-  two locally complete axes are transformed together as one planned 2D transform
-  (per component, batched over the local planes); a *pencil* decomposition
-  transforms one axis at a time between transposes (see [FFT](fft.md)).
-
-The MPI FFT test suite exercises these paths on the GPU.
+  two locally complete axes are transformed together as one planned 2D
+  transform; a *pencil* decomposition transforms one axis at a time between
+  transposes (see [FFT](fft.md#choosing-the-decomposition)).
 
 ### AMD GPUs (rocFFT)
 
-On AMD GPUs, µGrid uses the native rocFFT library directly (not hipFFT).
-rocFFT's API provides more flexible stride support through its
-`rocfft_plan_description_set_data_layout()` function, which allows specifying
-arbitrary strides for all transform types including R2C and C2R.
-
-**Consequence**: 3D MPI-parallel FFTs should work correctly on AMD GPUs with rocFFT.
-
-!!! note
-    The rocFFT backend is a new implementation and may require testing on your
-    specific ROCm installation. Please report any issues.
+On AMD GPUs µGrid calls rocFFT directly (not through hipFFT). rocFFT accepts
+arbitrary input and output strides for all transform types, including R2C and
+C2R (`rocfft_plan_description_set_data_layout()`). µGrid nevertheless uses the
+same structure-of-arrays layout as on NVIDIA hardware, so both backends share
+one code path and no storage-order conversion is needed. rocFFT cannot plan
+some ghost-padded strided N-D layouts (e.g. a $32 \times 32$ grid with one
+ghost layer); for those the engine detects the planning failure before any data
+is written, remembers it, and uses the axis-by-axis path instead.
 
 ### Example: GPU FFT
 
-Creating a GPU FFT engine is the same for any dimension — 2D and 3D both run
-natively on cuFFT / rocFFT, serial or MPI-parallel:
+A GPU FFT engine is created like a CPU one; 2D and 3D, serial and MPI-parallel,
+all run on the device:
 
 ```python
 import muGrid
 
-nb_grid_pts = [64, 64, 64]  # 2D or 3D — both run on the GPU
+nb_grid_pts = [64, 64, 64]
 device = "gpu" if muGrid.has_gpu else "cpu"
 engine = muGrid.FFTEngine(nb_grid_pts, device=device)
 ```
-
-!!! note "No more 3D CPU fallback"
-    Earlier releases routed 3D transforms on CUDA back to the CPU because the
-    FFT was driven axis by axis and could not satisfy cuFFT's unit-stride
-    requirement on the real axis. µGrid now issues whole N-D transforms, so 3D
-    runs natively on cuFFT; no dimension-dependent fallback is needed.
 
 ## GPU data and MPI
 
@@ -381,11 +327,10 @@ extensions are queried. For MPI stacks that cannot be queried, the conservative
 answer is *not GPU-aware*.
 
 When MPI is not GPU-aware, the contiguous staging buffers are bounced through host
-memory: pack on the device, copy once to a pinned-size host buffer, communicate,
-copy back, unpack on the device. This is correct with any MPI library and, because
-only flat buffers are copied, costs a single device-host round trip per message
-(measured at roughly 30-40 % on the total time of an FFT-preconditioned solve
-across two GPUs, compared to a GPU-aware MPI taking the device pointers directly).
+memory: pack on the device, copy once to a host buffer, communicate, copy back,
+unpack on the device. This is correct with any MPI library and, because only
+flat buffers are copied, costs one device-to-host and one host-to-device copy
+per message.
 
 ### The `MUGRID_GPU_AWARE_MPI` environment variable
 
@@ -418,9 +363,7 @@ MUGRID_GPU_AWARE_MPI=1 mpiexec -n 4 python3 my_solver.py
 
 ### Validating an installation
 
-If you suspect the MPI/GPU stack, two quick checks help:
-
-- Run the MPI test suite on the GPU device:
+If you suspect the MPI/GPU stack, run the MPI test suite on the GPU device:
 
   ```bash
   mpiexec -n 2 python3 -m pytest tests/python_mpi_fft_tests.py -k gpu
@@ -429,11 +372,6 @@ If you suspect the MPI/GPU stack, two quick checks help:
   with and without `MUGRID_GPU_AWARE_MPI=0`. If results differ, the GPU-aware
   path of your MPI installation is broken; keep the kill switch on and report the
   issue to your MPI/UCX vendor.
-
-- Time the communication primitives with
-  `benchmarks/communication_benchmark.py` (per-axis halo exchange and
-  FFT/transpose timings). Per-call halo times should be milliseconds; much larger
-  values indicate that messages take a slow path.
 
 ## Performance considerations
 

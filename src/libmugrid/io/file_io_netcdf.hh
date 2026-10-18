@@ -50,6 +50,13 @@
 #include "io/file_io_base.hh"
 #include "mpi/communicator.hh"
 
+// Backend selection. With MPI, I/O goes through PnetCDF: all ranks open one
+// shared file and each writes/reads the hyperslab of its own subdomain in
+// collective (*_all) calls over MPI-IO, so no rank has to gather the global
+// field. Without MPI, the serial NetCDF C library is used. The ncmu_* aliases
+// give both backends the same call names; serial NetCDF has no varn or
+// collective variants, so those aliases map to the plain vara/varm calls.
+// TODO: rationale for PnetCDF rather than parallel netCDF-4/HDF5?
 #ifdef WITH_MPI
 #include <pnetcdf.h>
 const auto ncmu_create = ncmpi_create;
@@ -303,8 +310,9 @@ namespace muGrid {
     return NC_DOUBLE;
   }
 
-  // These are the equivalents of NC_CHAR, NC_INT, NC_DOUBLE etc. but now
-  // correctly determined for the basic muGrid types Int, Uint, Real, ...
+  // These are the equivalents of NC_CHAR, NC_INT, NC_DOUBLE etc., but
+  // determined from the sizes of the basic muGrid types Int, Uint, Real, ...
+  // rather than assumed
 
   constexpr nc_type MU_NC_CHAR = netcdf_type<char>();
   constexpr nc_type MU_NC_INT = netcdf_type<muGrid::Int>();
@@ -634,7 +642,7 @@ namespace muGrid {
 
     //! check if the global attribute was already written to the file;
     //! true  -- the attribute was already written to the file
-    //! false -- the attribute was up to now not written to the file
+    //! false -- the attribute has not yet been written to the file
     bool is_already_written_to_file() { return this->is_written; }
 
     //! call this function after the NetCDFGlobalAtt was written to the NetCDF
@@ -643,7 +651,7 @@ namespace muGrid {
 
     //! changes the global attributes value to new_value if the type of the
     //! new_value matches the old value and the size of the new_value does not
-    //! exceed the size of the old value. Here with old value the current calue
+    //! exceed the size of the old value. Here with old value the current value
     //! of the global attribute is meant.
     template <class T>
     void update_global_attribute(const std::string & new_att_name,
@@ -2075,7 +2083,7 @@ namespace muGrid {
                                       // something in the NetCDF file
     bool global_attributes_defined{
         false};  // satisfy that global attributes are only written once.
-                 // "false" means they are not written up to now.
+                 // "false" means they have not been written yet.
 
     NetCDFGlobalAttributes global_attributes;
     NetCDFDimensions dimensions;

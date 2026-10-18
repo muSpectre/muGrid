@@ -47,9 +47,11 @@
 namespace muGrid {
     namespace CcoordOps {
         /**
-         * Iteration over square (or cubic) discretisation grids. Duplicates
-         * capabilities of `muGrid::CcoordOps::Pixels` without needing to be
-         * templated with the spatial dimension. Iteration is slower, though.
+         * Iteration over rectangular (or cuboid) discretisation grids whose
+         * spatial dimension (1, 2 or 3) is a runtime value, so the class is
+         * not templated on it. A pixel with coordinate x has linear index
+         * i = sum_k s_k (x_k - location_k) for the strides s; get_coord()
+         * inverts this map.
          *
          * Iteration is provided through three explicit methods:
          * - `indices()`: iterate over linear indices only (most efficient)
@@ -133,6 +135,9 @@ namespace muGrid {
                                                   this->axes_order, index);
             }
 
+            //! return the coordinate of ccoord + offset, wrapped
+            //! periodically into this subdomain:
+            //! ((x + o - location) mod N) + location
             DynGridIndex get_neighbour(const DynGridIndex & ccoord,
                                      const DynGridIndex & offset) const {
                 return modulo(ccoord + offset - this->subdomain_locations,
@@ -163,7 +168,7 @@ namespace muGrid {
             /**
              * return the ccoordinates of the bottom, left, (front) pixel/voxel
              * of this processors partition of the discretisation grid. For
-             * sequential calculations, this is alvays the origin
+             * sequential calculations, this is always the origin
              */
             const DynGridIndex & get_subdomain_locations() const {
                 return this->subdomain_locations;

@@ -64,6 +64,14 @@ class FFTPlanUnsupported : public RuntimeError {
  * (MUGRID_ENABLE_CUDA or MUGRID_ENABLE_HIP). The backend operates on raw pointers -
  * the caller is responsible for ensuring the pointers are valid for the
  * backend's memory space.
+ *
+ * All transforms are unnormalised. For a sequence x_j, j = 0..n-1:
+ * - forward (r2c, c2c_forward): X_k = sum_j x_j exp(-2 pi i j k / n),
+ * - backward (c2r, c2c_backward): x_j = sum_k X_k exp(+2 pi i j k / n),
+ * so backward(forward(x)) = n x. r2c stores only k = 0..n/2 (integer
+ * division); c2r reads those n/2+1 modes and assumes Hermitian symmetry
+ * X_{n-k} = conj(X_k), ignoring the imaginary parts of X_0 and (n even)
+ * X_{n/2}. Element (j, b) of batch b is at ptr[j * stride + b * dist].
  */
 class FFT1DBackend {
  public:
@@ -167,16 +175,20 @@ class FFT1DBackend {
 
   /**
    * Returns true if this backend implements the N-dimensional `r2c_nd` /
-   * `c2r_nd` entry points below. These let a serial (non-decomposed) engine
-   * hand a whole multidimensional transform to the backend in a single planned
-   * call, instead of driving it axis-by-axis through the 1D primitives. The
-   * default is `false`; backends that do not override it keep the axis-by-axis
-   * decomposition, which is mandatory for the MPI/pencil path anyway.
+   * `c2r_nd` entry points below. These let the engine hand all locally
+   * complete axes (the whole grid of a serial engine, or the X-Y plane of an
+   * MPI slab) to the backend in a single planned call, instead of driving it
+   * axis-by-axis through the 1D primitives. The default is `false`; backends
+   * that do not override it use the axis-by-axis decomposition, which the
+   * MPI pencil path uses in any case.
    */
   virtual bool supports_nd() const { return false; }
 
   /**
    * N-dimensional real-to-complex FFT, issued as a single backend call.
+   * Computes the unnormalised forward DFT over the listed axes,
+   * F(k) = sum_x f(x) exp(-2 pi i sum_{a in axes} k_a x_a / N_a), stored for
+   * 0 <= k_last <= N_last/2 along the last listed axis.
    *
    * The arrays are described in row-major (C) order: `shape` is the logical
    * real-space extent of each axis, `in_strides`/`out_strides` are the element
@@ -200,7 +212,8 @@ class FFT1DBackend {
   }
 
   /**
-   * N-dimensional complex-to-real FFT, the inverse of `r2c_nd`. `shape` is the
+   * N-dimensional complex-to-real FFT, the unnormalised inverse of `r2c_nd`
+   * (c2r_nd(r2c_nd(f)) = prod_{a in axes} N_a f). `shape` is the
    * logical real-space (output) extent; `in_strides` are Complex strides of the
    * Fourier input, `out_strides` are Real strides of the output. As in
    * `r2c_nd`, the real (c2r) axis is the last entry of `axes`.

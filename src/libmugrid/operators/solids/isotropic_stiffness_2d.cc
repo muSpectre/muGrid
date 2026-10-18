@@ -1,11 +1,14 @@
 /**
- * @file   isotropic_stiffness_operator.cc
+ * @file   isotropic_stiffness_2d.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
  * @date   31 Dec 2025
  *
- * @brief  Host implementation of fused isotropic stiffness operator
+ * @brief  Host (2D) implementation of the fused isotropic stiffness
+ *         operator: geometry precomputation (G, V, D̄) and the CPU kernels
+ *         for K u, the macro RHS, the stress integral, diag(K) and the
+ *         sensitivity contractions.
  *
  * Copyright © 2025 Lars Pastewka
  *
@@ -42,7 +45,7 @@
 namespace muGrid {
 
     // Forward declarations of the (templated) host kernels defined at the
-    // bottom of this file, so the operator's impl methods above can call them.
+    // bottom of this file, so the operator's impl methods below can call them.
     namespace isotropic_stiffness_kernels {
         template <typename T>
         void isotropic_stiffness_2d_host(
@@ -72,9 +75,10 @@ namespace muGrid {
     // 2D Implementation
     // ============================================================================
 
-    // Shape-function gradients and quadrature weights now come from the element
-    // traits (fem_element.hh) via the operator's runtime element data; the
-    // precompute below reads them, so the per-element kernels are unchanged.
+    // Shape-function gradients and quadrature weights come from the element
+    // traits (fem_element.hh) via the operator's runtime element data; only
+    // the precompute below reads them, so the per-element kernels are
+    // element-agnostic.
 
     template <>
     void IsotropicStiffnessOperator<2>::precompute_matrices() {
@@ -93,6 +97,12 @@ namespace muGrid {
 
         // G = Σ_q w_q B_q^T I_sym B_q (shear/μ geometry) and
         // V = Σ_q w_q (B_q^T m)(m^T B_q) (volumetric/λ geometry), m = [1,1,0]^T.
+        // Component-wise, with physical gradients ∂_a N_I = B[q][a][I] / h_a and
+        // DOF index (I, a) -> I·Dim + a:
+        //   G_(Ia)(Jb) = ½ Σ_q w_q (δ_ab ∇N_I·∇N_J + ∂_b N_I ∂_a N_J),
+        //   V_(Ia)(Jb) =   Σ_q w_q ∂_a N_I ∂_b N_J,
+        // so uᵀ G v = Σ_q w_q ε(u):ε(v) and uᵀ V v = Σ_q w_q tr ε(u) tr ε(v).
+        // The Voigt shear rows carry engineering strains 2ε_ab, hence the ½.
         for (Index_t q = 0; q < elem_nb_quad; ++q) {
             Real w = elem_Wfrac[q] * hx * hy;  // weight includes element area
             for (Index_t I = 0; I < NB_NODES; ++I) {
@@ -686,7 +696,10 @@ namespace muGrid {
             }
         }
 
-        // Per-pixel material entry point (unchanged public signature).
+        // Per-pixel material entry point. Takes the full stride set so the
+        // impl methods pass layout explicitly; the x-strides are asserted to be
+        // the AoS constants and the element counts are unused (one element
+        // per node in the computable region).
         template <typename T>
         void isotropic_stiffness_2d_host(
             const T * MUGRID_RESTRICT displacement,
@@ -801,8 +814,10 @@ namespace muGrid {
                 {0, 0}, {1, 0}, {0, 1}, {1, 1}};
 
             // The per-element stress is formed in working precision T, but the
-            // volume integral is accumulated in double for the cross-rank
-            // reduction.
+            // volume integral is accumulated in double: a recursive sum of N
+            // terms has a rounding-error bound ~N·ε, which in float (ε ≈ 6e-8)
+            // becomes significant for large grids, and the result feeds a
+            // cross-rank reduction that is carried out in double.
             Real acc[DIM * DIM] = {0.0, 0.0, 0.0, 0.0};
 
             for (SIndex_t ey = 0; ey < static_cast<SIndex_t>(nely); ++ey) {

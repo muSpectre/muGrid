@@ -1,5 +1,5 @@
 /**
- * @file   laplace_operator_gpu.cc
+ * @file   laplace_gpu.cc
  *
  * @author Lars Pastewka <lars.pastewka@imtek.uni-freiburg.de>
  *
@@ -47,13 +47,23 @@
 namespace muGrid {
 namespace laplace_kernels {
 
-// Block sizes for GPU kernels
+// Block sizes for GPU kernels: 16 x 16 = 256 threads in 2D, 8 x 8 x 8 = 512
+// threads in 3D, both multiples of the warp (32) and wavefront (64) width.
+// threadIdx.x runs along x (unit stride), so neighbouring threads load
+// neighbouring addresses and the loads coalesce.
+// TODO: rationale for 16 x 16 / 8 x 8 x 8 over other shapes?
 constexpr int BLOCK_SIZE_2D = 16;
 constexpr int BLOCK_SIZE_3D = 8;
 
 /**
  * GPU kernel for 2D Laplace operator with 5-point stencil.
  * Works with both CUDA and HIP - the __global__ keyword is the same.
+ *
+ * One thread per interior point (ix, iy), 1 <= ix < nx - 1,
+ * 1 <= iy < ny - 1, computing
+ * out(i) [+]= wx (in(i - e_x) + in(i + e_x)) + wy (in(i - e_y) + in(i + e_y))
+ *             - 2 (wx + wy) in(i).
+ * Each thread writes only its own point, so no atomics are needed.
  */
 template <typename T>
 __global__ void laplace_2d_kernel(
@@ -92,7 +102,8 @@ __global__ void laplace_2d_kernel(
 
 /**
  * GPU kernel for 3D Laplace operator with 7-point stencil.
- * Works with both CUDA and HIP.
+ * Works with both CUDA and HIP. One thread per interior point
+ * (1 <= i_d < n_d - 1), as in the 2D kernel.
  */
 template <typename T>
 __global__ void laplace_3d_kernel(

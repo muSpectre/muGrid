@@ -56,11 +56,11 @@ if has_mpi:
     try:
         from mpi4py import MPI
     except (ImportError, RuntimeError) as error:
-        # mpi4py fails three ways here and they are not interchangeable.
-        # ModuleNotFoundError: not installed. ImportError: installed, but its
-        # extension cannot dlopen libmpi -- and since ModuleNotFoundError is a
-        # *subclass* of ImportError, catching only the former missed this one.
-        # RuntimeError: its ABI probe cannot find libmpi at all. All three mean
+        # mpi4py fails three ways here. ModuleNotFoundError: not installed.
+        # ImportError: installed, but its extension cannot dlopen libmpi
+        # (ModuleNotFoundError is a subclass of ImportError, so catching
+        # ImportError covers both). RuntimeError: its ABI probe cannot find
+        # libmpi at all. All three mean
         # a partial or absent MPI install and deserve the same explanation
         # rather than a dlopen traceback from inside mpi4py, so the original is
         # kept as the cause.
@@ -194,7 +194,7 @@ if hasattr(_muGrid, "FileIONetCDF"):
 
 # Base classes and utilities (always C++ objects)
 GradientOperator = _muGrid.GradientOperator
-# Backwards compatibility alias
+# Deprecated alias of GradientOperator, kept for code that imports this name.
 ConvolutionOperatorBase = GradientOperator
 Decomposition = _muGrid.Decomposition
 
@@ -216,9 +216,8 @@ Unit = _muGrid.Unit
 # Linear algebra operations on fields (Python wrapper with automatic _cpp extraction)
 from . import linalg  # noqa: E402
 
-# FFT utility functions
-# Note: fft_freq, fft_freqind, rfft_freq, rfft_freqind are now properties
-# on the FFTEngine class (fftfreq, ifftfreq). Use engine.fftfreq instead.
+# FFT utility functions. Frequencies of the local Fourier subdomain are
+# properties of the FFTEngine (engine.fftfreq, engine.ifftfreq).
 fft_normalization = _muGrid.fft_normalization
 get_hermitian_grid_pts = _muGrid.get_hermitian_grid_pts
 
@@ -328,7 +327,7 @@ __all__ = [
     "get_domain_index",
     # Enums and types
     "GradientOperator",
-    "ConvolutionOperatorBase",  # Backwards compatibility alias
+    "ConvolutionOperatorBase",  # Deprecated alias of GradientOperator
     "LaplaceOperator",
     "FEMGradientOperator",
     "IsotropicStiffnessOperator",

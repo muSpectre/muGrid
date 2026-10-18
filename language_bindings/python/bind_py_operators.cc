@@ -70,7 +70,7 @@ using muGrid::Shape_t;
 using muGrid::HostSpace;
 using pybind11::literals::operator""_a;
 
-// Backwards compatibility aliases
+// Alternative (deprecated) names of the operator base and generic classes
 using ConvolutionOperatorBase = LinearOperator;
 using ConvolutionOperator = GenericLinearOperator;
 
@@ -264,7 +264,8 @@ void add_stencil_gradient_operator(py::module & mod) {
                  static_cast<TransposeHostFn>(&GenericLinearOperator::transpose),
                  "quadrature_point_field"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
-                 "Apply transpose (divergence) to host (CPU) fields")
+                 "Apply the transpose (weighted by `weights` per quadrature "
+                 "point if given, else unweighted) to host (CPU) fields")
             .def("fourier",
                  [](const GenericLinearOperator & op,
                     py::array_t<Real, py::array::f_style> phases) {
@@ -315,15 +316,19 @@ void add_stencil_gradient_operator(py::module & mod) {
                  R"pbdoc(
                  Compute the Fourier representation of this convolution operator.
 
-                 This method converts a translationally invariant linear combination of
-                 grid values into a multiplication with a complex number in Fourier space.
+                 A translationally invariant linear combination of grid values
+                 acts on a Fourier mode as multiplication by a complex number,
+                 the operator's symbol. This evaluates it for a scalar
+                 (single-component, single-quadrature-point) stencil.
 
                  Parameters
                  ----------
                  phases : numpy.ndarray
                      Array of phase vectors. First dimension must match spatial_dim.
                      Remaining dimensions represent the batch of phase vectors.
-                     Each phase is the wavevector times cell dimension (lacking factor of 2π).
+                     Each phase vector is the frequency q in cycles per grid
+                     point (the wavevector k = 2π q / h without the factor
+                     2π / h), as returned by FFTEngine.fftfreq.
 
                      Examples:
                      - 1D: shape (1,) for single phase, (1, N) for N phases
@@ -394,8 +399,9 @@ void add_stencil_gradient_operator(py::module & mod) {
                 Stencil coefficients in reshaped form.
 
                 Returns the stencil coefficients with shape
-                (nb_operators, nb_quad_pts, nb_nodal_pts, *shape),
-                where shape contains the spatial dimensions of the stencil.
+                (nb_output_components, nb_quad_pts, nb_input_components,
+                *stencil_shape), where stencil_shape contains the spatial
+                extent of the stencil.
 
                 Returns
                 -------
@@ -520,10 +526,11 @@ void add_laplace_operator_2d(py::module & mod) {
         Optimized 2D Laplace operator with hard-coded 5-point stencil.
 
         This operator provides an optimized implementation of the discrete Laplace
-        operator using a 5-point stencil: [0,1,0; 1,-4,1; 0,1,0].
-
-        For new code, prefer using this class directly instead of LaplaceOperator(2)
-        for slightly better performance (avoids virtual dispatch).
+        operator using a 5-point stencil: scale * [0,1,0; 1,-4,1; 0,1,0] on a
+        unit-spacing grid, or scale * sum_d (u[i+e_d] - 2 u[i] + u[i-e_d]) / h_d^2
+        with explicit grid spacing. The stencil is hard-coded, so the kernel
+        avoids the coefficient loads of GenericLinearOperator. The Python
+        wrapper muGrid.LaplaceOperator(2, ...) constructs this class.
         )pbdoc")
             .def(py::init<Real>(), "scale"_a = 1.0,
                  "Construct a 2D Laplace operator on a unit-spacing grid with "
@@ -548,7 +555,7 @@ void add_laplace_operator_2d(py::module & mod) {
                  "input_field"_a, "output_field"_a,
                  "weights"_a = std::vector<Real>{},
                  "Apply the transpose; identical to apply for the self-adjoint "
-                 "Laplacian (weights are ignored)")
+                 "Laplacian (passing quadrature weights raises)")
             .def_property_readonly("nb_stencil_pts",
                                    &LaplaceOperator2D::get_nb_stencil_pts)
             .def_property_readonly("scale", &LaplaceOperator2D::get_scale)
@@ -613,10 +620,11 @@ void add_laplace_operator_3d(py::module & mod) {
         Optimized 3D Laplace operator with hard-coded 7-point stencil.
 
         This operator provides an optimized implementation of the discrete Laplace
-        operator using a 7-point stencil: center=-6, neighbors=+1.
-
-        For new code, prefer using this class directly instead of LaplaceOperator(3)
-        for slightly better performance (avoids virtual dispatch).
+        operator using a 7-point stencil: scale * (center -6, neighbors +1) on a
+        unit-spacing grid, or scale * sum_d (u[i+e_d] - 2 u[i] + u[i-e_d]) / h_d^2
+        with explicit grid spacing. The stencil is hard-coded, so the kernel
+        avoids the coefficient loads of GenericLinearOperator. The Python
+        wrapper muGrid.LaplaceOperator(3, ...) constructs this class.
         )pbdoc")
             .def(py::init<Real>(), "scale"_a = 1.0,
                  "Construct a 3D Laplace operator on a unit-spacing grid with "
@@ -641,7 +649,7 @@ void add_laplace_operator_3d(py::module & mod) {
                  "input_field"_a, "output_field"_a,
                  "weights"_a = std::vector<Real>{},
                  "Apply the transpose; identical to apply for the self-adjoint "
-                 "Laplacian (weights are ignored)")
+                 "Laplacian (passing quadrature weights raises)")
             .def_property_readonly("nb_stencil_pts",
                                    &LaplaceOperator3D::get_nb_stencil_pts)
             .def_property_readonly("scale", &LaplaceOperator3D::get_scale)
@@ -727,12 +735,13 @@ static void bind_fem_gradient_operator(py::module & mod, const char * name,
             .def("transpose", static_cast<TransposeHostFn>(&Op::transpose),
                  "gradient_field"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
-                 "Apply transpose (divergence) to host fields")
+                 "Apply the quadrature-weighted transpose B^T W (the discrete "
+                 "weak divergence; `weights` overrides W) to host fields")
             .def("transpose_increment",
                  static_cast<TransposeIncrementHostFn>(&Op::transpose_increment),
                  "gradient_field"_a, "alpha"_a, "nodal_field"_a,
                  "weights"_a = std::vector<Real>{},
-                 "Add alpha * (-div(gradient_field)) to nodal_field on host "
+                 "Add alpha * B^T W gradient_field to nodal_field on host "
                  "fields")
             .def_property_readonly("grid_spacing", &Op::get_grid_spacing)
             .def_property_readonly("quadrature_weights",
@@ -794,12 +803,12 @@ static void bind_fem_gradient_operator(py::module & mod, const char * name,
              static_cast<TransposeIncrementDeviceFn>(&Op::transpose_increment),
              "gradient_field"_a, "alpha"_a, "nodal_field"_a,
              "weights"_a = std::vector<Real>{},
-             "Add alpha * (-div(gradient_field)) to nodal_field on device "
+             "Add alpha * B^T W gradient_field to nodal_field on device "
              "fields");
 #endif
 }
 
-// Bind the FEM gradient operators: linear simplices (historical names) and Q1.
+// Bind the FEM gradient operators: linear simplices (unsuffixed names) and Q1.
 void add_fem_gradient_operator_2d(py::module & mod) {
     bind_fem_gradient_operator<FEMGradientOperator2D>(
         mod, "FEMGradientOperator2D",
@@ -820,7 +829,7 @@ void add_fem_gradient_operator_2d(py::module & mod) {
 void add_fem_gradient_operator_3d(py::module & mod) {
     bind_fem_gradient_operator<FEMGradientOperator3D>(
         mod, "FEMGradientOperator3D",
-        "3D linear FEM gradient operator (5 Kuhn tetrahedra per voxel, 5 "
+        "3D linear FEM gradient operator (5 tetrahedra per voxel, 5 "
         "quadrature points).");
     bind_fem_gradient_operator<FEMGradientOperatorQ1_3D>(
         mod, "FEMGradientOperatorQ1_3D",
@@ -956,27 +965,33 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
                                                  R"pbdoc(
         Fused stiffness operator for 2D isotropic linear elastic materials.
 
-        This operator computes K @ u = B^T C B @ u for 2D linear triangular
-        elements, where C is the isotropic elasticity tensor parameterized by
-        Lamé constants λ (lambda) and μ (mu).
+        This operator computes K @ u = B^T W C B @ u for 2D Q1 (bilinear quad,
+        default) or P1 (two linear triangles per pixel) elements, where C is
+        the isotropic elasticity tensor parameterized by per-pixel Lamé
+        parameters λ (lambda) and μ (mu).
 
         Instead of storing the full stiffness matrix K, it exploits the
-        isotropic structure: K = 2μ G + λ V, where G and V are geometry-only
-        matrices precomputed at construction time.
+        isotropic structure of the element stiffness: K_e = 2μ_e G + λ_e V,
+        where G and V (8 x 8) are geometry-only matrices precomputed at
+        construction time.
 
-        This reduces memory from O(N × 64) for full K storage to O(N × 2) for
-        spatially-varying isotropic materials, plus O(1) for the shared G and V.
+        This reduces memory from O(N × 64) for stored element matrices to
+        O(N × 2) for spatially-varying isotropic materials, plus O(1) for the
+        shared G and V.
 
         Parameters
         ----------
         grid_spacing : list of float
             Grid spacing [hx, hy] in each direction.
+        element : FEMElement, optional
+            FEMElement.q1 (default) or FEMElement.p1.
 
         Notes
         -----
-        - Displacement field shape: [2, nx, ny] (2 DOFs per node)
-        - Material fields (lambda, mu) shape: [nx-1, ny-1] (one value per pixel)
-        - Force field shape: [2, nx, ny] (same as displacement)
+        - Displacement and force: nodal fields with 2 components (one node
+          per pixel); the displacement's ghosts must be communicated first.
+        - Material fields (lambda, mu): one value per pixel, on the same
+          collection.
         )pbdoc")
             .def(py::init<const std::vector<Real> &, FEMElementKind>(),
                  "grid_spacing"_a,
@@ -1161,23 +1176,29 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
                                                  R"pbdoc(
         Fused stiffness operator for 3D isotropic linear elastic materials.
 
-        This operator computes K @ u = B^T C B @ u for 3D linear tetrahedral
-        elements using a 5-tetrahedra decomposition per voxel (Kuhn triangulation).
+        This operator computes K @ u = B^T W C B @ u for 3D Q1 (trilinear hex,
+        default) or P1 (five linear tetrahedra per voxel) elements, where C is
+        the isotropic elasticity tensor parameterized by per-voxel Lamé
+        parameters λ (lambda) and μ (mu).
 
-        The isotropic structure K = 2μ G + λ V is exploited to reduce memory
-        requirements from O(N × 576) for full K storage to O(N × 2) for
-        spatially-varying isotropic materials.
+        The isotropic structure of the element stiffness, K_e = 2μ_e G + λ_e V
+        with geometry-only G and V (24 x 24), is exploited to reduce memory
+        requirements from O(N × 576) for stored element matrices to O(N × 2)
+        for spatially-varying isotropic materials.
 
         Parameters
         ----------
         grid_spacing : list of float
             Grid spacing [hx, hy, hz] in each direction.
+        element : FEMElement, optional
+            FEMElement.q1 (default) or FEMElement.p1.
 
         Notes
         -----
-        - Displacement field shape: [3, nx, ny, nz] (3 DOFs per node)
-        - Material fields (lambda, mu) shape: [nx-1, ny-1, nz-1] (one value per voxel)
-        - Force field shape: [3, nx, ny, nz] (same as displacement)
+        - Displacement and force: nodal fields with 3 components (one node
+          per voxel); the displacement's ghosts must be communicated first.
+        - Material fields (lambda, mu): one value per voxel, on the same
+          collection.
         )pbdoc")
             .def(py::init<const std::vector<Real> &, FEMElementKind>(),
                  "grid_spacing"_a,
@@ -1498,7 +1519,7 @@ void add_convolution_operator_classes(py::module & mod) {
     add_grid_transfer<2>(mod, "GridTransfer2D");
     add_grid_transfer<3>(mod, "GridTransfer3D");
 
-    // Backwards compatibility aliases
+    // Deprecated alternative names, kept for code that imports them
     mod.attr("ConvolutionOperatorBase") = mod.attr("GradientOperator");
     mod.attr("ConvolutionOperator") = mod.attr("GenericLinearOperator");
 }

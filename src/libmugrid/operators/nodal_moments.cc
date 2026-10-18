@@ -46,15 +46,16 @@ namespace muGrid {
              *
              * Reads the cell's NbNodes corner values through @p corner (a
              * callable mapping a corner index to its value), runs the moment
-             * quadrature, and accumulates
-             *   - `value[j] += w_q rho_q^(j+2)` when @p WantValue, and
-             *   - `grad[j]  += w_q (j+2) rho_q^(j+1) N[q][GradCorner]`
+             * quadrature, with rho_q = Σ_n N[q][n] rho_n, and accumulates
+             *   - `value[j] += w_q rho_q^(j+2)` when @p value is non-null, and
+             *   - `grad[j]  += w_q (j+2) rho_q^(j+1) N[q][grad_corner]`
+             *     when @p grad_corner >= 0.
              * The quadrature point is never stored: this is the whole reason
              * the kernel exists, since the array-at-a-time form materialises
              * NbQuad copies of the grid instead.
              *
-             * @p grad_corner is the index this cell's owner occupies in it, or
-             * -1 to skip the gradient.
+             * @p grad_corner is the corner index the current node occupies in
+             * this cell, or -1 to skip the gradient.
              */
             template <class Quadrature, typename T, class Corner>
             inline void accumulate_cell(const Corner & corner,
@@ -115,10 +116,13 @@ namespace muGrid {
                     T value[NB_NODAL_MOMENTS]{};
                     T grad[NB_NODAL_MOMENTS]{};
 
-                    // This thread's own cell carries the value; every cell
+                    // This node's own cell carries the value; every cell
                     // touching this node (offsets 0 and -1 per axis, i.e. the
                     // cell in which the node is corner c) carries a gradient
                     // term. Corner c of cell (node - offset(c)) is this node.
+                    // Each cell is thus evaluated 2^Dim times, once per
+                    // corner, so that every node's gradient is complete
+                    // without a scatter.
                     for (Index_t c = 0; c < NB_NODES; ++c) {
                         const Index_t e0{
                             r0 - fem_node_offset(c, 0) * rho_stride_x -

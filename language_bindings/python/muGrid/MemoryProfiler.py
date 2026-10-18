@@ -24,9 +24,10 @@ or via the ``muGrid.memory_profiler`` namespace for non-scoped use::
 
 Two caveats worth knowing:
 
-* Recording is only active when muGrid was built with
-  ``-DMUGRID_PROFILE_ALLOCATIONS=ON``. The calls below are always safe — they
-  are no-ops (returning empty data) in a non-instrumented build.
+* Recording is off by default; the instrumentation is always compiled in and
+  costs one relaxed atomic load per allocation while disabled. Enable it with
+  :func:`enable` / :class:`memory_profile`, or set the environment variable
+  ``MUGRID_PROFILE_ALLOCATIONS=1`` to record from process start.
 * Only muGrid ``Field`` buffers are tracked. Array libraries such as cupy draw
   from their own caching pool, which on a GPU workload is frequently the larger
   consumer. Pass ``include_cupy_pool=True`` to fold the cupy pool's

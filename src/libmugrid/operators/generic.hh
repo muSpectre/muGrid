@@ -1,13 +1,13 @@
 /**
- * @file   convolution_operator.hh
+ * @file   generic.hh
  *
  * @author Till Junge <till.junge@altermail.ch>
  * @author Martin Ladecký <m.ladecky@gmail.com>
  *
  * @date   16 Jun 2020
  *
- * @brief  D operator based on the shape function gradients for each quadrature
- * point
+ * @brief  Generic stencil (convolution) operator mapping nodal values to
+ * quadrature-point values, e.g. shape-function gradients
  *
  * Copyright © 2020 Till Junge, Martin Ladecký
  *
@@ -56,7 +56,7 @@ namespace muGrid {
     class GlobalFieldCollection;
 
     // SparseOperatorSoA and GridTraversalParams are defined in
-    // memory/kernels_cpu.hh
+    // operators/convolution_kernels_cpu.hh
 
     /**
      * @brief Cache key for sparse operator memoization
@@ -75,19 +75,36 @@ namespace muGrid {
      * @class GenericLinearOperator
      * @brief Implements gradient operations using a stencil-based approach.
      *
-     * This class extends GradientOperator to provide specific implementations
-     * for gradient and divergence operations based on the shape function
-     * gradients for each quadrature point. It is designed to work with fields
-     * defined on nodal points and quadrature points, facilitating the
-     * evaluation of gradients and the discretised divergence.
+     * This class extends LinearOperator with an arbitrary, user-supplied
+     * stencil, e.g. the shape-function gradients evaluated at each
+     * quadrature point. For a nodal field u with n_c components (each
+     * component is transformed independently) it computes
+     *
+     *     apply:     y_{p,q,o,c} = sum_s sum_i B_{o,q,i}(s) u_{p+s,i,c}
+     *     transpose: u_{p,i,c}   = sum_s sum_{q,o} w_q B_{o,q,i}(s)
+     *                                              y_{p-s,q,o,c}
+     *
+     * where p is a pixel, s an offset in the stencil box
+     * [offset, offset + stencil_shape - 1], i a nodal sub-point (input
+     * component), q a quadrature point, o an output component and w_q the
+     * optional quadrature weights (w_q = 1 when none are given). transpose()
+     * is therefore the exact matrix transpose of apply() (weighted by W).
+     *
+     * The stencil is converted once per grid into a list of its non-zero
+     * entries (coefficients with |c| <= 1e-14 max|c| are dropped), each with
+     * precomputed input/output index offsets. The kernels loop over these
+     * entries and, for each, sweep the computable region with a unit-stride
+     * inner x loop, so the cost is O(nnz x n_c x pixels). The list is cached
+     * per (grid, n_c) and rebuilt when either changes.
      *
      * The implementation supports portable execution across CPU and GPU
      * (CUDA/HIP) architectures through backend-specific kernel implementations.
-     * The sparse operator representation uses a Structure-of-Arrays (SoA)
-     * layout for optimal memory access patterns on both CPU and GPU.
+     * The sparse operator is stored as a Structure-of-Arrays (separate index,
+     * value and quadrature-point arrays), so each kernel streams contiguous
+     * arrays and GPU threads reading the same field load consecutive words.
      *
-     * @note This class cannot be instantiated directly and does not support
-     * copy construction or copy assignment.
+     * @note There is no default constructor, and copy construction and copy
+     * assignment are disabled (the operator owns its sparse caches).
      */
     class GenericLinearOperator : public LinearOperator {
        public:
@@ -102,7 +119,13 @@ namespace muGrid {
          * and necessary information to indicate its shape.
          *
          * @param offset Stencil offset in number of pixels
-         * @param coefficients The stencil coefficients raveled as an array.
+         * @param coefficients The stencil coefficients raveled as an array
+         * in column-major order with the output component fastest: entry
+         * ((s * nb_pixel_input_components + i) * nb_quad_pts + q)
+         * * nb_output_components + o, where s is the column-major (x
+         * fastest) index of the stencil point. Its size must be
+         * nb_output_components * nb_quad_pts * nb_pixel_input_components *
+         * prod(stencil_shape).
          * @param stencil_shape Shape of the stencil.
          * @param nb_pixel_input_components Number of input components per
          * pixel.
@@ -318,10 +341,9 @@ namespace muGrid {
         Index_t get_nb_output_components() const final;
 
         /**
-         * returns the number of input components associated with any
-         * pixel/voxel. (Every node belonging to at least one of the elements
-         * belonging to any pixel/voxel, without recounting nodes that appear
-         * multiple times)
+         * returns the number of input components (nodal sub-points) per
+         * pixel/voxel, i.e. the nodes owned by one pixel/voxel, each counted
+         * once even if it belongs to several elements.
          */
         Index_t get_nb_input_components() const final;
 
@@ -339,10 +361,17 @@ namespace muGrid {
          * Compute the Fourier representation of this stencil operator
          *
          * Converts a translationally invariant linear combination of grid
-         * values into a multiplication with a complex number in Fourier space.
+         * values into a multiplication with a complex number in Fourier space:
+         * for u_p = exp(2πi q·p), (B u)_p = fourier(q) u_p with
          *
-         * @param phase The wavevector times cell dimension (lacking factor of
-         * 2π)
+         *     fourier(q) = sum_s c_s exp(2πi q·s).
+         *
+         * Only defined for scalar operators (one output component,
+         * quadrature point and input component); throws otherwise. Cost
+         * O(prod(stencil_shape)).
+         *
+         * @param phase The frequency q in cycles per grid point per axis
+         * (the wavevector times the grid spacing, lacking the factor 2π)
          * @return Complex Fourier representation of the operator
          */
         Complex fourier(const Eigen::VectorXd & phase) const;
@@ -386,8 +415,8 @@ namespace muGrid {
          * Coefficients at most this fraction of the largest one are dropped
          * from the sparse operator. Relative, so it removes rounding noise in
          * the coefficient tables without depending on the units: an absolute
-         * 1e-14 made an operator in SI units at the micrometre scale (or the
-         * identity times 1e-15) vanish entirely.
+         * threshold of 1e-14 would drop every coefficient of an operator in
+         * SI units at the micrometre scale (or of the identity times 1e-15).
          */
         static constexpr Real relative_zero_tolerance = 1e-14;
 
@@ -400,11 +429,12 @@ namespace muGrid {
             return relative_zero_tolerance * max_abs;
         }
 
-        //! Cached sparse operators for reuse (two orderings for optimal access)
-        //! Row-major: groups by quad index (optimal for apply - write locality)
+        //! Cached sparse operators for reuse (two orderings, one per
+        //! direction). Row-major: groups by quad index, so consecutive
+        //! entries write the same output location in apply
         mutable std::optional<SparseOperatorSoA<HostSpace>> cached_apply_op_{};
-        //! Column-major: groups by nodal index (optimal for transpose - write
-        //! locality)
+        //! Column-major: groups by nodal index, so consecutive entries write
+        //! the same output location in transpose
         mutable std::optional<SparseOperatorSoA<HostSpace>>
             cached_transpose_op_{};
         mutable std::optional<SparseOperatorCacheKey> cached_key_{};
@@ -545,16 +575,6 @@ namespace muGrid {
                                  Index_t nb_quad_components,
                                  bool is_transpose) const;
 
-        /**
-         * Apply convolution on device memory fields.
-         * Data must already be in device memory space.
-         *
-         * @tparam DeviceSpace Target device memory space (CUDASpace, ROCmSpace)
-         * @param nodal_data Pointer to nodal field data in device memory
-         * @param quad_data Pointer to quadrature field data in device memory
-         * @param alpha Scaling factor
-         * @param params Grid traversal parameters
-         */
         //! Host apply/transpose with increment, templated on the field scalar
         //! type T (Real or Real32). The cached sparse operator stays in double
         //! and its coefficients are cast to T inside the kernels.
@@ -582,6 +602,17 @@ namespace muGrid {
             const std::vector<Real> & weights) const;
 #endif
 
+        /**
+         * Apply convolution on device memory fields.
+         * Data must already be in device memory space, and the device apply
+         * operator must already be cached (get_device_apply_operator()).
+         *
+         * @tparam DeviceSpace Target device memory space (CUDASpace, ROCmSpace)
+         * @param nodal_data Pointer to nodal field data in device memory
+         * @param quad_data Pointer to quadrature field data in device memory
+         * @param alpha Scaling factor
+         * @param params Grid traversal parameters
+         */
         template <typename DeviceSpace, typename T>
         void apply_on_device(const T * nodal_data, T * quad_data,
                              const T alpha,
@@ -589,7 +620,9 @@ namespace muGrid {
 
         /**
          * Transpose convolution on device memory fields.
-         * Data must already be in device memory space.
+         * Data must already be in device memory space, and the device
+         * transpose operator must already be cached
+         * (get_device_transpose_operator()).
          *
          * @tparam DeviceSpace Target device memory space (CUDASpace, ROCmSpace)
          * @param quad_data Pointer to quadrature field data in device memory
@@ -607,7 +640,9 @@ namespace muGrid {
 
         /**
          * Get or create device-space sparse operator for apply operation.
-         * Lazily copies from host cache to device.
+         * On a miss (or a different grid/component count) the operator is
+         * built on the host with DeviceSpace::storage_order indices and
+         * deep-copied to the device; the host cache is not involved.
          *
          * @tparam DeviceSpace Target device memory space
          * @param nb_grid_pts Grid points with ghosts
@@ -621,7 +656,7 @@ namespace muGrid {
 
         /**
          * Get or create device-space sparse operator for transpose operation.
-         * Lazily copies from host cache to device.
+         * Built and copied like get_device_apply_operator().
          *
          * @tparam DeviceSpace Target device memory space
          * @param nb_grid_pts Grid points with ghosts
@@ -634,8 +669,9 @@ namespace muGrid {
                                       Index_t nb_nodal_components) const;
     };
 
-    // Kernel functions and deep_copy_sparse_operator are now in
-    // operators/convolution_kernels.hh
+    // The kernel functions are in operators/convolution_kernels_cpu.hh and
+    // operators/convolution_kernels_gpu.hh; deep_copy_sparse_operator is in
+    // operators/kernel_dispatcher.hh
 
     /**
      * @brief Pad a shape vector to 3D by appending fill_value
@@ -676,7 +712,8 @@ namespace muGrid {
     void GenericLinearOperator::apply_on_device(
         const T * nodal_data, T * quad_data, const T alpha,
         const GridTraversalParams & params) const {
-        // Get device sparse operator (lazily copies from host if needed)
+        // Device sparse operator, cached beforehand by
+        // get_device_apply_operator()
         const auto & sparse_op = this->cached_device_apply_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
@@ -688,7 +725,8 @@ namespace muGrid {
     void GenericLinearOperator::transpose_on_device(
         const T * quad_data, T * nodal_data, const T alpha,
         const GridTraversalParams & params, const Real * weights) const {
-        // Get device sparse operator (lazily copies from host if needed)
+        // Device sparse operator, cached beforehand by
+        // get_device_transpose_operator()
         const auto & sparse_op = this->cached_device_transpose_op_.value();
 
         // Use the KernelDispatcher for backend-agnostic kernel execution
@@ -707,8 +745,9 @@ namespace muGrid {
                            !(this->cached_device_key_.value() == key);
         if (!this->cached_device_apply_op_.has_value() || stale) {
             // Create operator with SoA indices (device storage order) and copy
-            // to device Device spaces use StructureOfArrays for optimal memory
-            // coalescence
+            // it to the device. Device fields are StructureOfArrays so that
+            // consecutive threads (consecutive pixels) access consecutive
+            // addresses and loads coalesce.
             auto host_soa_op =
                 this->create_apply_operator<DeviceSpace::storage_order>(
                     nb_grid_pts, nb_nodal_components);
@@ -716,7 +755,7 @@ namespace muGrid {
                 muGrid::deep_copy_sparse_operator<DeviceSpace, HostSpace>(
                     host_soa_op);
             if (stale) {
-                // Grid changed: the transpose cache is now stale too.
+                // Grid changed: the transpose cache is stale as well.
                 this->cached_device_transpose_op_.reset();
             }
             this->cached_device_key_ = key;
@@ -736,8 +775,7 @@ namespace muGrid {
                            !(this->cached_device_key_.value() == key);
         if (!this->cached_device_transpose_op_.has_value() || stale) {
             // Create operator with SoA indices (device storage order) and copy
-            // to device Device spaces use StructureOfArrays for optimal memory
-            // coalescence
+            // it to the device (see get_device_apply_operator()).
             auto host_soa_op =
                 this->create_transpose_operator<DeviceSpace::storage_order>(
                     nb_grid_pts, nb_nodal_components);
@@ -745,7 +783,7 @@ namespace muGrid {
                 muGrid::deep_copy_sparse_operator<DeviceSpace, HostSpace>(
                     host_soa_op);
             if (stale) {
-                // Grid changed: the apply cache is now stale too.
+                // Grid changed: the apply cache is stale as well.
                 this->cached_device_apply_op_.reset();
             }
             this->cached_device_key_ = key;

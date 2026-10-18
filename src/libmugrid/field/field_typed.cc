@@ -223,7 +223,8 @@ namespace muGrid {
       }
 
       // Tag the buffer with the field name and device so the allocation
-      // profiler can attribute it (no-op unless MUGRID_PROFILE_ALLOCATIONS).
+      // profiler can attribute it (only used while the profiler records,
+      // e.g. with MUGRID_PROFILE_ALLOCATIONS=1).
       this->values.set_label(this->get_name(), this->get_device_string());
 
       // Use our resize function

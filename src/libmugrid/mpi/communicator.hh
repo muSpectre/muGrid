@@ -122,7 +122,13 @@ namespace muGrid {
         return MPI_C_FLOAT_COMPLEX;
     }
 
-    //! lightweight abstraction for the MPI communicator object
+    //! lightweight abstraction for the MPI communicator object.
+    //! All reductions are collective: every rank of the communicator must
+    //! call them. With p ranging over the P ranks, sum/max/min return
+    //! sum_p a_p, max_p a_p, min_p a_p of the per-rank arguments a_p on
+    //! every rank. A communicator equal to MPI_COMM_NULL behaves as a
+    //! single rank (P = 1) and calls no MPI function, so an MPI-enabled
+    //! build can run serially without MPI_Init.
     class Communicator {
        public:
         explicit Communicator(MPI_Comm comm = MPI_COMM_SELF);
@@ -155,9 +161,8 @@ namespace muGrid {
             return res;
         }
 
-        //! Barrier syncronization, muGrids communicator is calling MPI's
-        //! Barrier() A Barrier blocks until all processes in the communicator
-        //! have reached this point
+        //! Barrier synchronization through MPI_Barrier: blocks until all
+        //! processes in the communicator have reached this point
         void barrier() {
             if (comm == MPI_COMM_NULL) {
                 return;
@@ -246,9 +251,11 @@ namespace muGrid {
             return res;
         }
 
-        //! ordered partial cumulative sum on scalar types. With the nomenclatur
-        //! p0 = the processor with rank = 0 and so on the following example
-        //! demonstrates the cumulative sum of arg='a' returned on res='b'
+        //! ordered partial cumulative sum (inclusive prefix sum, MPI_Scan) on
+        //! scalar types: rank p returns b_p = sum_{q <= p} a_q. With the
+        //! nomenclature p0 = the processor with rank = 0 and so on, the
+        //! following example demonstrates the cumulative sum of arg='a'
+        //! returned on res='b'
         //! p0 a=2, b=0;  p1 a=3, b=0;  p2 a=1, b=0;  p3 a=5, b=0
         //! after computing the cumulative sum we find:
         //! p0 a=2, b=2,  p1 a=3, b=5,  p2 a=1, b=6,  p3 a=5, b=11
@@ -301,9 +308,9 @@ namespace muGrid {
             // It is only allowed to have matrices with a fixed number of rows
             // or empty matrices: either nb_rows_loc == nb_rows_max or
             // nb_rows_loc == 0. Otherwise the result is laid out with the
-            // wrong number of rows and the data is scrambled or dropped. This
-            // used to be an assert, i.e. unchecked in release builds. The
-            // check is collective (a rank-local throw would leave the others
+            // wrong number of rows and the data is scrambled or dropped. The
+            // check is a runtime error rather than an assert so that it also
+            // holds in release (NDEBUG) builds. It is collective (a rank-local throw would leave the others
             // blocked in MPI_Allgatherv), so every rank raises together.
             int uneven_loc{(nb_rows_loc != nb_rows_max) and (nb_rows_loc != 0)};
             int uneven{0};
@@ -403,9 +410,9 @@ namespace muGrid {
         }
 
         //! broadcast of scalar types
-        //! broadcasts arg from root to all processors and additionally returns
-        //! the broadcasted value in res (this is an overhead but usefull for
-        //! the python binding).
+        //! broadcasts arg from root to all processors (overwriting arg on the
+        //! non-root ranks) and additionally returns the broadcast value (a
+        //! copy, which is convenient for the python binding).
         template <typename T>
         T bcast(T & arg, const Int & root) {
             if (comm == MPI_COMM_NULL) {
@@ -462,7 +469,7 @@ namespace muGrid {
         //! get total number of processes
         int size() const { return 1; }
 
-        //! Barrier syncronization, nothing to be done in serial
+        //! Barrier synchronization, nothing to be done in serial
         void barrier() { return; }
 
         //! sum reduction on scalar types
@@ -490,7 +497,7 @@ namespace muGrid {
         }
 
         //! ordered partial cumulative sum on scalar types. Find more details in
-        //! the doc of the into the parallel implementation.
+        //! the doc of the parallel implementation.
         template <typename T>
         T cumulative_sum(const T & arg) const {
             return arg;

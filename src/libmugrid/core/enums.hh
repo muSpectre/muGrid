@@ -70,11 +70,16 @@ namespace muGrid {
      * These storage orders can be used to determine the order in which field
      * components are stored in memory.
      *
-     * @var ArrayOfStructures Represents a column-major storage order. In this
-     * order, the first index changes fastest, and the last index changes
-     * slowest.
+     * With C entries (components x sub-points) per pixel and N buffer
+     * pixels, entry (c, p) is stored at offset c + C p (ArrayOfStructures)
+     * or p + N c (StructureOfArrays).
+     *
+     * @var ArrayOfStructures Represents a column-major storage order of the
+     * (entry, pixel) array: the first index (the per-pixel entry) changes
+     * fastest, the pixel index slowest. Default on the host.
      * @var StructureOfArrays Represents a structure of arrays storage order. In
-     * this order, pixels are consecutive in memory.
+     * this order, pixels are consecutive in memory. Always used for device
+     * collections (see memory/memory_space.hh for the rationale).
      * @var Automatic Represents an automatic storage order. In this order, the
      * storage order is inherited from `FieldCollection`.
      */

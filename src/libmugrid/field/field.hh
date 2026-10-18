@@ -88,8 +88,10 @@ namespace muGrid {
          * ensure this. This constructor initializes a field that does not know
          * the shape and storage order of its components.
          * @param unique_name unique field name (unique within a collection)
-         * @param nb_components number of components to store per sub-point
          * @param collection reference to the holding field collection.
+         * @param nb_components number of components to store per sub-point
+         * @param sub_div_tag tag of the sub-division scheme
+         * @param unit physical unit of this field
          */
         Field(const std::string & unique_name, FieldCollection & collection,
               const Index_t & nb_components, const std::string & sub_div_tag,
@@ -103,7 +105,8 @@ namespace muGrid {
          * @param collection reference to the holding field collection.
          * @param components_shape number of components to store per quadrature
          * point
-         * @param storage_oder in-memory storage order of the components
+         * @param sub_div_tag tag of the sub-division scheme
+         * @param unit physical unit of this field
          */
         Field(const std::string & unique_name, FieldCollection & collection,
               const Shape_t & components_shape, const std::string & sub_div_tag,
@@ -137,7 +140,7 @@ namespace muGrid {
         //! return a const reference to the field's collection
         const FieldCollection & get_collection() const;
 
-        //! return the number of components stored per sub-point point
+        //! return the number of components stored per sub-point
         const Index_t & get_nb_components() const;
 
         //! return the number of sub points per pixel
@@ -162,7 +165,7 @@ namespace muGrid {
         /**
          * returns the number of entries held by this field. This corresponds to
          * nb_pixels × nb_sub_pts, (I.e., a scalar field and a vector field
-         * sharing the the same collection and subdivision tag have the same
+         * sharing the same collection and subdivision tag have the same
          * number of entries, even though the vector field has more scalar
          * values.)
          */
@@ -171,7 +174,7 @@ namespace muGrid {
         /**
          * returns the number of entries held by the buffer of this field. This
          * corresponds to nb_buffer_pixels × nb_sub_pts, (I.e., a scalar field
-         * and a vector field sharing the the same collection have the same
+         * and a vector field sharing the same collection have the same
          * number of entries, even though the vector field has more scalar
          * values.)
          */
@@ -306,8 +309,10 @@ namespace muGrid {
          * return a pointer to the raw data
          *
          * @param assert_host_memory If true (default), throws an error if the
-         *        field is on device memory. Set to false only when passing the
-         *        pointer to CUDA-aware libraries (e.g., CUDA-aware MPI).
+         *        field is on device memory. Set to false only when the
+         *        caller handles device pointers itself (device kernels, GPU
+         *        staging copies, GPU-aware MPI, or host-accessible unified
+         *        memory; see is_host_accessible()).
          **/
         virtual void * get_void_data_ptr(bool assert_host_memory = true) const = 0;
 
@@ -334,7 +339,7 @@ namespace muGrid {
          */
         Dim_t get_spatial_dim() const;
 
-        //! check wether the number of pixel sub-divisions has been set
+        //! check whether the number of pixel sub-divisions has been set
         bool has_nb_sub_pts() const;
 
         //! returns a const ref to the field's pixel sub-division type
@@ -446,7 +451,7 @@ namespace muGrid {
         /**
          * number of pixel subdivisions. Will depend on sub_division. This value
          * depends on the field collection and might or might not exist at
-         * construction time (it would be `muGrid::Unknown` if not yes set
+         * construction time (it would be `muGrid::Unknown` if not yet set)
          */
         Index_t nb_sub_pts;
 

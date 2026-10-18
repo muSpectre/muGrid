@@ -1,18 +1,51 @@
 """
 Preconditioners for the matrix-free solvers in :mod:`muGrid.Solvers`.
 
-A preconditioner approximates the inverse of the system operator. The
-solvers accept any callable with the signature ``prec(r, z)`` that computes
-``z = M⁻¹ r`` for muGrid fields ``r`` and ``z``; the
-:class:`Preconditioner` base class below formalizes this contract, so
+A preconditioner ``M ≈ A⁻¹`` approximates the inverse of the system operator
+``A`` of ``A x = b``. The solvers accept any callable with the signature
+``prec(r, z)`` that computes ``z = M r`` for muGrid fields ``r`` and ``z``;
+the :class:`Preconditioner` base class below formalizes this contract, so
 instances can be passed directly as the ``prec`` argument of
 :func:`muGrid.Solvers.conjugate_gradients`.
 
-For conjugate gradients, ``M⁻¹`` must be symmetric positive definite on the
-subspace the iteration operates in. A spectral preconditioner whose kernel
-vanishes on a mode (e.g. the zero-frequency mode of the periodic Laplacian)
-projects that mode out; in that case the right-hand side must not contain
-it.
+For conjugate gradients, ``M`` must be a fixed linear operator that is
+symmetric positive definite on the subspace the iteration operates in; CG
+then converges at a rate governed by ``κ(M A)``. A spectral preconditioner
+whose kernel vanishes on a mode (e.g. the zero-frequency mode of the periodic
+Laplacian) projects that mode out; in that case the right-hand side must not
+contain it.
+
+Notation: ``d`` is the dimension, ``N_α`` and ``h_α`` the grid points and
+spacing along axis ``α``, ``P`` the number of MPI ranks; ``F`` is the
+unnormalised forward FFT and ``F⁻¹`` its inverse including the factor
+``engine.normalisation = 1/∏N_α``. Fourier frequencies ``q`` are in cycles
+per grid point (``engine.fftfreq``, axis 0 half-complex). For FE elasticity
+the system matrix is ``K = Bᵀ W C B`` with nodal displacement ``u``, gradient
+``B u`` at quadrature points, quadrature weights ``W`` and per-pixel Lamé
+parameters ``λ, μ``; ``Kʳᵉᶠ`` is the same operator with uniform reference
+parameters ``λʳᵉᶠ, μʳᵉᶠ``.
+
+Available preconditioners:
+
+- :class:`JacobiPreconditioner` -- ``M = D⁻¹`` with ``D = diag(A)``.
+- :class:`FourierPreconditioner` -- ``M = F⁻¹ k(q) F`` for a scalar symbol
+  ``k(q)``, e.g. the inverse symbol of a constant-coefficient operator.
+- :class:`BlockFourierPreconditioner` -- ``M = F⁻¹ K̂⁻¹(q) F`` with an
+  ``n × n`` block per mode; built by
+  :func:`make_reference_stiffness_preconditioner` as the Green
+  (reference-material) preconditioner ``G = (Kʳᵉᶠ)⁺``.
+- :class:`AnalyticReferencePreconditioner` -- the same ``G``, with the
+  symbol ``K̂(q) = Σ_s S[s] exp(-2πi q·s)`` re-evaluated from the ``3^d``
+  stencil ``S`` per mode on each apply instead of stored.
+- :class:`GreenJacobiPreconditioner` -- ``M = J^{1/2} G J^{1/2}``,
+  ``J = diag(K)⁻¹``, for smooth high-contrast material data;
+  :func:`make_green_jacobi_preconditioner` assembles it.
+- :class:`MultigridReferencePreconditioner` -- a fixed symmetric V-cycle
+  approximating ``(Kʳᵉᶠ)⁺`` with damped-Jacobi smoothing and an exact FFT
+  solve on the coarsest grid.
+- :class:`HybridFourierTridiagonalPreconditioner` -- the exact ``(Kʳᵉᶠ)⁺``
+  by FFT along the rank-local axes and a block-tridiagonal (block-Thomas plus
+  parallel cyclic reduction) solve along the distributed axis.
 """
 
 import os
@@ -56,14 +89,14 @@ class Preconditioner:
     """
     Abstract base class for preconditioners.
 
-    Subclasses implement :meth:`apply`, which computes ``z = M⁻¹ r``.
-    Instances are callable with the same signature, matching the ``prec``
-    argument of :func:`muGrid.Solvers.conjugate_gradients`.
+    Subclasses implement :meth:`apply`, which computes ``z = M r`` with
+    ``M ≈ A⁻¹``. Instances are callable with the same signature, matching the
+    ``prec`` argument of :func:`muGrid.Solvers.conjugate_gradients`.
     """
 
     def apply(self, r, z):
         """
-        Apply the preconditioner: ``z = M⁻¹ r``.
+        Apply the preconditioner: ``z = M r``.
 
         Parameters
         ----------
@@ -87,13 +120,15 @@ class IdentityPreconditioner(Preconditioner):
 
 class JacobiPreconditioner(Preconditioner):
     """
-    Diagonal (Jacobi) preconditioner, ``z = D⁻¹ r``.
+    Diagonal (Jacobi) preconditioner, ``z = D⁻¹ r`` with ``D = diag(A)``.
 
     Useful when the operator's diagonal varies strongly in space, e.g. for
-    heterogeneous coefficients: dividing by the diagonal equilibrates the
-    spectrum. (For operators with a constant diagonal, such as the plain
-    Laplacian, Jacobi only rescales the system and does not change the CG
-    iteration.)
+    heterogeneous coefficients: ``D^{-1/2} A D^{-1/2}`` has unit diagonal, and
+    among all diagonal scalings it is within a factor of the number of
+    non-zeros per row of the optimal condition number (van der Sluis, 1969).
+    (For operators with a constant diagonal, such as the plain Laplacian,
+    Jacobi only rescales the system and does not change the CG iteration.)
+    Cost per apply: one copy and one pointwise scaling, ``O(N)``.
 
     The preconditioner runs wherever the solver fields live: the inverse
     diagonal is stored in a field on the residual's collection (created on
@@ -155,8 +190,9 @@ class JacobiPreconditioner(Preconditioner):
 
     def _inverse_diagonal_field(self, z):
         """Field holding D⁻¹ on z's collection (created on first use)."""
-        # One field per precision: a float32 solve needs a float32 D⁻¹ (the
-        # field used to be float64 always, so linalg.scal raised).
+        # One field per precision: linalg.scal requires the scaling field and
+        # the scaled field to share a dtype, so a float32 solve needs a
+        # float32 D⁻¹.
         dtype = np.dtype(z.dtype)
         if self._field is None or np.dtype(self._field.dtype) != dtype:
             values = self._inverse_diagonal
@@ -197,9 +233,19 @@ class FourierPreconditioner(Preconditioner):
     """
     Spectral preconditioner ``z = F⁻¹ [ k(q) · F r ]``.
 
-    The kernel ``k(q)`` is the Fourier-space representation of ``M⁻¹``,
-    typically the inverse symbol of (an approximation to) the system
-    operator. It is applied pointwise on the local Fourier subdomain and
+    The kernel ``k(q)`` is the Fourier-space representation of ``M``,
+    typically the inverse symbol ``1/Â(q)`` of (an approximation to) a
+    constant-coefficient system operator. For a translation-invariant
+    operator on a periodic grid ``F`` diagonalises ``A``, so with the exact
+    inverse symbol ``M = A⁺`` and CG converges in one iteration. For a
+    variable-coefficient operator ``A = Bᵀ C(x) B`` preconditioned by the
+    inverse of a reference ``Bᵀ Cʳᵉᶠ B`` with
+    ``c_min Cʳᵉᶠ ≤ C(x) ≤ c_max Cʳᵉᶠ``, the effective condition number is
+    ``κ(M A) ≤ c_max / c_min``, independent of the grid. Cost per apply: one
+    forward and one inverse FFT,
+    ``O(N log N)`` with ``N = ∏N_α``, plus an ``O(N)`` pointwise product.
+
+    The kernel is applied pointwise on the local Fourier subdomain and
     broadcast over field components. Modes where the kernel is zero are
     projected out of the solution; for singular operators (e.g. the
     periodic Laplacian, whose symbol vanishes at ``q = 0``) set the kernel
@@ -343,10 +389,13 @@ class BlockFourierPreconditioner(Preconditioner):
     matrix ``K⁻¹(q)``. This is exactly what the reference-material (Green's
     function) preconditioner of an FE homogenization problem needs (Ladecký et
     al., Appl. Math. Comput. 446 (2023) 127835): the reference stiffness
-    ``Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D`` built from spatially uniform data is block-circulant,
+    ``Kʳᵉᶠ = Bᵀ W Cʳᵉᶠ B`` built from spatially uniform data is block-circulant,
     hence block-diagonal in Fourier space with one ``n × n`` block per mode
-    (``n = d·Nn`` degrees of freedom per stencil), and its (pseudo-)inverse is
-    applied mode by mode between a forward and an inverse FFT.
+    (``n = d·Nn`` degrees of freedom per pixel, ``Nn`` nodes per pixel), and
+    its (pseudo-)inverse is applied mode by mode between a forward and an
+    inverse FFT. Cost per apply: two FFTs of ``n`` components,
+    ``O(n N log N)``, plus ``O(n² N)`` for the per-mode products; memory
+    ``n²`` stored values per Fourier mode (fewer when Hermitian, see below).
 
     The blocks are supplied pre-assembled and pre-inverted (the singular
     zero-frequency block, corresponding to the rigid-body modes, must already be
@@ -375,6 +424,14 @@ class BlockFourierPreconditioner(Preconditioner):
         solver's fields -- a single-precision solve needs a single-precision
         preconditioner, otherwise the internal ``ifft`` mismatches and the
         result is NaN.
+
+    Notes
+    -----
+    If the blocks are Hermitian to within :func:`_hermitian_tol` (decided
+    collectively over all ranks), only the real diagonal and the complex
+    upper triangle are stored, ``n²`` reals per mode instead of ``2n²``.
+    On a device with ``n <=`` :attr:`FUSED_MAX_COMPONENTS` the per-mode
+    product is one generated elementwise kernel.
     """
 
     def __init__(self, engine, blocks, name="block-fourier-preconditioner",
@@ -629,9 +686,12 @@ class GreenJacobiPreconditioner(Preconditioner):
     system matrix re-clusters the spectrum around one and restores fast CG
     convergence, while keeping the ``O(N log N)`` cost of the FFT-based apply.
 
-    The symmetric split ``J^{1/2} G J^{1/2}`` keeps ``M⁻¹`` symmetric
+    The symmetric split ``M = J^{1/2} G J^{1/2}`` keeps ``M`` symmetric
     positive-definite (``G`` is SPD on the non-rigid-body subspace and
-    ``J^{1/2}`` is a positive diagonal), so plain PCG remains valid.
+    ``J^{1/2}`` is a positive diagonal), so plain PCG remains valid. Cost per
+    apply: one apply of ``G`` plus two ``O(N)`` pointwise scalings; the
+    output field doubles as the scratch, so no work field is allocated
+    beyond ``J^{1/2}``.
 
     Parameters
     ----------
@@ -776,8 +836,8 @@ class GreenJacobiPreconditioner(Preconditioner):
 #: :func:`make_reference_stiffness_preconditioner`. The symbol is inverted in
 #: double precision one slab of Fourier modes at a time; this bounds the size
 #: of the double-precision copy, independent of the grid. Module-level so the
-#: tests can shrink it and actually exercise the multi-slab path -- at any
-#: realistic test resolution the whole symbol is one slab.
+#: tests can shrink it and exercise the multi-slab path -- at any realistic
+#: test resolution the whole symbol is one slab.
 SYMBOL_INVERSION_SLAB_BYTES = 128 * 1024 * 1024
 
 
@@ -789,36 +849,40 @@ class AnalyticReferencePreconditioner(Preconditioner):
     class holds the inverse symbol: ``n²`` complex values per Fourier mode,
     2.3 GB at 512³ for three components in single precision, growing with the
     grid. A uniform operator is a ``3^dim`` stencil -- 243 numbers in 3D -- so
-    the symbol is the closed-form sum ``Σ_d S[d] exp(-2πi q·d)`` and can be
-    rebuilt for one mode, inverted and applied entirely in registers. What this
-    class stores is the stencil.
+    the symbol is the closed-form sum ``K̂(q) = Σ_s S[s] exp(-2πi q·s)`` over
+    the offsets ``s ∈ {-1, 0, 1}^d`` and can be rebuilt for one mode, inverted
+    and applied entirely in registers. Per mode the apply computes
+
+        ``ẑ(q) = engine.normalisation · K̂(q)⁻¹ r̂(q)``  (``ẑ(0) = 0``),
+
+    i.e. ``z = F⁻¹ K̂⁻¹ F r`` with the rigid-body translations at ``q = 0``
+    projected out. What this class stores is the stencil.
 
     The trade is arithmetic for memory. Rebuilding costs ~630 flops per mode
     against ~36 bytes read for the stored symbol, so it wants about 17.6
     flops/byte to break even. A CPU socket is nearer 5, and there the apply is
-    about 28% slower (128³, float32). On a GPU it wins outright: on an H200 at
-    512³, three components, the apply is 9.3 ms against 25.5 ms stored in
-    float32 and 16.1 against 31.2 ms in float64, with 4.9 GB less device
-    memory and a 1.3 s setup instead of 168 s. That is why
+    about 28% slower (measured at 128³, float32). On a GPU it wins outright:
+    measured on an H200 at 512³, three components, the apply is 9.3 ms against
+    25.5 ms stored in float32 and 16.1 against 31.2 ms in float64, with 4.9 GB
+    less device memory and a 1.3 s setup instead of 168 s. That is why
     :func:`make_reference_stiffness_preconditioner` picks this class on a
     device and the stored symbol on the host.
 
     In single precision the low-frequency phase sum cancels O(S) terms to
-    O(S q²), and a symbol built in float32 alone lost the lowest modes (zeroed
-    outright from N ≈ 2048). On the host the symbol is therefore built and
+    O(S q²), so a symbol built in float32 alone loses the lowest modes
+    (measured: zeroed outright from N ≈ 2048). On the host the symbol is therefore built and
     inverted in double for either field precision; only the mode's components
     are read and written in the field's. On a device a float32 field is
     finished in single precision per mode, and redone in double only where an
     a-posteriori test on the block says the single-precision result is off by
     more than about 1e-4 -- the long wavelengths, about 0.05% of the modes for
     an isotropic medium. That keeps the float32 apply at single-precision speed
-    on GPUs with weak double throughput (L40S, 512³: 45 ms, against 87 ms with
-    the symbol in double throughout).
+    on GPUs with weak double throughput (measured on an L40S at 512³: 45 ms,
+    against 87 ms with the symbol in double throughout).
 
-    The per-mode cost would be nine times higher done naively. Modes along the
-    fastest axis share the frequencies of every other axis, so the kernel
-    hoists those sums out of that loop; without it the symbol build alone is
-    1944 flops per mode instead of 216.
+    Modes along the fastest axis share the frequencies of every other axis,
+    so the kernel hoists those partial sums out of that loop: the symbol build
+    costs 216 flops per mode instead of the 1944 of a direct evaluation.
 
     Parameters
     ----------
@@ -832,7 +896,17 @@ class AnalyticReferencePreconditioner(Preconditioner):
         When given, :meth:`apply` records ``"fft"``, ``"symbol"`` and
         ``"ifft"``.
     dtype : data-type, optional
-        Real-space precision of the fields this will be applied to.
+        Real-space precision of the fields this will be applied to,
+        ``np.float64`` (default) or ``np.float32``.
+
+    Raises
+    ------
+    ValueError
+        If `dtype` is not float32/float64, the stencil shape is not
+        ``(3,) * dim + (dim, dim)`` with dim 2 or 3, or the Fourier work
+        field is not laid out axis-0-fastest.
+    RuntimeError
+        If the fields live on a device but this build has no device kernel.
     """
 
     def __init__(self, engine, stencil, name="analytic-reference-preconditioner",
@@ -987,8 +1061,8 @@ _HERMITIAN_TOL_DOUBLE = 1e-10
 
 def _hermitian_tol(cdtype):
     """Relative asymmetry that counts as rounding for blocks of `cdtype`:
-    1e-10 in double (as before) and 100 eps in single precision, where the
-    rounding of the entries alone exceeds 1e-10."""
+    ``max(1e-10, 100 eps)``, i.e. 1e-10 in double and 100 eps in single
+    precision, where the rounding of the entries alone exceeds 1e-10."""
     return max(_HERMITIAN_TOL_DOUBLE, 100 * float(np.finfo(cdtype).eps))
 
 
@@ -1004,9 +1078,9 @@ def _invert_symbol_slab(blocks, singular, normalisation, hermitian_tol):
     A slab Hermitian to within `hermitian_tol` is made exactly Hermitian: its
     entries and their conjugate partners then round to the same values when
     cast to the solve precision, so BlockFourierPreconditioner can store the
-    upper triangle -- in single precision the rounding of a slightly
-    asymmetric double inverse used to defeat that test and keep the dense
-    block.
+    upper triangle. Without the symmetrisation, single-precision rounding of
+    a slightly asymmetric double inverse fails BlockFourierPreconditioner's
+    Hermitian test and forces the dense block.
     """
     n = blocks.shape[-1]
     blocks[singular] = np.eye(n, dtype=blocks.dtype)
@@ -1042,22 +1116,43 @@ def make_reference_stiffness_preconditioner(
     al., Appl. Math. Comput. 446 (2023) 127835.
 
     For an FE problem on a regular periodic grid, the reference-material
-    stiffness ``Kʳᵉᶠ = Dᵀ W Cʳᵉᶠ D`` built from spatially *uniform* data is
+    stiffness ``Kʳᵉᶠ = Bᵀ W Cʳᵉᶠ B`` built from spatially *uniform* data is
     block-circulant — every pixel carries the same stencil — hence
     block-diagonal in Fourier space, with one ``n × n`` block ``K̂(q)`` per mode
-    (``n`` degrees of freedom per stencil). This routine assembles ``K̂(q)`` by
-    the impulse-response method (paper Algorithm 2): it applies ``Kʳᵉᶠ`` to a
-    unit nodal impulse in each of the ``n`` directions placed at the global
-    origin pixel, and the FFT of the response is the ``β``-th column of the
-    symbol. Each block is inverted; the singular zero-frequency block (the
-    rigid-body modes) is replaced by its pseudo-inverse (zero), which projects
-    those modes out — consistent with a rigid-body-free right-hand side. The
-    inverse-transform normalisation is folded in, and a
-    :class:`BlockFourierPreconditioner` applying ``F⁻¹ K̂⁻¹(q) F`` is returned.
+    (``n`` degrees of freedom per pixel). The returned preconditioner applies
 
-    The routine is FE-agnostic: it only needs the action of ``Kʳᵉᶠ``. The caller
-    supplies that as ``apply_reference_stiffness`` (e.g. built from a uniform
-    reference stiffness and the discrete gradient/divergence operators).
+        ``G r = F⁻¹ [ K̂(q)⁺ · F r ]``,
+
+    where ``K̂(q)⁺ = K̂(q)⁻¹`` for ``q ≠ 0`` and ``K̂(0)⁺ = 0``: the singular
+    zero-frequency block (the rigid-body translations) is replaced by its
+    pseudo-inverse, which projects those modes out — consistent with a
+    rigid-body-free right-hand side. For material data with
+    ``c_min Cʳᵉᶠ ≤ C(x) ≤ c_max Cʳᵉᶠ``, ``κ(G K) ≤ c_max / c_min``
+    independently of the grid.
+
+    ``K̂(q)`` is obtained by one of two routes:
+
+    * **Impulse response** (paper Algorithm 2), when
+      ``apply_reference_stiffness`` is given: ``Kʳᵉᶠ`` is applied to a unit
+      nodal impulse in each of the ``n`` directions placed at the global
+      origin pixel, and the FFT of the response is the ``β``-th column of the
+      symbol. FE-agnostic -- only the action of ``Kʳᵉᶠ`` is needed -- at the
+      cost of ``n`` operator applies and ``n`` full-grid FFTs at setup.
+    * **Analytic**, when ``element``, ``grid_spacing``, ``lambda_ref`` and
+      ``mu_ref`` name the operator: ``K̂(q) = Σ_s S[s] exp(-2πi q·s)`` from its
+      ``3^d`` stencil ``S`` (:func:`reference_stencil`,
+      :func:`stencil_symbol`), with no setup transforms. The symbol is
+      assembled in double precision because the stencil rows sum to zero, so
+      at low ``q`` the sum cancels ``O(S)`` terms to ``O(S q²)`` and a
+      single-precision assembly carries a relative error of about
+      ``eps N²`` (measured: 3e-4 at N = 256, 0.13 at N = 4096).
+
+    Each block is inverted in double precision, a slab of Fourier modes at a
+    time (at most :data:`SYMBOL_INVERSION_SLAB_BYTES`), the inverse-transform
+    normalisation is folded in, and the result is stored at the solve
+    precision in a :class:`BlockFourierPreconditioner`; with
+    ``evaluate_symbol`` an :class:`AnalyticReferencePreconditioner` is
+    returned instead, which stores nothing per mode.
 
     Parameters
     ----------
@@ -1066,13 +1161,14 @@ def make_reference_stiffness_preconditioner(
         the transforms and the parallel (MPI) decomposition. The impulse
         assembly and the per-mode inverse are computed on the rank-local Fourier
         subdomain, so this is MPI-transparent.
-    apply_reference_stiffness : callable
+    apply_reference_stiffness : callable, optional
         ``apply_reference_stiffness(u, f)`` computing ``f = Kʳᵉᶠ u`` for
         ``n``-component real fields ``u``, ``f`` on the engine's real-space
-        collection (it may use ghost communication internally).
-    nb_components : int
-        Degrees of freedom per stencil ``n`` (e.g. ``dim`` for one node per
-        pixel).
+        collection (it may use ghost communication internally). Required
+        unless ``element`` is given; ignored when it is.
+    nb_components : int, optional
+        Degrees of freedom per pixel ``n``. Default: the dimension of the
+        engine (one node per pixel).
     name : str, optional
         Prefix for the engine-managed work fields and the preconditioner.
     timer : muTimer.Timer, optional
@@ -1085,11 +1181,15 @@ def make_reference_stiffness_preconditioner(
         fields; ``apply_reference_stiffness`` is therefore invoked on fields of
         this precision too. The symbol itself is assembled and inverted in
         double wherever single precision would lose accuracy.
-    element, grid_spacing, lambda_ref, mu_ref : optional
-        Name the reference operator instead of passing
-        ``apply_reference_stiffness``: the symbol is then built from its
-        ``3^dim`` stencil (:func:`reference_stencil`), with no impulse response
-        and no setup transforms.
+    element : muGrid.FEMElement, optional
+        Names the reference operator instead of passing
+        ``apply_reference_stiffness`` (analytic route): the symbol is then
+        built from its ``3^dim`` stencil (:func:`reference_stencil`), with no
+        impulse response and no setup transforms. Requires the next three.
+    grid_spacing : sequence of float, optional
+        Grid spacing ``h_α`` per direction (analytic route).
+    lambda_ref, mu_ref : float, optional
+        Uniform reference Lamé parameters (analytic route).
     evaluate_symbol : bool, optional
         Analytic route only. ``True`` returns an
         :class:`AnalyticReferencePreconditioner`, which keeps only the stencil
@@ -1105,6 +1205,15 @@ def make_reference_stiffness_preconditioner(
     BlockFourierPreconditioner or AnalyticReferencePreconditioner
         Ready to pass as ``prec=`` to
         :func:`muGrid.Solvers.conjugate_gradients`.
+
+    Raises
+    ------
+    ValueError
+        If neither ``apply_reference_stiffness`` nor ``element`` is given;
+        if ``element`` is given without ``grid_spacing``, ``lambda_ref`` and
+        ``mu_ref``; if ``evaluate_symbol`` is true without ``element``; if
+        `dtype` is not float32/float64; or if the stencil's component count
+        differs from ``nb_components``.
     """
     fourier_shape = tuple(engine.nb_fourier_subdomain_grid_pts)
     dim = len(fourier_shape)
@@ -1147,8 +1256,8 @@ def make_reference_stiffness_preconditioner(
     #
     # Impulse: the caller handed over an opaque callable. Recovering the same
     # information then means one impulse response per component on the *full*
-    # grid, each followed by a full-grid FFT. This stays because it is the
-    # only route that works for an operator muGrid cannot name.
+    # grid, each followed by a full-grid FFT. It is the only route that works
+    # for an operator muGrid cannot name.
     analytic = element is not None
     if analytic:
         S = reference_stencil(dim, grid_spacing, element, lambda_ref, mu_ref)
@@ -1260,7 +1369,7 @@ def make_reference_stiffness_preconditioner(
     # Release the impulse-response scratch. These three fields (two real, one
     # Fourier) were only needed to assemble the symbol above; left in the
     # engine's collections they would persist through the entire solve. The
-    # symbol now lives in K_inv (a plain array, copied onto the device inside
+    # symbol lives in K_inv (a plain array, copied onto the device inside
     # the preconditioner), so the only Fourier buffer the solve then needs is
     # the preconditioner's own work field. Freeing here drops ~3 vector-sized
     # buffers from the resident set during the CG iteration.
@@ -1313,9 +1422,15 @@ def make_green_jacobi_preconditioner(
       MPI-aware).
 
     The reference Lamé parameters default to the volume means of the supplied
-    ``lambda_field`` / ``mu_field`` (a common, robust choice). The returned
+    ``lambda_field`` / ``mu_field``. A common scale factor of the reference
+    does not affect CG (it scales ``M`` by a constant, which leaves the
+    iterates unchanged); only the ratio ``λʳᵉᶠ/μʳᵉᶠ`` matters.
+
+    .. TODO: rationale for the volume mean as default reference ratio?
+
+    The returned
     preconditioner exposes :meth:`GreenJacobiPreconditioner.update_diagonal`
-    (and the convenience :meth:`refresh` below) to recompute the Jacobi part
+    (and the convenience ``refresh()`` attached to it) to recompute the Jacobi part
     when the material changes across optimization/Newton steps; the Green part
     is reference-only and is reused unchanged.
 
@@ -1335,6 +1450,14 @@ def make_green_jacobi_preconditioner(
         global (MPI-reduced) means of ``lambda_field`` / ``mu_field``, so the
         reference — and hence the assembled Green symbol — is identical on
         every rank regardless of the domain decomposition.
+    element : muGrid.FEMElement, optional
+        Element of ``stiffness_op``. Together with ``grid_spacing`` it selects
+        the analytic (stencil-based) assembly of the Green part in
+        :func:`make_reference_stiffness_preconditioner`; without them the
+        impulse-response route is used, since ``stiffness_op`` does not
+        expose its element or spacing.
+    grid_spacing : sequence of float, optional
+        Grid spacing ``h_α`` of ``stiffness_op``; needed with ``element``.
     void_tol : float, optional
         Passed to :class:`GreenJacobiPreconditioner`.
     name : str, optional
@@ -1365,7 +1488,7 @@ def make_green_jacobi_preconditioner(
     # precision of the material fields (the FFT engine and fused operators
     # dispatch on the field dtype). Inferred from ``lambda_field`` when not
     # given, so a single-precision (float32) material yields a single-precision
-    # preconditioner; float64 fields keep the previous default unchanged.
+    # preconditioner and a float64 material a double-precision one.
     if dtype is None:
         lam_p = lambda_field.s
         dtype = (lam_p.get() if hasattr(lam_p, "get")
@@ -1444,7 +1567,7 @@ def _project_constants_out(field):
     in it.)
 
     Done on the array view because ``linalg`` has no interior-only sum and no
-    add-a-constant kernel -- the one place this preconditioner still touches an
+    add-a-constant kernel -- the one place this preconditioner touches an
     array library in its hot path. Two calls per apply, not per level.
     """
     values = field.s
@@ -1627,10 +1750,37 @@ class MultigridReferencePreconditioner(Preconditioner):
     use a genuine 3D Cartesian decomposition.
 
     On a single shared-memory node the slab is not itself a cost -- it moves
-    more halo bytes but through 2 neighbours rather than 6, and latency wins;
-    see the Stage 0 measurements in ``docs/multigrid_preconditioner_plan.md``.
-    Its liability is the rank ceiling and the halo volume, both of which bite
+    more halo bytes but through 2 neighbours rather than 6, and latency wins
+    (measured on one MI300A node at 128³ with
+    ``examples/decomposition_baseline.py``: the slab's halo exchange took
+    0.75-0.90x the time of a 3D Cartesian split at 2-16 ranks while moving up
+    to 2.23x the bytes; see ``docs/multigrid_preconditioner_plan.md``). Its
+    liability is the rank ceiling and the halo volume, both of which bite
     only where messages stop being latency-bound.
+
+    One V-cycle on level ``l`` (grid spacing ``2^l h``, operator ``K_l`` the
+    uniform reference operator rediscretised there, ``D_l`` its diagonal)
+    applied to ``r_l`` computes, starting from ``z_l = 0``:
+
+    1. ``ν`` damped-Jacobi pre-smoothing sweeps
+       ``z_l ← z_l + ω D_l⁻¹ (r_l - K_l z_l)``;
+    2. restriction of the residual, ``r_{l+1} = R (r_l - K_l z_l)``, with
+       ``R = Pᵀ`` the adjoint of multilinear prolongation ``P``
+       (:class:`muGrid.GridTransfer`);
+    3. the coarse correction ``z_{l+1}`` by a recursive V-cycle, or on the
+       coarsest level exactly by the block-Fourier pseudo-inverse of
+       :func:`make_reference_stiffness_preconditioner`;
+    4. ``z_l ← z_l + P z_{l+1}``;
+    5. ``ν`` post-smoothing sweeps as in 1.
+
+    The constant translations (the null space of the periodic ``Kʳᵉᶠ``) are
+    removed from ``r`` before and from ``z`` after the cycle. Damped Jacobi is
+    stable for ``0 < ω < 2/λ_max(D⁻¹K)``; ``ω`` is set from a power-iteration
+    estimate of ``λ_max`` on the coarsest level, which equals that of every
+    level because ``D`` and ``K`` scale with the same power of ``h``. Cost per
+    apply: ``O(N)`` operator applies (``2ν + 1`` per level, geometric in the
+    level size) plus one small FFT solve; communication is nearest-neighbour
+    halo exchange per level.
 
     The cycle runs on the **uniform** reference operator only, so no material
     field is ever restricted and every level is a plain rediscretisation of
@@ -1640,7 +1790,7 @@ class MultigridReferencePreconditioner(Preconditioner):
 
     The preconditioner is a **fixed** linear operator — a fixed cycle count and
     a fixed number of smoothing steps, with symmetric pre- and post-smoothing
-    and ``R = Pᵀ`` — because plain CG requires ``M⁻¹`` to be symmetric positive
+    and ``R = Pᵀ`` — because plain CG requires ``M`` to be symmetric positive
     definite. Do not replace the cycle count by an inner convergence test; that
     would make the preconditioner non-linear and require a flexible Krylov
     method.
@@ -1657,8 +1807,11 @@ class MultigridReferencePreconditioner(Preconditioner):
         Uniform reference Lamé parameters. The volume means of the actual
         material are the usual choice, as in ``examples/homogenization.py``.
     communicator : muGrid.Communicator, optional
-        Communicator of the parallel run. MPI is not yet supported; passing a
-        communicator of size > 1 raises.
+        Communicator of the parallel run. The cycle is serial: a communicator
+        of size > 1, or a decomposition with more than one subdivision,
+        raises :class:`NotImplementedError`. A distributed cycle requires
+        nested power-of-two subdivisions pinned across levels and a redundant
+        coarsest level.
     element : muGrid.FEMElement, optional
         Finite element, default Q1. P1 in 2D is rejected by the smoother (see
         :class:`_MultigridLevel`).
@@ -1669,7 +1822,7 @@ class MultigridReferencePreconditioner(Preconditioner):
         Smallest coarse grid to coarsen towards. Convergence is insensitive to
         this over a wide range, so the choice is a parallel one; default 32.
     nu : int, optional
-        Pre- and post-smoothing steps per level (equal, to keep ``M⁻¹``
+        Pre- and post-smoothing steps per level (equal, to keep ``M``
         symmetric). Default 2.
     omega : float, optional
         Jacobi damping. Default ``1.7 / λ_max(D⁻¹K)``, measured by power
@@ -1681,6 +1834,22 @@ class MultigridReferencePreconditioner(Preconditioner):
         alone) if the cycle turns out too weak; it stays linear and symmetric.
     timer : muTimer.Timer, optional
         When given, :meth:`apply` records ``"vcycle"`` and ``"coarse"``.
+    dtype : data-type, optional
+        Precision of the level work fields, ``np.float64`` (default) or
+        ``np.float32``.
+    name : str, optional
+        Prefix for the per-level work fields.
+
+    Raises
+    ------
+    NotImplementedError
+        For a distributed decomposition or communicator (see
+        `communicator`); from :meth:`apply` when the fields live on a device,
+        because :class:`muGrid.GridTransfer` has host kernels only; and for
+        2D P1 elements (see :class:`_MultigridLevel`).
+    ValueError
+        If fewer than two levels are possible, or `nb_levels` does not divide
+        the grid.
     """
 
     #: ω = SAFETY / λ_max(D⁻¹K). The measured optimum is 1.7 across
@@ -1698,9 +1867,9 @@ class MultigridReferencePreconditioner(Preconditioner):
 
         if element is None:
             element = _muGrid.FEMElement.q1
-        # The decomposition is the reliable signal: a parallel one without a
-        # communicator argument used to slip through and run the serial
-        # algorithm with rank-local reductions.
+        # Check the decomposition, not only the communicator argument: a
+        # parallel decomposition passed without a communicator would otherwise
+        # run the serial algorithm with rank-local reductions.
         distributed = int(np.prod(list(decomposition.nb_subdivisions))) > 1
         if distributed or (communicator is not None and communicator.size > 1):
             raise NotImplementedError(
@@ -1834,7 +2003,7 @@ class MultigridReferencePreconditioner(Preconditioner):
         level.smooth(self.nu, self.omega)
 
     def apply(self, r, z):
-        """``z = M⁻¹ r``."""
+        """``z = M r``: ``nb_cycles`` V-cycles from ``z = 0``."""
         if self._on_device:
             # Everything else in the cycle runs on the device; the two grid
             # transfers do not, because GridTransfer declares host-space
@@ -1892,8 +2061,8 @@ def _mpi_is_gpu_aware():
     the MPI library's own report through the OpenMPI extension. That probe
     cannot see Cray MPICH's switch, ``MPICH_GPU_SUPPORT_ENABLED=1``, which is
     what makes that MPI accept device memory, so with the variable unset it
-    counts as a yes too. An older ``_muGrid`` without the property falls back
-    to the variable alone, read as the C++ side reads it.
+    counts as a yes too. A ``_muGrid`` that does not expose the property
+    falls back to the variable alone, read as the C++ side reads it.
     """
     from .Wrappers import _muGrid
 
@@ -1912,8 +2081,8 @@ def _mpi_is_gpu_aware():
 #: double, 4.6e-7 in single) and a singular one at 6e-4 and above, so this sits
 #: a couple of orders clear of each in single and ten or more in double. It is
 #: deliberately *not* an absolute number -- the hybrid runs at complex64
-#: whenever the solver does, where the 1e-8 this used to carry is below the
-#: noise floor and condemns healthy blocks by the hundred.
+#: whenever the solver does, where an absolute threshold such as 1e-8 is below
+#: the rounding noise of a healthy block and would reject them by the hundred.
 _INVERSE_RESIDUAL_EPS = 1e3
 
 
@@ -1924,19 +2093,18 @@ def _batched_inverse(matrices, xp=np, singular_mode=None):
     built along the distributed axis inherits the reference operator's rigid
     translation and may therefore be singular. Its inverse is set to zero --
     unconditionally, whether or not that particular matrix turned out to be
-    invertible, because nothing reads it either way -- rather than approximated,
-    which is what
-    :func:`make_reference_stiffness_preconditioner` does with the same block at
-    ``q = 0``, and is safe here for a stronger reason: :meth:`apply` replaces
-    that mode's entire solve with :meth:`_solve_zero_mode`, so nothing computed
-    from it is ever read. Passing ``None`` states that no mode may be singular.
+    invertible. :func:`make_reference_stiffness_preconditioner` sets the same
+    block at ``q = 0`` to zero as its pseudo-inverse; here zero is safe for a
+    stronger reason: :meth:`apply` replaces that mode's entire solve with
+    :meth:`_solve_zero_mode`, so nothing computed from it is ever read.
+    Passing ``None`` states that no mode may be singular.
 
     What this deliberately does not do is *discover* the singular mode by the
     size of its residual and repair it with a pseudo-inverse. That is the trap
-    :meth:`_build_zero_mode` documents -- a pseudo-inverse separates kernel from
-    range by a magnitude threshold, and at complex64 the threshold that used to
-    live here sat below the rounding noise of a perfectly healthy block, so it
-    fired on hundreds of them and replaced each one, in a Python loop, with a
+    :meth:`HybridFourierTridiagonalPreconditioner._build_zero_mode` documents
+    -- a pseudo-inverse separates kernel from range by a magnitude threshold,
+    and at complex64 a threshold below the rounding noise of a healthy block
+    fires on hundreds of them, each then replaced (in a Python loop) by a
     pseudo-inverse computed at that same precision.
 
     Everything else is verified instead: a mode that is singular and not
@@ -2077,7 +2245,8 @@ def _z_coupling_blocks(dim, grid_spacing, element, lambda_ref, mu_ref,
                           angular=True)
 
 
-#: Deprecated private spelling; kept so existing callers keep working.
+#: Alias of :func:`reference_stencil` under its private spelling, for callers
+#: that import that name. Deprecated.
 _reference_stencil = reference_stencil
 
 
@@ -2352,7 +2521,7 @@ extern "C" __global__ void __launch_bounds__(THREADS) block_thomas(
 #: block and a right-hand side in registers. Measured on MI300A, 3D, double,
 #: 64-thread blocks with __launch_bounds__ (no spills at any chunk), ms per
 #: sweep at 128^3 / 256^3: chunk 1 0.179 / 0.946, chunk 2 0.167 / 0.907,
-#: chunk 4 0.169 / 0.918, chunk 8 0.185 / 0.909; the original single-step
+#: chunk 4 0.169 / 0.918, chunk 8 0.185 / 0.909; an unchunked single-step
 #: kernel at 256-thread blocks 0.398 / 1.292. Past 2 the extra registers buy
 #: nothing, and 2 needs 200 -- within NVIDIA's 255 as well.
 _BLOCK_THOMAS_CHUNK = 2
@@ -2423,6 +2592,45 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     Per apply this exchanges only interface planes -- ``2 * dim`` complex numbers
     per mode per rank -- against an all-to-all of the entire field.
 
+    In formulas: let ``z`` be the last axis (distributed over ``P`` ranks,
+    ``N_z`` planes, ``n_z = N_z / P`` per rank) and ``q`` the frequencies of
+    the other, rank-local axes. After the real FFT over those axes, the
+    reference operator for each ``q`` is the periodic block-tridiagonal
+    system
+
+        ``A₀(q) v_{k+1} + A₁(q) v_k + A₂(q) v_{k-1} = r̂_k(q)``,
+        ``k = 0 … N_z - 1`` (indices mod ``N_z``),
+
+    with the ``d × d`` coupling blocks ``A_m(q)`` (:func:`stencil_symbol`
+    with ``offset_axis``). Per rank and mode:
+
+    1. **Block-Thomas** on the rank's ``n_z`` planes without the periodic or
+       inter-rank coupling: ``D₀ = A₁``, ``D_k = A₁ - A₂ D_{k-1}⁻¹ A₀``,
+       forward ``y_k = r̂_k - A₂ D_{k-1}⁻¹ y_{k-1}``, backward
+       ``v_k = D_k⁻¹ (y_k - A₀ v_{k+1})``; ``O(d³ n_z)`` per mode. The
+       factors ``D_k⁻¹`` are computed once at setup; the recursion is a
+       fixed-point iteration in ``k``, so only the first
+       :attr:`HEAD_LENGTH` are stored except for the slowly converging
+       modes.
+    2. **Interface (Spike) system** for the ``2d`` end-plane unknowns per
+       rank, which couples rank ``p`` to ``p ± 1`` cyclically. For a
+       power-of-two ``P`` it is solved by **parallel cyclic reduction** in
+       ``log₂ P`` neighbour exchanges (see :meth:`_build_pcr`); otherwise its
+       ``2dP × 2dP`` inverse per mode is assembled at setup and applied after
+       an all-gather.
+    3. A second block-Thomas sweep with the right-hand side corrected at the
+       two end planes by the neighbours' interface values.
+    4. The ``q = 0`` mode, whose operator is singular (constant
+       translations), is solved separately on its gathered ``N_z``-line by a
+       deflated dense inverse projected onto the complement of the null space
+       (see :meth:`_build_zero_mode`).
+
+    Cost per apply: two batched real FFTs over the local axes,
+    ``O(N log N)`` with no inter-rank communication, two ``O(d² N)``
+    tridiagonal sweeps, and ``log₂ P + 1`` interface exchanges of
+    ``O(d N / N_z)`` values each. Setup is ``O(d³ N / P)`` per rank for the
+    factors and spikes.
+
     Host and device are the same code: the array module follows the
     decomposition, so ``numpy`` and ``cupy`` take the identical path. Only the
     interface exchange can differ: device buffers go to MPI directly when it is
@@ -2439,13 +2647,31 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     grid_spacing : sequence of float
         Grid spacing, one entry per direction.
     lambda_ref, mu_ref : float
-        Uniform reference Lame parameters; normally the volume means.
+        Uniform reference Lamé parameters; normally the volume means.
     communicator : muGrid.Communicator, optional
+        Communicator of the parallel run; its ``mpi4py_comm`` carries the
+        interface exchanges. Default: a serial communicator.
     element : muGrid.FEMElement, optional
         Default Q1.
     timer : muTimer.Timer, optional
         When given, :meth:`apply` records ``"fft"``, ``"tridiag"``,
         ``"interface"`` and ``"ifft"``.
+    dtype : data-type, optional
+        Real precision of the solve, ``np.float64`` (default) or
+        ``np.float32``; the per-mode blocks and factors are complex128 or
+        complex64 accordingly.
+    name : str, optional
+        Name of the preconditioner (stored, used for nothing else).
+
+    Raises
+    ------
+    ValueError
+        If the decomposition is not a slab, the distributed axis does not
+        divide evenly among the ranks, the ranks are not ordered along it, or
+        a rank holds fewer than two planes.
+    RuntimeError
+        If a Fourier block other than the ``q = 0`` one is singular, or the
+        spike blocks differ between ranks.
     """
 
     def __init__(self, decomposition, grid_spacing, lambda_ref, mu_ref,
@@ -2754,11 +2980,12 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         return out.reshape(rhs.shape)
 
     #: Route the device sweep through the compiled kernel in libmuGrid rather
-    #: than the CuPy one built here. Both implement the same recurrence; the
-    #: compiled one shares its source tree with the host kernel and needs no
-    #: runtime compilation, but the CuPy one is what has been measured on
-    #: hardware, so it stays the default until the compiled path has been run
-    #: on a device. `test_hybrid_device_matches_host` is what settles that.
+    #: than the CuPy one built here (``MUGRID_BLOCK_THOMAS_COMPILED=1``). Both
+    #: implement the same recurrence; the compiled one shares its source tree
+    #: with the host kernel and needs no runtime compilation. The CuPy kernel
+    #: is the default because its performance is the one measured on hardware
+    #: (see _BLOCK_THOMAS_CHUNK); `test_hybrid_device_matches_host` checks
+    #: that the two agree.
     _USE_COMPILED_DEVICE_SWEEP = os.environ.get(
         "MUGRID_BLOCK_THOMAS_COMPILED", "") not in ("", "0")
 
@@ -2863,7 +3090,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         right-hand sides to exchange per apply.
 
         Writing the system as ``u_p + A u_{p-s} + C u_{p+s} = x_p`` with stride
-        ``s = 2^k``, one elimination step against the neighbours at ``±s`` gives
+        ``s = 2^k``, one elimination step against the neighbours at ``±s`` gives::
 
             D       = I - A C - C A
             A'      = -D^-1 A^2 ,   C' = -D^-1 C^2
@@ -2935,11 +3162,12 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         slab's first and last plane. Both are linear in the values the
         interface step starts from, through operators that do not change
         between applies, so multiplying ``A2`` and ``A0`` through once here
-        leaves apply() one batched product per end where it had an einsum, a
+        leaves apply() one batched product per end instead of an einsum, a
         reshape, two index selections and two products. On a GPU every one of
         those is a kernel launch, and launches -- not arithmetic -- are what
-        the interface step costs there: 0.35 ms per apply at 32^3 and 0.42 ms
-        at 128^3 on one MI300A, with no MPI involved at all.
+        the interface step costs there (measured for the unfolded form: 0.35 ms
+        per apply at 32^3 and 0.42 ms at 128^3 on one MI300A, with no MPI
+        involved at all).
         """
         xp, dim = self._xp, self.dim
         A0, A2 = self.A[0], self.A[2]
@@ -3145,7 +3373,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     # -- the preconditioner ------------------------------------------------- #
 
     def apply(self, r, z):
-        """``z = M⁻¹ r``."""
+        """``z = M r``."""
         with self._on_own_device():
             self._apply(r, z)
 
@@ -3160,11 +3388,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         muGrid stores fields component-fastest on the host (``(nz, ..., y, x,
         dim)`` in memory) and component-slowest on a device (``(dim, nz, ...,
-        y, x)``); either way ``x`` varies fastest of the spatial axes. The
-        transforms used to run in the logical ``(x, y)`` order instead, over
-        axes that were neither trailing nor contiguous, which no single batched
-        plan describes: on MI300A at 256^3 they cost twice the reference
-        preconditioner's full 3D transform. Following memory order, the copy
+        y, x)``); either way ``x`` varies fastest of the spatial axes.
+        Transforming in the logical ``(x, y)`` order instead runs over axes
+        that are neither trailing nor contiguous, which no single batched plan
+        describes (measured on MI300A at 256^3: twice the cost of the reference
+        preconditioner's full 3D transform). Following memory order, the copy
         into the transform buffer moves at most whole planes (the device
         layout's component and ``z`` blocks change places), and on the host
         nothing at all but the ghost layers it drops.
@@ -3241,6 +3469,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             # in the same memory order as `out`: an elementwise copy walks its
             # output in logical order, and z's logical order (dim, x, y, z) is
             # the opposite of its memory order, so `z.p[...] = out.transpose()`
-            # put neighbouring threads far apart on both sides -- 8 ms per
-            # apply at 256^3 on MI300A, three times the inverse FFT itself.
+            # would put neighbouring threads far apart on both sides (measured:
+            # 8 ms per apply at 256^3 on MI300A, three times the inverse FFT
+            # itself).
             xp.asarray(z.p).transpose(perm)[...] = out

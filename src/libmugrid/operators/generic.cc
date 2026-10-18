@@ -1,12 +1,12 @@
 /**
- * @file   gradient_operator_default.cc
+ * @file   generic.cc
  *
  * @author Till Junge <till.junge@altermail.ch>
  * @author Martin Ladecký <m.ladecky@gmail.com>
  *
  * @date   23 Jun 2020
  *
- * @brief  Implementation of member functions for the default gradient operator
+ * @brief  Implementation of member functions of GenericLinearOperator
  *
  * Copyright © 2020 Till Junge, Martin Ladecký
  *
@@ -631,9 +631,9 @@ namespace muGrid {
         }
 
         // The symbol of an operator with several outputs, quadrature points
-        // or inputs is a matrix; summing its entries into one number (as this
-        // did) mixes unrelated components -- the x- and y-derivatives of a
-        // gradient cancel. Only the scalar case has a scalar symbol.
+        // or inputs is a matrix; summing its entries into one number would
+        // mix unrelated components -- the x- and y-derivatives of a gradient
+        // cancel. Only the scalar case has a scalar symbol.
         if (this->nb_output_components_ * this->nb_quad_pts_ *
                 this->nb_pixel_input_components_ !=
             1) {
@@ -679,7 +679,9 @@ namespace muGrid {
                 }
             }
 
-            // Accumulate: operator_sum * exp(2πi * arg)
+            // Accumulate: operator_sum * exp(2πi * arg), i.e. the symbol
+            // sum_s c_s exp(2πi q·s) of the correlation (B u)_p =
+            // sum_s c_s u_{p+s}
             s += operator_sum * std::exp(Complex(0.0, 2.0 * pi * arg));
         }
 

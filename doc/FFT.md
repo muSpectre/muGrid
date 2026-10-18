@@ -1,240 +1,206 @@
 # FFT Engine Design
 
-This document describes the design and implementation decisions for the muGrid FFT engine.
-
-## Overview
-
-The FFT engine provides distributed Fast Fourier Transform operations on structured grids with MPI parallelization. It uses pencil decomposition for efficient scaling to large numbers of MPI ranks.
-
-## Storage Order
-
-### Array of Structures (AoS) vs Structure of Arrays (SoA)
-
-muGrid supports two storage orders for multi-component fields:
-
-- **AoS (Array of Structures)**: Components are interleaved per pixel
-  - Memory layout: `[c0p0, c1p0, c2p0, c0p1, c1p1, c2p1, ...]`
-  - Used on **CPU** (default for `HostSpace`)
-  - Stride between consecutive X elements = `nb_components`
-  - Component offset = `comp` (component index)
-
-- **SoA (Structure of Arrays)**: Components are stored in separate contiguous blocks
-  - Memory layout: `[c0p0, c0p1, c0p2, ..., c1p0, c1p1, c1p2, ...]`
-  - Used on **GPU** (default for `CUDASpace` and `ROCmSpace`)
-  - Stride between consecutive X elements = 1
-  - Component offset = `comp * nb_pixels`
-
-### Why Different Storage Orders?
-
-- **GPU (SoA)**: Coalesced memory access is critical for GPU performance. When threads access consecutive memory locations, the hardware can combine multiple accesses into a single transaction. SoA ensures that threads processing different pixels of the same component access contiguous memory.
-
-- **CPU (AoS)**: Cache locality for multi-component operations. When processing a single pixel, all its components are in the same cache line.
-
-### Design Decision: Work Buffers Match Memory Space
-
-**Key Design Decision**: FFT work buffers use the same storage order as the memory space they reside in (SoA on GPU, AoS on CPU). This avoids expensive storage order conversions during FFT operations.
-
-The FFT engine detects the storage order of input/output fields using `field.get_storage_order()` and computes the appropriate strides for each buffer.
-
-## Stride Calculations
-
-### 2D Case
-
-For a 2D field with dimensions `[Nx, Ny]` and `nb_components` components:
-
-**SoA strides:**
-```
-comp_offset_factor = nb_pixels        // Component i starts at i * nb_pixels
-x_stride = 1                          // Consecutive X elements are contiguous
-row_dist = row_width                  // Distance between rows (Y direction)
-```
-
-**AoS strides:**
-```
-comp_offset_factor = 1                // Component i starts at offset i
-x_stride = nb_components              // Skip over all components between X elements
-row_dist = row_width * nb_components  // Distance between rows includes all components
-```
-
-### 3D Case
-
-For a 3D field with dimensions `[Nx, Ny, Nz]`:
-
-**SoA strides:**
-```
-comp_offset_factor = nb_pixels
-x_stride = 1
-y_dist = row_x
-z_dist = row_x * rows_y
-```
-
-**AoS strides:**
-```
-comp_offset_factor = 1
-x_stride = nb_components
-y_dist = row_x * nb_components
-z_dist = row_x * rows_y * nb_components
-```
-
-## GPU Backend Limitations
-
-### cuFFT Strided R2C/C2R Limitation
-
-cuFFT has a documented limitation: **strided real-to-complex (R2C) and complex-to-real (C2R) transforms are not supported**. The stride on the real data side must be 1.
-
-This affects multi-component FFTs because with AoS storage, the stride between consecutive real values would be `nb_components` (not 1).
-
-**Solution**: With SoA storage order on GPU, each component's data is contiguous (stride = 1), which satisfies cuFFT's requirement. The FFT engine loops over components, executing one batched FFT per component.
-
-### rocFFT Native API
-
-Unlike cuFFT, rocFFT's native API (`rocfft_plan_description_set_data_layout()`) supports arbitrary strides for both input and output. However, for consistency and to avoid storage order conversions, we use the same SoA approach on AMD GPUs.
-
-## MPI Parallel FFT Design
-
-### Pencil Decomposition
-
-For 3D distributed FFT with a `P1 x P2` process grid (Z distributed across
-P1, Y across P2 in real space), the engine uses a true pencil decomposition:
-
-1. **Z-pencil** `[Fx, Ny/P2, Nz/P1]`: FFT along X (r2c)
-2. **Y-pencil** `[Fx/P2, Ny, Nz/P1]`: Transpose X<->Y within the row
-   communicator (scatter X across P2, gather Y), then FFT along Y (c2c)
-3. **X-pencil** `[Fx/P2, Ny/P1, Nz]`: Transpose Y<->Z within the column
-   communicator (scatter Y across P1, gather Z), then FFT along Z (c2c)
-
-Each rank holds O(N³/P) data at every stage; no dimension is ever
-replicated across ranks. The X-pencil is the final Fourier-space layout: X
-distributed across P2, Y across P1, Z full.
-
-### Transpose Operations
-
-The `Transpose` class handles MPI all-to-all communication for
-redistributing data between pencil orientations. Every transpose is a
-genuine scatter-gather: each rank sends a disjoint block to every peer and
-receives into a disjoint block, as required by the MPI standard for
-`MPI_Alltoallw`. Both AoS (host) and SoA (device) storage orders are
-supported; the engine threads the storage order of the fields through to
-the datatype construction.
-
-### Communication Efficiency
-
-**Design Decision**: MPI communication does not require explicit packing
-and unpacking. Non-contiguous blocks are described with MPI derived
-datatypes (`MPI_Type_create_subarray` for the spatial block,
-`MPI_Type_contiguous`/`MPI_Type_create_hvector` for AoS/SoA components) and
-communicated with a single `MPI_Alltoallw` per transpose. Because only MPI
-intrinsics touch the data buffers, the same code path operates directly on
-device memory with a GPU-aware MPI implementation — responsibility for
-packing lands on the MPI library, which can use specialized device kernels
-or staging as appropriate.
-
-## Algorithm: Forward 2D FFT
-
-```
-1. r2c FFT along X for each component
-   - Input: real field (with ghosts)
-   - Output: work buffer (half-complex, no ghosts)
-   - Loop over components, batched over Y rows
-
-2. [MPI only] Transpose X<->Y
-   - Redistributes data across ranks
-   - Changes from Y-local to X-local
-
-3. c2c FFT along Y for each component
-   - In-place on work buffer (serial) or output (MPI)
-   - Batched over X values
-
-4. [Serial only] Copy work to output
-   - Same storage order, direct copy
-```
-
-## Algorithm: Forward 3D FFT
-
-```
-1. r2c FFT along X for each component
-   - Input: real field
-   - Output: Z-pencil work buffer (half-complex in X)
-   - Batched over Y rows for each Z plane
-
-2a. [MPI, P2 > 1] Transpose X<->Y (row communicator)
-    - Z-pencil [Fx, Ny/P2, Nz/P1] to Y-pencil [Fx/P2, Ny, Nz/P1]
-    - Scatter X across P2, gather Y
-    - (P2 == 1: plain copy, shapes are identical)
-
-2b. c2c FFT along Y for each component
-    - On Y-pencil buffer
-    - Batched over local X values per Z plane
-
-3. [MPI, P1 > 1] Transpose Y<->Z (column communicator)
-   - Y-pencil [Fx/P2, Ny, Nz/P1] to X-pencil [Fx/P2, Ny/P1, Nz] (output)
-   - Scatter Y across P1, gather Z
-   - (P1 == 1: plain copy, shapes are identical)
-
-4. c2c FFT along Z for each component
-   - On output buffer
-   - Batched over local (X, Y) positions
-
-5. [Serial only] Copy work to output
-```
-
-## Per-Component Looping
-
-Instead of attempting to batch across components (which would require non-unit strides on GPU), the FFT engine loops over components:
-
-```cpp
-for (Index_t comp = 0; comp < nb_components; ++comp) {
-    Index_t in_comp_offset = comp * in_comp_factor;
-    Index_t out_comp_offset = comp * work_comp_factor;
-    backend->r2c(Nx, batch_size,
-                 input_ptr + in_base + in_comp_offset,
-                 in_x_stride, in_row_dist,
-                 work_ptr + out_comp_offset,
-                 work_x_stride, work_row_dist);
-}
-```
-
-This approach:
-- Satisfies cuFFT's unit-stride requirement for R2C/C2R
-- Allows efficient batching within each component
-- Works correctly for both SoA and AoS storage orders
-- Has minimal overhead (one kernel launch per component)
-
-## Testing the Axis-by-Axis Paths
-
-Both production backends (pocketfft, cuFFT/rocFFT) report `supports_nd() ==
-true`, so the serial engine always takes the single N-D backend call and the
-MPI engine always tries the slab fast path first. The per-axis fallbacks (1D
-r2c along X, then c2c along Y and Z through the work buffers, and the general
-pencil path with the X<->Y transpose) are therefore dead code in a normal run.
-
-Setting the environment variable `MUGRID_FFT_NO_ND=1` before constructing a
-host `FFTEngine` swaps in `PocketFFTAxisBackend`, a `PocketFFTBackend` that
-hides its N-D entry points. Results are identical (the 1D primitives are the
-same), but the engine runs the fallback paths, and `engine.backend_name`
-reports `PocketFFT (axis-by-axis)`. Single-precision transforms are only
-implemented on top of the N-D entry point and raise in this mode. CTest
-registers the FFT tests a second time with this variable set (the
-`*_fft_no_nd_*` tests), so every CI leg that runs `ctest` covers these paths.
-
-## Normalization
-
-Like FFTW and cuFFT, the transforms are **unnormalized**. A forward FFT followed by an inverse FFT multiplies the result by N (the transform size). Users must explicitly normalize if needed.
-
-## File Structure
-
-- `fft_engine.hh`: Template class `FFTEngine<MemorySpace>` with all transform implementations
-- `fft_engine_base.hh/cc`: Base class with field collections and transpose management
-- `fft_backend.hh`: Abstract interface for FFT backends (1D primitives plus optional N-dimensional transforms)
-- `pocketfft_backend.cc`: CPU backend using pocketfft
-- `cufft_backend.cc`: NVIDIA GPU backend using cuFFT
-- `rocfft_backend.cc`: AMD GPU backend using rocFFT
-- `transpose.hh/cc`: MPI transpose operations
-
-## Future Improvements
-
-1. **Batched multi-component GPU FFT**: For c2c transforms (which don't have the stride limitation), explore batching across all components in a single kernel launch.
-
-2. **deep_copy with storage order conversion**: Extend the `deep_copy` utility to optionally convert between AoS and SoA during the copy, enabling more flexible data movement.
-
-3. **GPU derived-datatype performance**: GPU-aware MPI implementations vary in how efficiently they handle derived datatypes on device memory (some use specialized pack kernels, others stage through host). If profiling shows the `MPI_Alltoallw` transposes dominate on a given system, consider a vendor multi-GPU FFT backend (cuFFTMp/heFFTe) as an alternative.
+Design notes for the muGrid FFT engine (`src/libmugrid/fft/`). The
+user-facing documentation — transform definitions, normalisation, frequency
+arrays and the choice between slab and pencil decomposition — is
+`docs/fft.md`. This document describes how the engine lays out data, which
+transform path it takes, and how the MPI transposes are implemented.
+
+Notation: grid $N_0 \times N_1 [\times N_2]$, half-complex extent
+$F_0 = \lfloor N_0/2 \rfloor + 1$, $n_c$ components per pixel, process grid
+$P = P_1 \times P_2$ (3D: axis 1 split over $P_2$, axis 2 over $P_1$; 2D:
+axis 1 split over $P_2 = P$).
+
+## Storage order
+
+A field with $n_c$ components on $M$ pixels (ghosts included) is stored in one
+of two layouts. With pixel index $p$ and component index $c$, the linear
+offset of entry $(c, p)$ is
+
+| Layout | Offset | Used for |
+|---|---|---|
+| Array of structures (AoS) | $c + n_c\,p$ | `HostSpace` (CPU) |
+| Structure of arrays (SoA) | $c\,M + p$ | `CUDASpace`, `ROCmSpace` (GPU) |
+
+- **SoA on the GPU.** Threads that process consecutive pixels of one component
+  access consecutive addresses, which the hardware coalesces into few memory
+  transactions. SoA also gives each component unit stride, which cuFFT
+  requires for real-to-complex (R2C) and complex-to-real (C2R) transforms:
+  cuFFT does not support strided real data for R2C/C2R.
+- **AoS on the CPU.** All components of a pixel share a cache line, which
+  suits kernels that operate on whole per-pixel vectors or tensors.
+
+The engine's FFT work buffers and the MPI transposes use the storage order of
+the memory space they live in, so no transform ever converts between layouts.
+The engine verifies once, at construction, that its real-space and
+Fourier-space collections share a storage order; `fft()`/`ifft()` only accept
+fields from these collections, so every transform sees a single layout.
+
+## Strides
+
+For a buffer of extent $L_0 \times L_1 [\times L_2]$ (ghosts included) with
+$M = \prod_\alpha L_\alpha$ pixels, the element strides are
+
+| | component | axis 0 | axis 1 | axis 2 |
+|---|---|---|---|---|
+| AoS | $1$ | $n_c$ | $n_c L_0$ | $n_c L_0 L_1$ |
+| SoA | $M$ | $1$ | $L_0$ | $L_0 L_1$ |
+
+The first interior pixel sits at pixel offset
+$g_0 + g_1 L_0 + g_2 L_0 L_1$ for left ghost counts $g_\alpha$. The backends
+receive these strides directly, so ghosted real-space fields are transformed
+without repacking.
+
+### Ghost padding along axis 0
+
+GPU backends require the real array of an R2C/C2R transform to be aligned like
+a complex array (16 bytes for double precision). The base pointer of each
+transformed row is offset from the aligned allocation by
+$g_0 + i\,L_0$ (plus multiples of $L_0 L_1$) real values, which stays aligned
+iff both $g_0$ and $L_0$ are even. The engine therefore increases the left
+ghost count along axis 0 to the next even number and adds one right ghost
+layer if $L_0$ would otherwise be odd. Host engines are padded identically so
+that host and device engines with equal parameters produce identical buffer
+layouts. Axis 0 is never distributed, so the padding is the same on every
+rank. The extra layers contain valid communicated ghost data.
+
+## Backends
+
+`FFTBackend` (`fft_backend.hh`) declares batched one-dimensional primitives
+
+- `r2c(n, batch, in, in_stride, in_dist, out, out_stride, out_dist)`,
+- `c2r(...)`, `c2c_forward(...)`, `c2c_backward(...)`,
+
+in double and single precision, and optional planned $d$-dimensional
+transforms `r2c_nd`/`c2r_nd` over an arbitrary strided shape with a list of
+transformed axes (the half-complex axis last), reported by `supports_nd()`.
+pocketfft, cuFFT and rocFFT all implement the $d$-dimensional entry points.
+
+A backend that cannot plan a particular layout (observed with rocFFT for some
+batched, strided, ghost-padded real transforms) throws `FFTPlanUnsupported`
+before writing any output. The engine then falls back to the axis-by-axis path
+for that grid and remembers the outcome, so later transforms skip the attempt.
+Any other exception (e.g. out of memory) propagates.
+
+rocFFT's native API (`rocfft_plan_description_set_data_layout`) accepts
+arbitrary strides on both sides; the engine nevertheless uses the same SoA
+layout on AMD and NVIDIA GPUs so that one device code path serves both.
+
+## Transform paths
+
+The forward transform takes the first applicable path below; the inverse runs
+the same steps in reverse order with C2R in place of R2C.
+
+1. **Serial, $d$-dimensional.** If the whole grid is local and the backend
+   supports $d$-dimensional transforms, one planned R2C transform over all
+   $d$ axes is issued, with the component axis as a non-transformed batch axis
+   and input/output strides folded from the ghost and AoS/SoA layout. No work
+   buffer is used.
+
+2. **2D, MPI.** R2C along axis 0 into a work buffer of shape
+   $F_0 \times N_1/P$, an all-to-all on all $P$ ranks that scatters axis 0
+   and gathers axis 1 (result $F_0/P \times N_1$), then C2C along axis 1.
+
+3. **3D slab** ($P_2 = 1$). One planned 2D R2C transform of the local
+   $(x, y)$ planes per component, batched over the $N_2/P$ local planes and
+   written directly into the $F_0 \times N_1 \times N_2/P$ layout; an
+   all-to-all on all $P$ ranks that scatters axis 1 and gathers axis 2
+   (result $F_0 \times N_1/P \times N_2$); C2C along axis 2.
+
+4. **3D pencil** (general):
+
+   | stage | local shape | operation |
+   |---|---|---|
+   | Z-pencil | $F_0 \times N_1/P_2 \times N_2/P_1$ | R2C along axis 0 |
+   | Y-pencil | $F_0/P_2 \times N_1 \times N_2/P_1$ | all-to-all in the row communicator ($P_2$ ranks), then C2C along axis 1 |
+   | X-pencil | $F_0/P_2 \times N_1/P_1 \times N_2$ | all-to-all in the column communicator ($P_1$ ranks), then C2C along axis 2 |
+
+   When $P_2 = 1$ (resp. $P_1 = 1$) the corresponding all-to-all is a local
+   copy. Each rank holds $O(N/P)$ values at every stage; no axis is replicated.
+   The X-pencil layout is the Fourier-space layout of the engine.
+
+The 1D engine is serial; it issues one batched 1D R2C transform per component.
+
+The row communicator contains the ranks with equal $P_1$ coordinate and the
+column communicator the ranks with equal $P_2$ coordinate; ranks are numbered
+$r = p_2 P_1 + p_1$.
+
+### Component batching
+
+On the axis-by-axis and slab paths the engine issues one batched transform per
+component (batched over rows or planes), rather than one transform batched over
+components. With SoA storage each component is then a unit-stride array, which
+satisfies cuFFT's R2C/C2R constraint; with AoS storage the component offset is
+simply the starting address. The cost is $n_c$ backend calls instead of one;
+the serial $d$-dimensional path batches over components in a single call.
+
+## MPI transposes
+
+`Transpose` (`transpose.hh/.cc`) redistributes a block that is distributed
+along `axis_in` and complete along `axis_out` into one that is distributed
+along `axis_out` and complete along `axis_in`. Both axes are split into
+contiguous blocks whose sizes differ by at most one between ranks. Every rank
+sends a disjoint block to each peer and receives into a disjoint block.
+
+- **Host memory:** one `MPI_Alltoallw` per transpose. Each peer's block is
+  described by a derived datatype — `MPI_Type_create_subarray` for the spatial
+  block combined with `MPI_Type_contiguous` (AoS) or `MPI_Type_create_hvector`
+  (SoA) for the components — so there is no explicit pack/unpack buffer and
+  the MPI library performs the strided access. Setting
+  `MUGRID_STAGED_TRANSPOSE=1` selects the contiguous-staging exchange below on
+  the host as well.
+- **Device memory:** each peer's block is gathered into a cached contiguous
+  device staging buffer, exchanged with non-blocking `MPI_Isend`/`MPI_Irecv`
+  to every peer and a single `MPI_Waitall`, and scattered on the receiver. MPI
+  implementations pack strided datatypes on device memory block by block,
+  which is much slower than a device-side gather kernel.
+
+Both paths serialise blocks identically. The element datatype is
+`MPI_C_DOUBLE_COMPLEX` or `MPI_C_FLOAT_COMPLEX` (the C types are used because
+the Fortran `MPI_DOUBLE_COMPLEX` may be `MPI_DATATYPE_NULL` on MPI builds
+without Fortran support). Whether device buffers are handed to MPI directly or
+staged through host memory depends on GPU-aware-MPI detection; see the
+"GPU data and MPI" section of `docs/gpu.md`.
+
+## Testing the axis-by-axis paths
+
+pocketfft, cuFFT and rocFFT all support $d$-dimensional transforms, so a
+normal run takes path 1 in serial and path 3 for slab decompositions; the
+per-axis serial path and the slab fallback are otherwise reached only when a
+backend rejects a plan. Setting `MUGRID_FFT_NO_ND=1` before constructing a
+host `FFTEngine` substitutes `PocketFFTAxisBackend`, which hides the
+$d$-dimensional entry points of `PocketFFTBackend`. Results are bit-for-bit
+those of `PocketFFTBackend` (the 1D primitives are the same), the engine runs
+the per-axis paths in double and single precision, and `engine.backend_name`
+reports `PocketFFT (axis-by-axis)`. CTest registers the FFT tests a second
+time with this variable set (the `*_fft_no_nd_*` tests).
+
+## Normalisation
+
+Like FFTW, cuFFT and rocFFT, the transforms are unnormalised: `ifft(fft(u))`
+equals $\prod_\alpha N_\alpha\,u$. `normalisation` returns
+$1/\prod_\alpha N_\alpha$.
+
+## File structure
+
+- `fft_engine.hh`: `FFTEngine<MemorySpace>` with all transform paths
+- `fft_engine_base.hh/.cc`: process-grid setup, sub-communicators, field
+  collections, work buffers and transpose management
+- `fft_utils.hh/.cc`: Hermitian grid size, frequency helpers, process-grid
+  selection (`select_process_grid`), block distribution
+- `fft_backend.hh`: abstract backend interface (1D primitives, optional
+  $d$-dimensional transforms, `FFTPlanUnsupported`)
+- `fft_backend_traits.hh`: backend selection per memory space
+- `pocketfft_backend.hh/.cc`, `pocketfft/pocketfft_hdronly.h`: host backend
+  and the vendored pocketfft header
+- `gpu_fft_backend.hh`, `cufft_backend.hh/.cc`, `rocfft_backend.hh/.cc`: GPU
+  backends
+- `transpose.hh/.cc`: MPI transposes
+
+## Limitations
+
+- Device-side transforms on the axis-by-axis and slab paths are not batched
+  across components (see [Component batching](#component-batching)).
+- GPU-aware MPI implementations differ in how they move device memory. If the
+  transposes dominate on a given system, a vendor multi-GPU FFT library
+  (cuFFTMp, heFFTe) is an alternative that the engine does not support.

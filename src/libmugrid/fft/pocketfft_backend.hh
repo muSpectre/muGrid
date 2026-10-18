@@ -44,7 +44,11 @@ namespace muGrid {
  * PocketFFT implementation of FFT1DBackend.
  *
  * Uses the embedded pocketfft library (BSD-3 licensed) for CPU-based FFT.
- * This backend is always available and serves as the fallback for host memory.
+ * This backend is always available and is the backend for host memory.
+ * pocketfft factorises n into small radices and falls back to Bluestein's
+ * algorithm for large prime factors, so every length costs O(n log n).
+ * All transforms are called with scale factor 1, i.e. unnormalised (see
+ * FFT1DBackend).
  */
 class PocketFFTBackend : public FFT1DBackend {
  public:
@@ -68,7 +72,8 @@ class PocketFFTBackend : public FFT1DBackend {
                     Index_t out_stride, Index_t out_dist) override;
 
   // pocketfft transforms a whole multidimensional block in one call, so the
-  // serial engine can skip the axis-by-axis decomposition and the work buffer.
+  // serial engine and the MPI slab path can skip the axis-by-axis
+  // decomposition and the work buffer.
   bool supports_nd() const override { return true; }
 
   void r2c_nd(const std::vector<Index_t> & shape,

@@ -12,8 +12,9 @@
  * MPI_Type_create_hvector) with MPI_Alltoallw, avoiding explicit
  * pack/unpack buffers and letting MPI optimize the non-contiguous access.
  * Device transposes instead gather each peer's block into a contiguous
- * staging buffer, exchange flat messages pairwise, and scatter on the
- * receiver: MPI implementations pack strided datatypes on device memory
+ * staging buffer, exchange flat messages with non-blocking point-to-point
+ * MPI (MPI_Isend/MPI_Irecv to every peer, one MPI_Waitall), and scatter on
+ * the receiver: MPI implementations pack strided datatypes on device memory
  * block by block, which is orders of magnitude slower than a device-side
  * gather. Both paths support multi-component fields (AoS and SoA layouts)
  * and are wire-compatible with each other's block serialization.
@@ -76,6 +77,15 @@ namespace muGrid {
      * - Input: Data distributed along axis_in, full along axis_out
      * - Output: Data distributed along axis_out, full along axis_in
      *
+     * Both axes are split into contiguous blocks with sizes differing by at
+     * most one (first global % P ranks get one more). In forward(), rank s
+     * sends to rank r the block of its input that has rank r's slice of
+     * axis_out and all local entries of the other axes; rank r places it at
+     * rank s's slice of axis_in. The exchange is a permutation of the data:
+     * no arithmetic, exact in any precision. Each rank sends and receives
+     * O(N_local) elements in total (N_local = local grid size times
+     * nb_components), spread over P - 1 messages.
+     *
      * The transpose is a genuine scatter-gather: every rank sends a disjoint
      * block to every peer and receives into a disjoint block of the output.
      * All send and receive buffers are non-overlapping, as required by the
@@ -108,6 +118,10 @@ namespace muGrid {
          *                       device memory block by block, which is orders
          *                       of magnitude slower than a device-side gather
          *                       followed by a contiguous all-to-all.
+         * @param single_precision  True to transport Complex32 elements
+         *                       (MPI_C_FLOAT_COMPLEX) instead of Complex
+         *                       (MPI_C_DOUBLE_COMPLEX); selects which of the
+         *                       forward()/backward() overloads are valid.
          */
         Transpose(const Communicator & comm, const DynGridIndex & local_in,
                   const DynGridIndex & local_out, Index_t global_in,
@@ -142,7 +156,8 @@ namespace muGrid {
         }
 
         /**
-         * Perform backward transpose (reverse of forward).
+         * Perform backward transpose (exact inverse of forward: gather
+         * axis_out, scatter axis_in).
          *
          * @param input   Pointer to input complex data
          * @param output  Pointer to output complex data
@@ -193,8 +208,13 @@ namespace muGrid {
         /**
          * Build MPI datatype for a block in a multi-dimensional array.
          *
-         * For 2D array of shape [nx, ny] (column-major), extracts block at
-         * position [start_x, start_y] with size [block_x, block_y].
+         * For a 2D or 3D array in column-major order (axis 0 fastest),
+         * extracts the block at position block_start with size block_shape
+         * (MPI_Type_create_subarray, MPI_ORDER_FORTRAN). AoS: the subarray's
+         * element is nb_components contiguous complex values. SoA: a
+         * single-component subarray replicated nb_components times with a
+         * stride of one full local grid (MPI_Type_create_hvector). An empty
+         * block yields a zero-size type.
          *
          * @param local_shape   Full local array shape
          * @param block_shape   Shape of block to extract
@@ -223,7 +243,8 @@ namespace muGrid {
         /**
          * All-to-all through contiguous device staging buffers: gather each
          * peer's subarray block of `input` into a flat send buffer
-         * (one strided 2D copy per block), MPI_Alltoallv, scatter the flat
+         * (one strided 2D copy per block), exchange with MPI_Isend/MPI_Irecv
+         * to every peer (the self block is copied locally), scatter the flat
          * receive buffer into `output`. Block geometry: full extent in all
          * dimensions except `src_axis`/`dst_axis`, where peer r owns
          * `src_counts[r]` slices starting at `src_displs[r]`.
@@ -316,9 +337,9 @@ namespace muGrid {
         std::vector<int> recv_displs;
 #endif
 
-        //! Size in bytes of one transported element (one complex value times
-        //! nb_components is folded into the MPI datatype, so this is the size of
-        //! a single complex scalar: 16 for Complex, 8 for Complex32).
+        //! Size in bytes of one complex scalar: 16 for Complex, 8 for
+        //! Complex32. (The nb_components factor is folded into the MPI block
+        //! datatypes and the staging counts, not into this size.)
         std::size_t elem_size{sizeof(Complex)};
 #ifdef WITH_MPI
         //! MPI datatype of one complex scalar (MPI_C_DOUBLE_COMPLEX /
@@ -334,7 +355,7 @@ namespace muGrid {
         bool on_device{false};
 
         //! On the host, route the exchange through the contiguous-staging
-        //! Alltoallv path (explicit cache-friendly pack/unpack) instead of
+        //! path (explicit pack/unpack, see staged_alltoall) instead of
         //! MPI_Alltoallw with derived datatypes. Opt-in via the environment
         //! variable MUGRID_STAGED_TRANSPOSE=1.
         bool staged_host{false};
