@@ -430,8 +430,9 @@ class BlockFourierPreconditioner(Preconditioner):
     If the blocks are Hermitian to within :func:`_hermitian_tol` (decided
     collectively over all ranks), only the real diagonal and the complex
     upper triangle are stored, ``n²`` reals per mode instead of ``2n²``.
-    On a device with ``n <=`` :attr:`FUSED_MAX_COMPONENTS` the per-mode
-    product is one generated elementwise kernel.
+    On a device with ``n <=`` ``linalg.block_matvec_gpu_max_components``
+    the per-mode product is one compiled kernel (``linalg/block_matvec.hh``):
+    one pass over the blocks and the field, in place.
     """
 
     def __init__(self, engine, blocks, name="block-fourier-preconditioner",
@@ -527,87 +528,85 @@ class BlockFourierPreconditioner(Preconditioner):
         # Store the symbol at the solve precision (real diagonals, complex
         # off-diagonals / dense block): it is the largest persistent buffer, and
         # a single-precision solve should not carry a double-precision symbol.
+        #
+        # Each stored entry is one row of a flat (entries, nb_modes) buffer,
+        # with the modes in the memory order of a component plane of the work
+        # field -- x fastest on a device -- so that the compiled per-mode
+        # product (linalg/block_matvec.hh) indexes block and field with the
+        # same flat mode index. _diag, _off and _blocks are views of these
+        # buffers in the logical (*fourier_shape) layout, for the host loop.
+        fourier_shape = tuple(blocks.shape[2:])
+        nb_modes = int(np.prod(fourier_shape, dtype=np.int64))
+        plane = sample[0, 0]
+        self._mode_order = ("F" if plane.ndim > 1 and plane.flags.f_contiguous
+                            and not plane.flags.c_contiguous else "C")
+        order = self._mode_order
+
+        def flat_row(values, dtype):
+            return np.ravel(np.asarray(values), order=order).astype(
+                dtype, copy=False)
+
+        def logical(flat, lead):
+            if order == "F":
+                view = flat.reshape(lead + fourier_shape[::-1])
+                nlead = len(lead)
+                return view.transpose(
+                    tuple(range(nlead))
+                    + tuple(range(view.ndim - 1, nlead - 1, -1)))
+            return flat.reshape(lead + fourier_shape)
+
+        self._pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
         if self._hermitian:
-            diag = np.empty((n,) + blocks.shape[2:], dtype=real_dtype)
+            diag = np.empty((n, nb_modes), dtype=real_dtype)
             for i in range(n):
-                diag[i] = blocks[i, i].real
-            self._diag = xp.asarray(diag)
-            self._off = {
-                (i, j): xp.asarray(
-                    np.ascontiguousarray(blocks[i, j]).astype(complex_dtype))
-                for i in range(n)
-                for j in range(i + 1, n)
-            }
+                diag[i] = flat_row(blocks[i, i].real, real_dtype)
+            upper = np.empty((len(self._pairs), nb_modes), dtype=complex_dtype)
+            for p, (i, j) in enumerate(self._pairs):
+                upper[p] = flat_row(blocks[i, j], complex_dtype)
+            self._diag_flat = xp.asarray(diag)
+            self._upper_flat = xp.asarray(upper)
+            self._dense_flat = None
+            self._diag = logical(self._diag_flat, (n,))
+            self._off = {pair: logical(self._upper_flat[p], ())
+                         for p, pair in enumerate(self._pairs)}
             self._blocks = None
         else:
+            dense = np.empty((n * n, nb_modes), dtype=complex_dtype)
+            for i in range(n):
+                for j in range(n):
+                    dense[i * n + j] = flat_row(blocks[i, j], complex_dtype)
+            self._diag_flat = self._upper_flat = None
+            self._dense_flat = xp.asarray(dense)
             self._diag = None
             self._off = None
-            self._blocks = xp.asarray(
-                np.ascontiguousarray(blocks).astype(complex_dtype))
+            self._blocks = logical(self._dense_flat, (n, n))
+        self._nb_modes = nb_modes
+        # The compiled per-mode product needs a device field whose component
+        # planes are contiguous in the order the blocks were stored, with a
+        # single sub-point; otherwise apply() keeps the component loop.
+        self._compiled = self._compiled_kernel(sample, plane)
 
-        # Single fused kernel for the per-mode multiply, when the fields live
-        # on a device (None on the host, where apply() keeps the loop).
-        self._fused, self._fused_blocks = self._build_fused_kernel(n)
-
-    #: Largest `n` for which apply() uses the fused kernel. The fused variant
-    #: takes one kernel argument per stored block, so the parameter list grows
-    #: as n^2 and eventually runs into the kernel argument-space limit (and
-    #: into register pressure) for no gain. The vector-field cases this class
-    #: is used for are n = 2 and n = 3.
-    FUSED_MAX_COMPONENTS = 4
-
-    def _build_fused_kernel(self, n):
-        r"""Generate one elementwise kernel computing the whole per-mode
-        product ``z_i(q) = Σ_j K⁻¹_ij(q) r_j(q)``.
-
-        :meth:`apply`'s component-by-component form issues a kernel per term --
-        for n = 3 that is nine multiplies, six adds and three copies, each
-        reading and writing a full Fourier-sized array. Fusing them makes one
-        launch and one pass: the blocks and the input components are read once
-        and the result written once.
-
-        Returns ``(None, None)`` on the host (numpy has no equivalent
-        facility, and the loop's temporaries are cheap there) or when ``n``
-        exceeds :attr:`FUSED_MAX_COMPONENTS`.
-        """
-        xp = self._xp
-        if not xp.__name__.startswith("cupy") or n > self.FUSED_MAX_COMPONENTS:
-            return None, None
-
+    def _compiled_kernel(self, sample, plane):
+        """The compiled per-mode product for this field, or ``None`` when the
+        component loop has to be used: on the host, for more components than
+        compiled, or for a work-field layout the kernel cannot index."""
+        if self._xp is np:
+            return None
+        n = self._n
+        if n > getattr(linalg, "block_matvec_gpu_max_components", 0):
+            return None
+        contiguous = (plane.flags.f_contiguous if self._mode_order == "F"
+                      else plane.flags.c_contiguous)
+        if sample.ndim < 2 or sample.shape[1] != 1 or not contiguous:
+            return None
+        component_stride = sample.strides[0] // sample.itemsize
+        if n > 1 and component_stride < self._nb_modes:
+            return None
+        single = sample.dtype == np.complex64
+        suffix = "_f32" if single else ""
         if self._hermitian:
-            # Real diagonals and the stored upper triangle; the lower triangle
-            # is the conjugate, exactly as _block() reconstructs it -- but here
-            # the conjugation happens in-register instead of materialising an
-            # array.
-            params = [f"R d{i}" for i in range(n)]
-            params += [f"C u{i}_{j}" for i in range(n) for j in range(i + 1, n)]
-            arrays = [self._diag[i] for i in range(n)]
-            arrays += [self._off[(i, j)]
-                       for i in range(n) for j in range(i + 1, n)]
-
-            def term(i, j):
-                if i == j:
-                    return f"d{i} * s{j}"
-                return f"u{i}_{j} * s{j}" if i < j else f"conj(u{j}_{i}) * s{j}"
-        else:
-            params = [f"C b{i}_{j}" for i in range(n) for j in range(n)]
-            arrays = [self._blocks[i, j] for i in range(n) for j in range(n)]
-
-            def term(i, j):
-                return f"b{i}_{j} * s{j}"
-
-        params += [f"C s{i}" for i in range(n)]
-        out_params = [f"C o{i}" for i in range(n)]
-        # apply() runs in place (the outputs are the inputs), and every output
-        # needs every input, so form all n results in registers before writing
-        # any of them back.
-        body = [f"C t{i} = " + " + ".join(term(i, j) for j in range(n)) + ";"
-                for i in range(n)]
-        body += [f"o{i} = t{i};" for i in range(n)]
-        kernel = xp.ElementwiseKernel(
-            ", ".join(params), ", ".join(out_params), "\n".join(body),
-            f"mugrid_block_matvec_{n}")
-        return kernel, arrays
+            return getattr(linalg, "block_matvec_hermitian_gpu" + suffix)
+        return getattr(linalg, "block_matvec_dense_gpu" + suffix)
 
     def _timed(self, name):
         return self._timer(name) if self._timer is not None else nullcontext()
@@ -647,12 +646,19 @@ class BlockFourierPreconditioner(Preconditioner):
             # size-1 sub-point axis between the component and Fourier axes; the
             # per-mode blocks (no sub-point axis) broadcast over it.
             n = self._n
-            if self._fused is not None:
+            if self._compiled is not None:
                 # One launch, one pass: the kernel forms every output in
-                # registers, so passing the components as both inputs and
-                # outputs updates the work buffer in place.
-                comps = [s[i] for i in range(n)]
-                self._fused(*self._fused_blocks, *comps, *comps)
+                # registers and writes the work buffer in place. It takes
+                # device addresses, so it runs on the buffer's device.
+                stride = s.strides[0] // s.itemsize
+                with self._xp.cuda.Device(s.device.id):
+                    if self._hermitian:
+                        self._compiled(n, self._diag_flat.data.ptr,
+                                       self._upper_flat.data.ptr, s.data.ptr,
+                                       stride, self._nb_modes)
+                    else:
+                        self._compiled(n, self._dense_flat.data.ptr,
+                                       s.data.ptr, stride, self._nb_modes)
             else:
                 new = []
                 for i in range(n - 1):
