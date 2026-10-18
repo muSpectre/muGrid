@@ -136,7 +136,9 @@ def test_integer_min_max_tolerate_empty_ranks(comm):
 
 
 def test_sums_keep_imaginary_parts_and_large_integers(comm):
-    big = 2**60 + 1  # not representable in double
+    # Not representable in double, and small enough that the sum over
+    # the ranks (CI runs up to 8) stays inside int64
+    big = 2**53 + 1
     assert comm.sum(big) == comm.size * big
     assert comm.sum(np.int64(big)) == comm.size * big
     assert comm.sum(1 + 2j) == comm.size * (1 + 2j)

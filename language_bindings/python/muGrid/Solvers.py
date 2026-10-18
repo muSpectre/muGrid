@@ -652,8 +652,14 @@ def conjugate_gradients_pipelined(
             for iteration in range(maxiter):
                 if (replacement_interval and iteration > 0
                         and iteration % replacement_interval == 0):
+                    # After a restart in the previous iteration p, s, q and z
+                    # are still zero and gamma_prev/alpha_prev stale, so the
+                    # replacement must restart too: the drift test alone would
+                    # see no drift (r is the true residual already) and hand
+                    # the next step a direction of zero with a non-zero beta.
                     with timed("replace"):
-                        _, restarted = replace_residual()
+                        _, restarted = replace_residual(
+                            restart=True if restarted else None)
 
                 # Single combined reduction: (r,u), (w,u), (r,r). The three inner
                 # products are computed by one fused kernel (one device->host copy)
