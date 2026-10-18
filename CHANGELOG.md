@@ -1,1294 +1,609 @@
+<!--
+Style for this changelog (keep to it so entries stay uniform):
+
+- Newest version first. Heading `vX.Y.Z (DDMonYY)`, underlined with dashes.
+  A version not yet released is headed `vX.Y.Z (not yet released)`.
+- One bullet per user-visible change, at most two lines (about 200
+  characters). Say what changed for the user and, if useful, why or by how
+  much. Omit internals: no function, class, file or variable names, no
+  environment variables, no commit or PR references.
+- Start every bullet with one of: `ENH:` (new feature), `BUG:` (fix),
+  `API:` (interface change), `PERF:` (speed or memory), `MAINT:`, `TST:`,
+  `DOC:`, `BUILD:`, `CI:`.
+- Small related fixes may share one bullet. No trailing period on bullets.
+-->
+
 Change log for µGrid
 ====================
 
-v1.5.0 (08Oct26)
+v1.5.0 (18Oct26)
 ----------------
 
-- ENH: `LaplaceOperator` takes a `grid_spacing`: the two neighbours along
-  axis `d` are then weighted by `scale / h_d^2`, the finite-difference
-  Laplacian of an anisotropic grid. Host, device and single-precision kernels
-  take the per-axis weights; `coefficients` reports the weighted stencil and
-  `grid_spacing` the spacing. Without it the operator is unchanged (every axis
-  weighted by `scale`). Also fixed on the way: the 3D `coefficients` property
-  had the x and z neighbours swapped (invisible while they were equal), and
-  `apply_increment` on float64 device fields was not bound
-- DOC: `P1Tet3D` is the five-tetrahedra voxel of Leute's thesis (Sec. 3.5.3),
-  not a Kuhn triangulation as its summary said; its tables, volume fractions
-  and the 19-point Laplacian stencil it assembles are now pinned by
-  `tests/python_fem_element_tests.py`, and the docstring records why the
-  split is the same in every voxel
-- PERF: `HybridFourierTridiagonalPreconditioner` on a GPU. The rank-local
-  FFTs run in the order the field lies in memory -- distributed axis first,
-  `x` fastest and halved -- instead of over interior axes of the field in
-  logical order, which no single batched plan describes (on MI300A at 256³
-  they cost twice the reference preconditioner's full 3D transform). The
-  device block-Thomas sweep launches 64-thread blocks instead of 256 -- with
-  one thread per Fourier mode, 256 left most compute units idle -- declares
-  them in `__launch_bounds__`, which lifts the 128-register cap the compiler
-  otherwise assumes, and issues the loads of two planes ahead of the
-  recurrence: 0.398 → 0.167 ms per sweep at 128³, 1.29 → 0.91 ms at 256³. The
-  result is written into the output field through a view in its memory order
-  (writing in logical order took 8 ms per apply at 256³). The interface
-  exchange hands device buffers to MPI directly when it is GPU-aware --
-  `MUGRID_GPU_AWARE_MPI=1`, or `MPICH_GPU_SUPPORT_ENABLED=1` on Cray MPICH --
-  instead of always staging them through pageable host memory, which cost
-  5 ms per apply on two MI300A and 17 ms on four at 256³. The interface step
-  folds `A2`/`A0` into the reduced-system operators at setup -- one batched
-  product per end per apply instead of an einsum, a reshape, index selections
-  and two products -- and under PCR each rank sends its neighbours `dim`
-  numbers per mode instead of `2 dim`. The zero mode's two nullspace
-  projections are folded into its stored inverse, so its solve is one
-  matrix-vector product without reductions
-- BUG: `conjugate_gradients_pipelined` declared convergence on its recursive
-  residual alone, which in the pipelined formulation drifts away from the true
-  one: asked for `rtol=1e-8` at condition number 1e6 it returned at a true
-  relative residual of 5e-5, and in float32 it could return a diverged
-  iterate. It now only returns once `b - Ax` meets the tolerance (restarting
-  if not, and raising `ConvergenceError` when the true residual stagnates),
-  and replaces the residual every `replacement_interval` iterations (new
-  keyword; default 50 in float64, 20 in float32), restarting when the drift
-  is large. About 10% more operator applies than `conjugate_gradients`
-- BUG: The evaluated Green-function symbol (`AnalyticReferencePreconditioner`,
-  the default reference preconditioner on GPUs) lost the long-wavelength
-  modes in float32: the low-frequency phase sum cancels to O(S q²), and
-  `|det|²` underflowed, so from about N = 2048 (earlier for small moduli or
-  grid spacings) such modes were taken for the null space and zeroed. The
-  symbol is now built and inverted in double wherever single precision is not
-  enough, with the block scaled before inversion; the `apply_green_symbol_*`
-  kernels take the stencil, frequency tables and normalisation as float64. On
-  the host every mode is done in double. On a device a float32 field is done
-  in single precision per mode and redone in double only where an a-posteriori
-  test shows a relative error above 1e-4, so GPUs with 1:64 double throughput
-  (L40S) keep the float32 speed instead of a 2x slower apply
-- BUG: `FEMGradientOperator.transpose` gave silently wrong results under the
-  ghost layout its own requirement reported. It claimed the scatter-and-reduce
-  layout of `apply` (ghosts on the right only), but its kernels summed every
-  element in the buffer into every node, so `communicate_ghosts` on the input
-  followed by `transpose` lost the element below each first owned node
-  (relative errors 5-30), while with two-sided ghosts `transpose` followed by
-  `reduce_ghosts` counted elements twice. The transpose now writes only the
-  owned nodes, never the output's ghosts, and requires one left ghost layer
-  (`transpose_ghost_requirement` is `(1, ..), (0, ..)`, so
-  `ghost_requirement` is two-sided): communicate the input's ghosts first and
-  do not reduce the output -- the protocol of every other muGrid operator. A
-  collection without left ghosts now raises instead of returning a wrong sum
-- BUG: `conjugate_gradients` and `conjugate_gradients_pipelined` kept their
-  work vectors as fixed-name fields of the caller's collection. A solve nested
-  inside another's `hessp`, `prec` or `callback` on the same collection
-  overwrote the outer solve's residual and search direction (the outer solve
-  could report convergence at a true residual of 1), and a float32 solve after
-  a float64 one raised `TypeError`. Each call now uses fields of its own and
-  removes them from the collection when it returns or raises, so they also no
-  longer stay allocated between solves
-- BUG: `real_field(..., dtype=np.float32)` and `complex_field(...,
-  dtype=np.complex64)` returned any existing field of the requested name,
-  whatever its precision, shape or sub-point. They now raise `ValueError` on a
-  mismatch, as the double-precision get-or-create already did
-- BUG: `conjugate_gradients` declared convergence on its recursive residual,
-  which drifts from `b - Ax` by rounding: in float32 it returned at a true
-  relative residual of 1.01e-5 when asked for 1e-5, and below the float32
-  accuracy floor at 6e-7 when asked for 1e-8. Convergence is now confirmed on
-  the true residual (one operator apply); on failure CG restarts from it, and
-  raises `ConvergenceError` once it stagnates. The float32-floor warning no
-  longer claims the solve will run to `maxiter`
-- BUG: Indefinite systems went undetected: both CG solvers only checked for an
-  exactly zero curvature, and `conjugate_gradients` ran 17,529 iterations on
-  an operator with negative eigenvalues without an error. They now raise
-  `ConvergenceError` when `p^T A p` or `r^T M r` is not positive (the
-  pipelined solver first restarts, since its recurrences drift).
-  `JacobiPreconditioner` rejects negative and non-finite diagonal entries, not
-  only zeros, and takes a `communicator` so that the check is collective
-- BUG: The stored reference-stiffness preconditioner
-  (`make_reference_stiffness_preconditioner(..., evaluate_symbol=False)`, the
-  default on the host) assembled its symbol in single precision for float32
-  solves, where the low-frequency phase sum cancels: on the lowest modes it
-  was off from the float64 preconditioner by 4e-2 at 4096^2 (7e-4 at 1024^2).
-  It is now built and inverted in double a slab at a time and only the inverse
-  is stored in float32 (error 2e-7), and symmetrised so that the float32
-  symbol is stored as its upper triangle instead of the dense block (half the
-  memory). The Hermitian test of `BlockFourierPreconditioner` allows
-  single-precision rounding
-- BUG: The in-place kernels `apply_green_symbol_*` and `block_thomas_*`
-  converted an output array of the wrong dtype or layout into a temporary,
-  wrote the result there and returned the caller's array unchanged without an
-  error. Their outputs are now taken without conversion (`TypeError` on a
-  mismatch) and must be writeable, and the remaining shapes and indices are
-  validated (an `exc_index` beyond `exc`, a mode reading an empty `head`, the
-  coupling blocks, strides beyond the field)
-- BUG: `GenericLinearOperator` dropped stencil coefficients below an absolute
-  1e-14, so an operator in SI units at the micrometre scale (or the identity
-  times 1e-15) applied as zero. The threshold is now relative to the largest
-  coefficient
-- BUG: Reading a NetCDF variable into a field of a narrower type -- double
-  into float32, float into an integer -- rounded or truncated the values
-  without an error. Such reads now raise `FileIOError`; widening reads (float
-  into double, smaller into larger integers) still convert exactly
-- BUG: Out-of-bounds reads and writes on unchecked inputs: `linalg.cross`
-  and `leray_project` did not compare sub-point counts (the number of
-  three-vectors is taken from one operand); the float32 host
-  `pipelined_cg_dots` did not validate its operands at all; and the
-  flat-buffer kernels (the device's `axpy`/`scal`/`axpby`/`copy`/reductions,
-  the field-valued `scal`, `cross`, `leray_project`) assumed dense pixel
-  storage and silently computed on padding for collections with custom pixel
-  strides. All now raise. The transposes of `FEMGradientOperator` and
-  `GenericLinearOperator` check that `weights` has one entry per quadrature
-  point instead of reading past its end
-- BUG: MPI reductions: `Communicator.gather` checked for uneven row counts only
-  with an `assert`, so release builds scrambled the result; the check is now
-  collective and every rank raises. `reduce_min`/`reduce_max` of an integer
-  array deadlocked when one rank was empty (its +-inf identity overflowed on
-  that rank alone). `sum` and `reduce_sum` dropped imaginary parts and rounded
-  integers beyond 2^53, and chose the MPI datatype of a scalar from its value,
-  so ranks could disagree on it; scalars are now reduced with the type of
-  their dtype
-- BUG: Serial single-precision FFTs threw with a backend that has no
-  N-dimensional transform (e.g. under `MUGRID_FFT_NO_ND=1`); they now use the
-  per-axis path, as the MPI-decomposed float32 transforms already do
-- BUG: The Pixel layout (`.p`/`.pg`) of a field with several sub-points and a
-  last component axis longer than one ordered the folded axis differently on
-  the device (structure-of-arrays, sub-point fastest) than on the host
-  (component fastest), so the same code read and wrote different entries.
-  It now raises on structure-of-arrays storage in that case; use `.s`/`.sg`,
-  which are the same on host and device. Fields gain read-only `nb_sub_pts` and
-  `storage_order` properties
-- BUG: Fields on several GPUs of one process: kernels and the reduction
-  scratch acted on whichever device was current -- the one whose field was
-  allocated last -- so an operation on a field of another GPU faulted (MI300A:
-  memory access fault in `vecdot`). Every entry point that launches work for a
-  field (linalg, operators, ghost exchange, FFT) now runs on the field's device
-  and restores the caller's afterwards, and the reduction scratch is kept per
-  device
-- BUG: The Python GPU reductions (`Communicator.sum`/`max` and `reduce_*` of
-  CuPy arrays) handed device pointers to MPI even when it is not GPU-aware;
-  they now stage through the host in that case, as the C++ ghost exchange
-  does, and synchronise the stream first. `Communicator.gpu_aware_mpi` reports
-  the detection
-- BUG: cuFFT plan sizes, strides and distances were cast to `int` unchecked; a
-  value beyond the int range now raises instead of planning a wrapped size
-- API: The boolean environment switches (`MUGRID_GPU_AWARE_MPI`,
-  `MUGRID_UNIFIED_MEMORY`, `MUGRID_FFT_NO_ND`, `MUGRID_STAGED_TRANSPOSE`,
-  `MUGRID_PROFILE_ALLOCATIONS`) share one parser: 1/0, yes/no, true/false and
-  on/off in any case; any other value raises. Some used to read only the first
-  character (`on` meant false) or accept only `1`
-- DOC: `GenericLinearOperator.transpose` defaults to unit weights (the bare
-  `Bᵀ`), `FEMGradientOperator.transpose` to the physical quadrature weights
-  (`Bᵀ W`); both docstrings now say so and how to get the other
-- BUG: `GenericLinearOperator.fourier()` summed the entries of a multi-
-  component operator's symbol into one number; it now raises unless the
-  operator is scalar
-- BUG: `Iasymm<dim>` (the deviatoric projector) removed tr/3 in every
-  dimension; it now removes tr/dim
-- BUG: Linalg details: complex `norm_sq` could carry a rounding imaginary part
-  (now exactly real); the host single-precision `leray_project` accumulated in
-  complex64 (now double, as on the device); per-pixel Eigen maps of
-  structure-of-arrays fields read entries of different pixels (now refused);
-  full-buffer GPU reductions launched one block per 256 elements (now capped)
-- BUG: FFT details: `fftfreq` reported an even Nyquist mode on the
-  half-complex axis as -0.5 instead of +0.5 (now `rfftfreq`, as the C++
-  `rfft_freq`); serial float64 1D/2D transforms use the backend's N-D
-  transform where it can plan the layout, and every serial N-D transform falls
-  back to the per-axis path when it cannot (rocFFT on some ghost-padded grids)
-  instead of failing; the slab fast path no longer treats a transient failure
-  such as running out of memory as "unsupported" for the rest of the engine's
-  life; the pencil process grid avoids leaving ranks without data (16 ranks on
-  a (16, 16, 3) grid left four empty)
-- BUG: `is_buffer_contiguous` could report a contiguous buffer as
-  non-contiguous when a size-1 axis shared its stride with another axis
-- BUG: The ghost exchange now refuses fields whose pixels are not column-major
-  instead of exchanging the wrong slices
-- BUG: `CartesianDecomposition` without `nb_subdivisions` raised; it now
-  splits the ranks over the axes automatically
-- BUG: `JacobiPreconditioner` works in float32 solves; the multigrid
-  preconditioner refuses a distributed decomposition even without a
-  communicator argument, and its power iteration checks convergence (warning
-  otherwise); `conjugate_gradients_pipelined` accepts `residual=`; the
-  block-Thomas PCR verifies across ranks that its spike blocks agree
-- API: `FEMGradientOperator(..., dtype=np.float32)` selects the
-  single-precision operator; `NodalMomentOperator` is exported
-- DOC: Fourier-space ghost padding along x, C2R input requirements, the
-  Laplace operator's sign and isotropy, P1 prolongation, `coords` semantics,
-  local/global extents, MPI initialisation on import, transpose layouts and
-  cache lifetimes
-- API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
-  as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
-  instead of requiring writes into the array `register_frame_variable` returned.
-  Every value is checked (registered per-frame variable, shape, same-kind cast, so
-  a NaN or float is not truncated into an integer variable) before any is stored.
-  With `field_names` the keyword variables are written in addition; values stay in
-  the buffer for later frames until set again
-- API: `FileIONetCDF.frame_variable(name)` returns the view of a registered
-  per-frame variable's buffer, so a value read back with `read()` is reachable
-  without keeping the array from registration around
-- API: Per-frame variables carry a `_FillValue` attribute, NetCDF's default fill
-  value for their dtype unless `register_frame_variable(..., fill_value=x)` sets
-  one, and `write(name=None)` stores it, so a value that does not exist for a
-  frame (e.g. before the first evaluation) is missing to NetCDF readers rather
-  than an invented NaN or -1. Reading takes the file's `_FillValue`;
-  `FileIONetCDF.frame_variable_fill_value(name)` returns it. muGrid writes
-  without NetCDF fill mode, so a value never written stays undefined, not missing
+- ENH: The Laplace operator takes a grid spacing per axis, so it is correct on
+  anisotropic grids. Without one it behaves as before
+- ENH: Per-frame NetCDF variables are written as keyword arguments of a frame,
+  are validated, can be read back, and carry a fill value for frames without a value
+- PERF: The hybrid FFT/tridiagonal preconditioner is up to 5x faster on GPUs:
+  transforms in memory order, a retuned sweep kernel, and direct GPU-to-GPU exchange
+- BUG: Both conjugate-gradient solvers confirm convergence on the true residual,
+  raise when it stagnates, and detect indefinite operators and preconditioners
+- BUG: The pipelined conjugate-gradient solver no longer returns drifted iterates:
+  it periodically recomputes its residual, at about 10% more operator applications
+- BUG: The single-precision Green-function preconditioner lost long-wavelength modes
+  on large grids; its symbol is now built in double where needed, at float32 speed
+- BUG: The FEM gradient transpose was wrong at subdomain boundaries. It now writes
+  only owned nodes: communicate the input's ghosts first, never reduce the output
+- BUG: Solvers use private work fields per call, so nested solves and solves of
+  different precision on one field collection no longer interfere
+- BUG: The stored reference preconditioner for single-precision solves is built in
+  double and stored at half the memory
+- BUG: Requesting an existing single-precision field with another precision, shape
+  or sub-point raises instead of returning the wrong field
+- BUG: Operators and kernels validate their inputs: sub-point counts, padded storage,
+  transpose weight counts, and outputs that would have been silently copied
+- BUG: Stencil coefficients are dropped relative to the largest one, not below an
+  absolute threshold, so operators in SI units at small scales no longer vanish
+- BUG: NetCDF reads into a narrower type (double into float, float into integer)
+  raise instead of rounding silently
+- BUG: MPI reductions: uneven gathers are rejected on every rank, integer min/max no
+  longer deadlock on empty ranks, sums keep complex parts and large integers
+- BUG: Fields on several GPUs of one process: every operation runs on the field's
+  own device. Python GPU reductions stage through the host without GPU-aware MPI
+- BUG: The pixel view of a field with several sub-points raises on device storage,
+  where its ordering differs from the host; use the sub-point view instead
+- BUG: The 3D Laplace stencil reported to Python had x and z swapped; in-place
+  addition on float64 GPU fields was missing
+- BUG: Serial single-precision FFTs work with every backend; the Nyquist frequency
+  follows numpy; cuFFT plans beyond the 32-bit range raise; no rank is left empty
+- BUG: Smaller fixes: ghost exchange refuses non-column-major fields, a decomposition
+  without subdivisions splits the ranks itself, the deviatoric projector is right in 2D
+- API: All boolean environment switches accept 1/0, yes/no, true/false and on/off,
+  and reject anything else
+- API: A single-precision FEM gradient operator is selectable by dtype; the nodal
+  moment operator is exported from the package
+- DOC: The 3D linear-tetrahedron element is the five-tetrahedra voxel of Leute's
+  thesis, not a Kuhn triangulation; tests pin its tables and the stencil it builds
+- DOC: Fourier-space ghost padding, inverse-transform input requirements, operator
+  sign conventions, coordinate semantics and MPI initialisation on import
 
 v1.4.1 (07Oct26)
 ----------------
 
-- BUG: Clearing or replacing the device allocator (`clear_device_allocator`,
-  `set_device_allocator`) no longer frees memory still owned by live device
-  fields. With `use_cupy_allocator()` it dropped the cupy `MemoryPointer`s
-  backing them, returning their blocks to the pool for reuse; and a pointer
-  from the old allocator was freed through the new one. Each pointer is now
-  freed through the allocator that produced it, which stays alive until then
-- API: The C++ device-allocator hook takes a `DeviceAllocator` struct with an
-  opaque `ctx` passed to `allocate`/`deallocate` and an optional `release`,
-  instead of two bare function pointers, so a stateful allocator (an Umpire
-  pool, a specific cupy pool) needs no global state. New
-  `clear_device_allocator()` and `device_allocator_is_external()`. The Python
-  API is unchanged. External allocator callbacks no longer run under muGrid's
-  lock, which could deadlock against the GIL
-- BUG: The GPU `IsotropicStiffnessOperator` average reduction bypassed
-  `device_allocate`, allocating raw device memory beside an external allocator
-  (e.g. cupy's pool), and did so on every call. It now uses a cached scratch
-  buffer, visible to the allocation profiler as `stiffness-average-scratch`
+- BUG: Replacing or clearing the device allocator no longer frees memory of live
+  device fields; each block is freed by the allocator that made it
+- API: The C++ device-allocator hook takes a context and a release callback, so
+  stateful allocators need no global state; callbacks run outside muGrid's lock
+- BUG: The GPU stiffness operator's stress average uses a cached scratch buffer
+  instead of allocating raw device memory on every call
 
 v1.4.0 (25Sep26)
 ----------------
 
-- BUG: `HybridFourierTridiagonalPreconditioner` allocates and computes on its
-  decomposition's GPU instead of cupy's *current* device. With one GPU per rank,
-  rank 1 put its factors on GPU 0 next to fields on GPU 1, faulted with
-  `CUDA_ERROR_ILLEGAL_ADDRESS`, and left the other ranks deadlocked in the
-  interface exchange. First multi-GPU test of the hybrid preconditioner
-- BUG: Reductions return `reduction_result_t<T>`, double for a `Real32`/`Complex32`
-  field, instead of narrowing back — which turned any value past ~3.4e38 into `inf`.
-  An infinite `pAp` zeroes CG's step, so float32 stalled where float64 converged
-- BUG: Both CG solvers reject a non-finite residual, curvature term or inner
-  product with a `ConvergenceError` naming the cause, not only NaN. A zero
-  curvature term and a zero step on an unconverged residual are reported too
-- BUG: A float32 solve given an `rtol` below the ~1e-6 accuracy floor warns that it
-  is unreachable instead of running to maxiter. Double precision is unaffected
-- TST: `python_solvers_test.py` renamed to `python_solvers_tests.py`; pytest
-  collects `python_*_tests.py`, so it — and the only test of
-  `conjugate_gradients_pipelined` — had never run
-- BUG: The FFT transpose narrows its all-to-all counts through `checked_mpi_int`
-  rather than a bare cast, so an oversized transform throws instead of wrapping.
-  Now in `mpi/mpi_counts.hh`; this is the default exchange path on the GPU
-- BUG: GPU kernels use new `global_thread_{x,y,z}()` / `grid_stride_x()` helpers
-  instead of open-coding `blockIdx.x * blockDim.x`, whose all-`unsigned int`
-  product wraps above 2^32 threads before any widening. 48 sites
-- BUG: The reduction kernels widen each operand before multiplying, not after; an
-  fp32 square loses half the mantissa and overflows at `|x| ~ 1.8e19`. The fp32
-  `sq_norm` overload is gone so it cannot recur
-- PERF: The reference symbol is assembled at the solve precision and inverted one
-  slab of modes at a time, in place, not `complex128` plus four full-size arrays.
-  Peak RSS at 96³: 508 → 376 MB single, 575 → 444 MB double
-- PERF: `BlockFourierPreconditioner`'s Hermitian detection walks one component pair
-  at a time instead of allocating two arrays the size of the whole symbol
-- ENH: The Green preconditioner can evaluate its symbol per Fourier mode instead
-  of storing it: `AnalyticReferencePreconditioner` keeps the `3^dim` stencil, 243
-  numbers in 3D, where the stored symbol is 2.3 GB at 512³
-- ENH: `evaluate_symbol` on the reference and Green-Jacobi factories, defaulting to
-  evaluate on a device and store on the host. H200 at 512³: 2.7x (f32) faster per
-  apply, 4.9 GB less device memory, setup 1.3 s against 168 s
-- ENH: `reference_stencil` is public and is the single definition of the uniform
-  reference operator; `stencil_symbol` generalises the hybrid's
-  `_z_coupling_blocks`, so both preconditioners now derive from one stencil
-- ENH: The assembled route uses the stencil too when the caller names the operator,
-  dropping the impulse response, the `n` full-grid FFTs and three engine-sized
-  fields. An opaque callable still takes the impulse route
-- ENH: New `GridTransfer{2,3}D`: multilinear prolongation `P` between nested nodal
-  grids and its exact adjoint `R = Pᵀ`. Both act component-wise, so `range(P)`
-  contains every rigid-body mode and constant strain
-- ENH: The transfers require nested decompositions, so no transfer crosses a rank
-  boundary; a violation is rejected naming the axis and both extents rather than
-  corrupting the subdomain seams
-- ENH: New `MultigridReferencePreconditioner`: a V-cycle approximation of `Kʳᵉᶠ⁻¹`
-  with the FFT block symbol solving the coarsest level exactly. It needs only
-  nearest-neighbour halo where an FFT apply costs four all-to-all. Serial for now
-- ENH: The Jacobi damping is derived, `ω = 1.7 / λ_max(D⁻¹K)` by power iteration at
-  setup, since a value optimal in 2D diverges outright in 3D. 2D P1 is refused with
-  an explanatory error rather than smoothed with the wrong diagonal
-- BUILD: Clang's `--gcc-install-dir` is derived from the directory holding
-  `crtbegin.o`, not `libstdc++.so`; the two differ on an EasyBuild GCCcore
-  toolchain, where a HIP build died before compiling a line
-- BUG: `MultigridReferencePreconditioner` builds its coarse levels on the fine
-  level's device. They always landed on the host, which under a device fine grid is
-  a mismatch rather than a slow path
-- BUG: Two multigrid failures now say what is wrong: a grid too coarse to halve is
-  rejected as needing two levels, and a device-field apply names the missing
-  grid-transfer kernels
-- ENH: `examples/homogenization.py` gained `-P multigrid` and `--sync-timers`; the
-  latter is needed for GPU cost attribution, since asynchronous launches otherwise
-  charge the work to whichever region is open at the next synchronisation
-- ENH: New `examples/vcycle_vs_fft.py`, measuring R — V-cycle apply cost over FFT
-  apply cost on one device. The two scale oppositely, so R at one rank predicts the
-  crossover. It carries the iteration penalty too
-- ENH: `--decomposition` unties the domain split from the preconditioner, which
-  `FFTEngine` otherwise dictates; the JSON output now records the split used
-- ENH: New `examples/decomposition_baseline.py`, pricing the FFT engine's split on
-  its own. It is a slab, `[1, 1, P]`, which caps a run at `P <= N` ranks, though on
-  one shared-memory node it costs nothing measurable
-- ENH: `--mg-nu` and `--mg-cycles` expose the V-cycle's smoothing and cycle counts.
-  `nu = 1` beats the default of 2 at every grid tried, dropping the penalty against
-  the FFT preconditioner from 4.5x to 3.8x at 256³
-- TST: The symmetry and V-cycle convergence tests sweep `nu` over {1, 2, 3} in both
-  dimensions, since symmetry is what allows plain CG and `nu` is now tunable
-- ENH: New `HybridFourierTridiagonalPreconditioner` (`-P hybrid`): transforms only
-  the rank-local axes and solves block-tridiagonally along the distributed one, so
-  no all-to-all. Exact — it matches `-P reference`'s CG count at 1–8 ranks
-- ENH: The hybrid runs on the GPU, host and device sharing one implementation.
-  Validated on 2x MI300A at 1, 2 and 4 ranks: exact to 8e-16, and no GPU-aware MPI
-  build is needed
-- PERF: The hybrid's tridiagonal sweep is a fused HIP/CUDA kernel, one thread per
-  mode, replacing a Python loop that issued four kernels per plane. 52x faster at
-  256³ and 119x at 64³, reaching 1755 GB/s
-- PERF: The hybrid's Thomas factors are stored compressed: 32 kept densely, the rest
-  reusing the last, and the ~2% of modes not converged by then keeping a full line.
-  Exact, not approximate. 1217 → 177 MB at 256³, and the sweep gains 21%
-- BUG: The hybrid deflates the nullspace of its singular `q = 0` line instead of
-  pseudo-inverting it. `pinv`'s cutoff cannot resolve the gap — numpy 2.5 lands a
-  computed zero on the wrong side, keeping a kernel direction scaled by `1e13`
-- BUG: `_batched_inverse` is told which mode may be singular instead of discovering
-  it by an absolute `1e-8` threshold that sits below a healthy complex64 block's own
-  rounding noise, and so fired on hundreds of sound modes
-- BUG: `_compress_factors` compares against a scaled tolerance rather than dividing
-  by a guard floor of `1e-300`, which is not a small number in single precision but
-  zero
-- TST: `test_hybrid_is_exact_in_single_precision` runs the hybrid end to end at
-  float32, which nothing covered and where two tolerances were wrong. Sharper than
-  the double test, where the defect showed only on some numpy versions
+- ENH: New hybrid preconditioner: FFT in the rank-local axes and a tridiagonal solve
+  in the distributed one, so no all-to-all. Exact, and it runs on GPUs
+- PERF: The hybrid's tridiagonal sweep is one fused GPU kernel, 50-120x faster, with
+  compressed factors taking 7x less memory
+- ENH: The Green preconditioner can evaluate its symbol per mode instead of storing
+  it: 2.3 GB less at 512³ and 2.7x faster per apply on GPUs, where it is the default
+- ENH: New multigrid reference preconditioner (serial for now) with derived Jacobi
+  damping, and multilinear grid transfers between nested grids with exact adjoints
+- ENH: One public reference stencil defines the uniform reference operator for all
+  preconditioners; the assembled route no longer needs an impulse response
+- ENH: The homogenization example gained multigrid, synchronised timers and a
+  decomposition option; new examples price V-cycles against FFTs and the FFT split
+- PERF: The reference symbol is assembled at the solve precision and inverted slab
+  by slab, cutting peak memory by a quarter
+- BUG: The hybrid preconditioner computes on its decomposition's GPU, not the
+  current one; multi-GPU runs faulted and deadlocked
+- BUG: Reductions of single-precision fields return double, so large values no
+  longer overflow and stall the solver; squares are widened before multiplying
+- BUG: Both solvers reject non-finite residuals and curvatures with a clear error; a
+  float32 tolerance below the accuracy floor warns
+- BUG: FFT transposes and GPU kernels use range-checked counts, so oversized
+  transforms raise instead of wrapping
+- BUG: The hybrid deflates its null space exactly and uses precision-aware
+  tolerances; its single-precision path is tested end to end
+- BUG: Multigrid coarse levels are built on the fine level's device; its failures
+  say what is wrong
+- BUILD: HIP builds on EasyBuild toolchains find the right GCC installation
+- TST: The solver test file was never collected because of its name; fixed
 
 v1.3.0 (16Sep26)
 ----------------
 
-- ENH: New `NodalMomentOperator{2,3}D`: the cell moments `∫_e rho^k dx`
-  (k = 2, 3, 4) of a nodal scalar field's FE interpolant and their nodal
-  gradients, in one fused host/GPU pass. A polynomial phase-field energy is a
-  fixed combination of these — the double well `rho^2 (1-rho)^2` has cell
-  integral `M2 - 2 M3 + M4` — so the energy stays with the caller and µGrid
-  stays material-model-agnostic, as `compute_sensitivity` already is. The
-  array-at-a-time form of this computation materialises the interpolant at
-  every quadrature point of every cell at once (a 27-fold copy of the grid in
-  3D, plus a temporary per polynomial term); here every quadrature point is
-  consumed in registers and the pass is O(1) in scratch memory
-- ENH: `fem_element.hh` gains shape-function *values* and a moment quadrature
-  per element, alongside the existing gradient tables: 3-point-per-axis tensor
-  Gauss for Q1, and the same rule placed on each sub-simplex for P1. The
-  simplex rules are Gauss-Jacobi, not Gauss-Legendre: the collapsed map's
-  Jacobian is folded into the weight function, which keeps 3 points per axis
-  exact for the quartic integrand (leaving it in the integrand needs 4, and a
-  3-point Gauss-Legendre rule is exact for M2 and M3 but wrong for M4) and
-  makes every weight positive, so a cell's double-well energy is never
-  negative
-- ENH: The P1 sub-simplex decompositions are now data in `fem_element.hh`
-  (`Nodes`/`Frac`) rather than only comments, so downstream code need not keep
-  its own copy
-- TST: `fem_element.hh` now encodes each simplex decomposition twice — as the
-  gradient tables (`B`/`Wfrac`) and as the moment tables (`Nodes`/`Frac`) — so
-  `static_assert`s tie the two together: the volume fractions must equal the
-  gradient rule's weights, and a node the moment tables omit from a
-  sub-simplex must have a vanishing gradient at that quadrature point. All
-  four moment rules are also asserted to be partitions of the cell
+- ENH: New nodal moment operator: cell moments of a nodal field's FE interpolant and
+  their gradients in one fused host/GPU pass, for polynomial phase-field energies
+- ENH: Elements gain shape-function values and a moment quadrature that is exact
+  for quartic integrands with positive weights
+- TST: The simplex decompositions are stored as data and tied to the gradient
+  tables by compile-time checks
 
 v1.2.0 (14Sep26)
 ----------------
 
-- ENH: Device-to-device copies use a kernel instead of `Memcpy`/`Memcpy2D`,
-  which the HIP runtime services on the host CPU for managed allocations
-  (30x faster there, no slower on plain device memory); the serial ghost
-  exchange and the pencil transpose gain the most (30-38% per CG iteration)
-- ENH: N-D transforms only block the host when a decomposed engine hands
-  their output to GPU-aware MPI; a serial engine keeps the stream ordering
-  it already had (4-13% per CG iteration)
-- BUG: Device builds disable pybind11's LTO extras, which made the device
-  compiler silently drop every binding at link time (`import muGrid` then
-  failed with a missing module export function)
-- BUG: Throw on first GPU use when muGrid is linked against a CUDA/HIP runtime
-  older than the headers it was compiled with. The mismatch does not fail at
-  link time and reads device properties as garbage, which surfaced as a
-  segfault inside MPI
-- BUG: `sendrecv_staged` verifies that a device pointer really has a host
-  mapping before handing it to an MPI that does not report GPU support,
-  instead of faulting inside MPI's memcpy
+- PERF: Device-to-device copies use a kernel (30x faster on managed memory) and
+  transforms block the host only when needed: 30-40% per CG iteration
+- BUG: GPU builds no longer lose their Python bindings to link-time optimisation;
+  a CUDA/HIP runtime older than the headers is detected at first use
 
 v1.1.1 (12Sep26)
 ----------------
 
-- ENH: The fused stiffness kernels keep their G/V geometry matrices in
-  `__constant__` memory at the kernel's working precision; a float32 apply no
-  longer converts a `double` per inner-loop term on the fp64 pipe (~15x faster
-  in 3D single precision, bit-identical results)
-- ENH: The 3D stiffness kernel bounds its registers so two blocks fit per SM,
-  lifting it from latency-bound at 17% occupancy to 93% of DRAM throughput
-- ENH: `BlockFourierPreconditioner` applies its per-mode block product in one
-  fused GPU kernel instead of a kernel per term (10-22% per CG iteration)
-- ENH: GPU interior reductions (`vecdot`, `norm_sq`, `axpy_norm_sq`) cap their
-  grid at 1024 blocks and use the grid-stride loop the kernels already had, so
-  the shared-memory tree is amortised over many elements
-- ENH: The 3D stiffness kernel stages its displacement tile, halo included,
-  in shared memory instead of re-reading each node from L2 for all 27
-  stencils that touch it (global load traffic down 29x; 8-9% per CG
-  iteration at 96-128^3, growing with grid size)
-- MAINT: `GreenJacobiPreconditioner` scales into its output field and
-  applies the inner Green preconditioner in place, dropping a resident
-  vector-sized work buffer per solve
-- MAINT: `mpi4py` is imported only by MPI-enabled builds; a serial build no
-  longer runs `MPI_Init` at `import muGrid`
+- PERF: The fused stiffness kernels keep their geometry at working precision in
+  constant memory and tile through shared memory: up to 15x faster in float32
+- PERF: The block-Fourier preconditioner applies in one fused GPU kernel; GPU
+  reductions cap their grid size
+- MAINT: Serial builds no longer initialise MPI on import
 
 v1.1.0 (04Sep26)
 ----------------
 
-- ENH: `reduce_ghosts` supports halos wider than a rank's interior (and ranks
-  without grid points) by relaying through intermediate ranks; it is now the
-  exact adjoint of `communicate_ghosts` for any decomposition
-- ENH: The FFT engine's field helpers (`real_space_field`,
-  `fourier_space_field` and their `register_*` variants) accept `sub_pt`
-- BUG: FFT of fields with multiple sub-points returned garbage (issue #192);
-  `fft`/`ifft` now reject pairs with differing component or sub-point counts
-- BUG: `communicate_ghosts`/`reduce_ghosts` reject fields from a foreign field
-  collection, e.g. Fourier-space fields (issue #191)
-- BUG: `Communicator::sum` on a dynamically sized `Eigen::Matrix` crashed
-  under MPI (unsized result)
-- TST: `MUGRID_FFT_NO_ND=1` hides pocketfft's N-D transforms so the
-  axis-by-axis and general pencil FFT paths run in the test suite
+- ENH: Ghost reduction supports halos wider than a rank's interior and is the exact
+  adjoint of ghost communication for any decomposition
+- ENH: The FFT engine's field helpers accept sub-points
+- BUG: FFTs of fields with several sub-points returned garbage; mismatched field
+  pairs and fields from foreign collections are rejected
+- TST: An environment switch exercises the axis-by-axis FFT paths in the test suite
 
 v1.0.0 (16Jul26)
 ----------------
 
-- ENH: `FileIONetCDF.sync()` flushes buffered frames to disk for incremental
-  checkpointing of long runs
-- BUG: Autodetect GPU architecture; guard against GPU API failures
-- BUG: Guard NetCDF reads against dimension/data-type mismatch (were garbled)
-- BUG: `float32` field support in NetCDF I/O
-- BUG: Reject creating a field collection on a GPU device whose backend was not
-  compiled in (e.g. `Device.cuda()` in a CPU-only build)
-- BUG: `version_string()` reports the GPU backend as `ON`/`OFF` from the build;
-  a passed device appends its id (e.g. `CUDA: ON, device cuda:2`)
+- ENH: NetCDF output can be flushed to disk for incremental checkpointing
+- BUG: GPU architecture autodetection, guards against GPU API failures and against
+  mismatched NetCDF reads, float32 NetCDF I/O, rejection of GPU backends not built
 
 v0.112.0 (07Jul26)
 ------------------
 
 - ENH: Double-precision accumulators even in single-precision runs
-- ENH: `FileIONetCDF.register_frame_variable` stores per-frame, grid-less
-  quantities (small replicated scalars/vectors/tensors) alongside fields
-- ENH: `version_string()` returns a one-line build/run diagnostic (version, MPI
-  rank, GPU device, NetCDF backend); added `netcdf_backend`/`netcdf_version`
-- ENH: `MUGRID_NATIVE_ARCH` CMake option to tune code for the host CPU
-  (`-march=native`; non-portable, off by default)
-- ENH: Warn when a serial `Communicator` is built under an MPI launcher
-- BUG: Fixed the Green-Jacobi preconditioner
-- BUG: Single-precision support in the preconditioner
-- BUG: Match field precision in Fourier space
+- ENH: Per-frame, grid-less quantities can be stored in NetCDF output next to fields
+- ENH: A one-line build and run diagnostic string; optional native CPU tuning at
+  build time; a warning when a serial run is started under an MPI launcher
+- BUG: Green-Jacobi preconditioner and single-precision preconditioners fixed
 
 v0.111.0 (03Jul26)
 ------------------
 
-- ENH: Single-precision floating-point support
-- ENH: Added fused `compute_sensitivity` to the isotropic stiffness operator
-- ENH: Added the Green-Jacobi (J-FFT) preconditioner
-- ENH: Added Q1 (bilinear quad / trilinear hex) elements
-- ENH: Added fused `apply_macro_rhs` and `average_stress` to the isotropic stiffness
-  operator, so FE homogenization needs no resident strain/stress fields
-- ENH: `conjugate_gradients` can return the final residual `b - Ax` (for
-  adjoint-corrected objectives) via an optional out-field
-- ENH: Input guards across operators and fields — dtype-matched `fft`/`ifft`,
-  scalar-only Laplace, storage-order/contiguity checks, size-checked Eigen
-  field operators, rejection of duplicate local pixels and device state fields
-- API: Python lifetime fixes — `keep_alive` on `Pixels`/`FileFrame` iterators,
-  and `pop_field` kept safe against live DLPack exports
-- API: `dtype=` field-creation API
-- API: Bound `FieldCollection.pop_field` to free a field's memory from Python
-- MAINT: Unified FE shape-function tables into element traits
-- MAINT: Aliased the CG preconditioned-residual onto the residual when unpreconditioned
-- MAINT: Reference preconditioner frees its impulse-response scratch after assembly and
-  stores Hermitian symbols as a triangle
-- MAINT: Reference preconditioner apply is now einsum-free
-- BUG: `average_stress` integrates the owned region, not the padded one
-- BUG: Fixed np=8 deadlock in the block-Fourier preconditioner (Hermitian
-  detection diverged on ranks with empty Fourier subdomains)
-- BUG: `Field.p`/`.pg` pixel views are zero-copy and correctly ordered for
-  multi-component, multi-sub-point fields (were silently copied and permuted);
-  fixed the underlying `get_strides(Pixel)` for structure-of-arrays fields
-- BUG: `Array::resize` no longer double-frees when reallocation throws (GPU OOM)
-- BUG: Guard against zero-size GPU linalg kernel launches on empty MPI ranks
-- BUG: NetCDF attribute read no longer overflows on mismatched lengths, and the
-  registered-vs-file consistency check is now effective
-- BUG: `reduce_ghosts` supports single-precision (`Real32`/`Complex32`) fields
-- BUG: MPI ghost/gather paths use C complex datatypes and range-checked counts
-  (correct on Fortran-less MPI and halos above 2³¹ elements)
-- BUG: Fixed FFT-engine subcommunicator leak, `CartesianCommunicator`
-  copy-assignment, and unsafe `FieldCollection` moves of populated collections
-- BUG: Fixed non-contiguous `Pixels` iteration and cuFFT fp32 N-D alignment checks
+- ENH: Single-precision floating-point support throughout
+- ENH: Q1 (bilinear and trilinear) elements
+- ENH: Fused sensitivity, macroscopic right-hand side and average stress on the
+  isotropic stiffness operator, so homogenization needs no strain or stress fields
+- ENH: The Green-Jacobi (J-FFT) preconditioner; the solver can return the final
+  residual
+- API: Fields can be created with a dtype; fields can be removed from Python; Python
+  object lifetimes are tied to the iterators and exports that use them
+- BUG: Input guards across operators and fields; pixel views are zero-copy and
+  correctly ordered; several MPI, NetCDF, FFT and GPU memory fixes
 
 v0.110.0 (28Jun26)
 ------------------
 
-- ENH: Removed redundant device-wide synchronizations after GPU compute kernels so the
-  command queue pipelines; remaining MPI/FFT barriers scoped to the default stream
-- ENH: Added a uniform-coefficient apply to the fused isotropic stiffness operator so the
-  reference-material preconditioner runs from the Lamé means, dropping the full
-  stiffness-tensor field and its GPU memory cost
-- ENH: Added compile-time field allocation profiling with low-overhead runtime control
-  and Python bindings
-- ENH: Skipped MPI host-staging bounce on unified-memory devices during ghost exchanges
-  and FFT transposes
-- ENH: Native multidimensional R2C/C2R transforms in cuFFT and rocFFT backends for
-  faster serial GPU FFTs
-- ENH: Parallel 3D FFT uses native multi-dimensional transforms for slab decompositions
-  on CPU and GPU
-- ENH: Added slab decomposition option in `FFTEngine` with automatic fallback to pencil
-  decomposition
-- ENH: Optional staged host FFT transpose utilizing contiguous buffers for multi-node
-  networks
-- ENH: Added reference-material preconditioner for FFT-accelerated FE homogenization to
-  improve CG convergence
-- ENH: Added pipelined CG solver option using non-blocking reductions to hide latency
-- BUG: GPU kernel launches are now checked and raise exceptions instead of failing
-  silently
-- MAINT: Cache the linear algebra reduction scratch buffer across calls instead of
-  reallocating
-- DOC: Converted documentation from Sphinx to MkDocs and added CPU/GPU scaling benchmark
-  pages
-- ENH: Supported NetCDF I/O for device-resident GPU fields via staging buffers
-- ENH: Skipped staging buffer on unified-memory devices for zero-copy NetCDF I/O
-- API: Added field deep-copy, host-accessibility queries, and empty-clone overloads for
-  field collections
-- BUG: Fixed NetCDF variable-field reads with ghosts for structure-of-arrays fields
-- ENH: Implemented complex linear algebra operations on CUDA/HIP GPUs, excluding ghost
-  regions
-- ENH: Fused per-pixel vector operations for three-vector cross product and
-  Helmholtz/Leray projection
-- ENH: PocketFFT backend performs multi-dimensional transforms in a single call for
-  faster serial CPU execution
-- API: Renamed the FFT backend header and exposed optional N-dimensional transforms.
+- ENH: Reference-material preconditioner and a pipelined conjugate-gradient solver
+  for FFT-accelerated FE homogenization
+- ENH: Native multidimensional GPU FFTs, slab decomposition with pencil fallback,
+  and an optional staged host transpose for multi-node networks
+- ENH: NetCDF I/O for GPU-resident fields; complex GPU linear algebra; fused
+  cross-product and Helmholtz projection kernels
+- PERF: Fewer device synchronisations, no host bounce on unified-memory devices,
+  cached reduction scratch
+- API: Field deep copies, host-accessibility queries and empty clones of collections
+- DOC: Documentation moved to MkDocs with CPU/GPU scaling benchmarks
 
-0.109.0 (15Jun26)
+v0.109.0 (15Jun26)
+------------------
+
+- ENH: Helpers for reductions on GPUs
+
+v0.108.0 (13Jun26)
+------------------
+
+- ENH: Non-blocking all-to-all in FFT transposes; ghost reduction without a host buffer
+- BUG: NetCDF I/O of local field collections with empty MPI ranks
+
+v0.107.0 (12Jun26)
+------------------
+
+- ENH: Multi-GPU halo exchange and FFT transposes scale through contiguous staging
+  buffers; solvers run entirely on the device
+- ENH: True pencil decomposition for 3D MPI FFTs with per-rank memory scaling as 1/P
+- ENH: Operators report and validate the ghost layers they need
+- ENH: New preconditioner module (identity, Jacobi, Fourier) for the solver
+- API: The conjugate-gradient solver converges on a relative criterion
+- BUG: Many MPI, FFT, NetCDF, GPU and binding fixes, including silently dropped
+  ghost contributions on devices and garbled multi-component transposes
+
+v0.106.0 (09Jun26)
+------------------
+
+- ENH: Preconditioned conjugate gradients; optional coverage instrumentation
+- BUG: GPU linear algebra on sub-point fields ran past the buffer; mismatched
+  component counts are rejected
+
+v0.105.2 (17Apr26)
+------------------
+
+- BUG: Coordinates of FFT engines with ghost cells were garbage in the last dimension
+
+v0.105.1 (11Jan26)
+------------------
+
+- BUG: The inverse FFT frequency property was misnamed on GPU engines
+
+v0.105.0 (11Jan26)
+------------------
+
+- ENH: 1D FFTs on all backends (serial only)
+
+v0.104.0 (10Jan26)
+------------------
+
+- API: FFT engine field methods take a component shape, consistent with field
+  collections; scalar fields have no component axis
+
+v0.103.0 (07Jan26)
+------------------
+
+- ENH: Operators compute every point for which the stencil has valid input, so wider
+  ghost regions get valid results too
+
+v0.102.0 (05Jan26)
+------------------
+
+- API: A device class replaces the memory-location enum; devices are given as
+  strings such as "cpu", "gpu" or "cuda:1"
+- API: The generic stencil operator was renamed; the solver interface and the
+  convolution operators were simplified
+- ENH: Fused isotropic stiffness operators for linear elasticity in 2D and 3D on CPU
+  and GPU, storing only two material parameters per voxel
+- ENH: A linear-algebra module for fields that avoids copies in the solver
+- ENH: Native rocFFT backend with full stride support; MPI-parallel examples
+- BUG: Fixed the 3D stiffness kernel on GPUs and handling of uninitialised MPI
+
+v0.101.2 (29Dec25)
+------------------
+
+- PERF: Optimised GPU gradient and divergence kernels without atomic operations
+
+v0.101.1 (28Dec25)
+------------------
+
+- BUG: FFT engine field creation returns an existing field of the same name;
+  register-only variants raise instead
+
+v0.101.0 (28Dec25)
+------------------
+
+- API: Frequency and coordinate arrays are properties of the FFT engine; the
+  standalone frequency functions are gone; properties return tuples
+
+v0.100.0 (28Dec25)
+------------------
+
+- ENH: Offset, shape and coefficients of all stencil operators are accessible from
+  Python
+
+v0.99.0 (28Dec25)
 -----------------
 
-- ENH: Helpers for reduction on GPUs
+- ENH: Fourier-space representation of stencil operators
 
-0.108.0 (13Jun26)
+v0.98.1 (28Dec25)
 -----------------
 
-- ENH: FFT transpose all-to-all uses non-blocking communication
-- ENH: `reduce_ghosts` without intermediate host buffer
-- BUG: NetCDF I/O of local field collections now works with empty MPI ranks
+- BUG: Version detection in the publish workflow
+- MAINT: Versions come from git tags; build configuration consolidated
 
-0.107.0 (12Jun26)
+v0.98.0 (27Dec25)
 -----------------
 
-- ENH: Multi-GPU halo exchange and FFT transposes now scale: contiguous staging buffers
-  (with a host bounce when MPI is not GPU-aware) instead of strided MPI datatypes; FFT
-  scratch is cached across transforms
-- ENH: Solvers run entirely on the device
-- API: `conjugate_gradients` now converges on a relative criterion
-- BUG: Fixed device `reduce_ghosts` silently dropping all contributions received from
-  MPI neighbors (the host receive buffer was treated as device memory during
-  accumulation); found by a new device-vs-host equivalence test
-- BUG: Interior reductions (`norm_sq`, `vecdot`, `axpy_norm_sq`) on host and GPU now sum
-  the interior region directly instead of subtracting the ghost contribution from a
-  full-buffer reduction (minimizing floating point overflows)
-- ENH: Stencil operators now report the ghost layers they need
-- ENH: All stencil operators (including the FEM gradients, which previously did not
-  check) now validate at apply/transpose time that the field collection provides the
-  ghost layers they report
-- BUG: Removed the allgather/scatter-only `Transpose` modes, which posted overlapping
-  receive buffers (UB) and garbled multi-component 3D transforms
-- BUG: FFT transposes now honour field storage order (AoS/SoA); device fields were
-  transposed with AoS datatypes, garbling components
-- BUG: Fixed a deadlock in `CartesianDecomposition::reduce_ghosts` for uneven
-  subdomains; the halo-size check now uses the global minimum interior extent
-- BUG: Fixed state-field index rotation using bitwise `&` instead of modulo, which
-  aliased `current()`/`old()` for `nb_memory` not of the form 2^k-1
-- BUG: Fixed the 3D MPI FFT silently skipping the Y transform for process grids with P2
-  == 1 and P1 > 1
-- BUG: Fixed NetCDF `compute_tensor_dim_index` never throwing its error and an inverted
-  `static_assert` in the NetCDF type mapping
-- BUG: Fixed `Unit` streaming emitting an empty string for tagged-but-unitless units
-- BUG: Bound `FEMGradientOperator.apply_increment`/`.transpose_increment` and
-  `Communicator.max`/`.all`/`.any`; corrected misspelled `uint_state_field`
-- BUG: Fixed the `PyGradientOperator.transpose_increment` trampoline calling `transpose`
-- BUG: Added Python wrappers for `IsotropicStiffnessOperator2D`/`3D`; `from muGrid
-  import *` no longer breaks
-- BUG: The DLPack capsule now keeps the owning field (and its collection) alive for the
-  lifetime of the exported tensor
-- BUG: Fixed host<->device `deep_copy` permuting multi-axis component / multi-sub-point
-  data (AoS vs SoA dof ordering)
-- BUG: `FieldMap::size()`/`eigen_vec()`/`get_empty_clone()` now handle buffer padding
-  and ghost specifications correctly
-- BUG: Fixed 64-bit index overflow in index helpers for grids exceeding 2^31 points
-- BUG: Free the MPI communicator created by `MPI_Cart_create`; removed collective MPI
-  calls from `assert`s (debug/release deadlock)
-- BUG: GPU isotropic-stiffness now uploads per-instance G/V matrices; device
-  `GenericLinearOperator` caches are invalidated on grid change
-- BUG: GPU linalg ghost reductions now handle 1D fields; cuFFT inverse transforms
-  synchronize before GPU-aware MPI
-- BUG: MPI ghost accumulation now honours device memory and the actual element type
-  (Complex/Int) instead of hard-coding host-side `Real`
-- BUG: `reduce_ghosts` rejects halos larger than the subdomain instead of silently
-  producing a wrong reduction
-- ENH: The 3D MPI FFT now uses a true pencil decomposition; per-rank memory scales as
-  O(N³/P) and Fourier space distributes X across P2, Y across P1
-- ENH: MPI transposes use pure derived-datatype `MPI_Alltoallw` operations (no
-  pack/unpack) on host buffers; device buffers use contiguous staging (see above)
-- ENH: The FFT engine verifies at construction that its real- and Fourier-space
-  collections use the same storage order
-- ENH: CMake now probes for C++20 standard-library support at configure time and fails
-  with an actionable message instead of a cryptic mid-build error
-- ENH: Added `Communicator::min` (C++ and Python), mirroring `max`
-- ENH: New `muGrid.Preconditioners` module for the matrix-free CG solver, with
-  `Identity`, `Jacobi` and `Fourier` (spectral kernel) preconditioners
-- ENH: The Poisson example gained a `-P/--preconditioner` option
-  (`fourier`/`fourier-exact`) with per-stage (fft/kernel/ifft) timing
-- ENH: The Python `FFTEngine` exposes `communicate_ghosts`/`reduce_ghosts`, so one
-  engine can serve as the single decomposition for stencils and FFTs
-- MAINT: Removed dead code (`fft_work_buffer.hh`, stray repo-root files, dead
-  `[tool.flake8]` section); fixed latent compile-breakers in const accessors
-- TST: MPI FFT tests now compare against numpy for unevenly dividing grids,
-  multi-component fields and the 3D inverse transform
-- TST: Added regression tests for the state-field rotation and the Python API surface
-  (star import, FEM-gradient increments, isotropic-stiffness wrapper)
-- DOC: Coding convention: use brace initialization (non-narrowing); narrowing
-  conversions must be explicit `static_cast`s
-- DOC: Corrected numerous C++ doxygen and Sphinx documentation mismatches
+- ENH: Simplified user-facing API; Windows support; FEM gradient operator with a
+  homogenization example; hierarchical timer; ghost reduction
+- ENH: 3D Poisson example and an automatic benchmark suite
+- MAINT: Unified GPU code for CUDA and HIP
+- CI: GPU testing workflow
 
-0.106.0 (09Jun26)
+v0.97.0 (22Dec25)
 -----------------
 
-- ENH: Preconditioned conjugate gradients
-- ENH: Optional code-coverage instrumentation via `MUGRID_ENABLE_COVERAGE`
-- ENH: Bound `LaplaceOperator.apply_increment` and `.transpose` to Python
-- BUG: Fixed GPU linalg element count for sub-point fields (`nb_sub_pts > 1`), where
-  device kernels ran past the end of the buffer
-- BUG: `linalg.axpy`/`axpby`/`copy`/`axpy_norm_sq` now reject fields with mismatched
-  component counts
-- TST: Added functional tests for the 2D/3D Laplace operator
-- TST: Added functional tests for host linear-algebra operations
-- MAINT: Removed dead code with no callers
-
-0.105.2 (17Apr26)
------------------
-
-- BUG: Fixed `coords`/`icoords` returning garbage in the last grid dimension when the
-  FFT engine is created with ghost cells
-- TST: Added regression test `test_coords_2d_with_ghosts` that exercises `coords` and
-  `coordsg` when ghost cells are present
-
-0.105.1 (11Jan26)
------------------
-
-- BUG: Fixed `ifftfreq` property name on GPU FFT engines (CUDA/ROCm)
-  - Was incorrectly named `fftfreqind` instead of `ifftfreq`
-  - Now consistent with CPU `FFTEngine` naming
-
-0.105.0 (11Jan26)
------------------
-
-- ENH: Added 1D FFT support to `FFTEngine`
-  - `FFTEngine([N])` creates a 1D FFT engine for grids of size N
-  - Forward FFT: `real[N] → complex[N/2+1]` using r2c transform
-  - Inverse FFT: `complex[N/2+1] → real[N]` using c2r transform
-  - Supports all backends: PocketFFT (CPU), cuFFT (CUDA), rocFFT (ROCm)
-  - Supports both AoS (CPU) and SoA (GPU) storage orders
-  - Multi-component fields supported (vectors, tensors)
-  - Note: 1D FFT is serial-only (no MPI parallelization)
-- DOC: Updated FFT documentation to include 1D examples
-- TST: Added comprehensive 1D FFT test suite
-  - Engine creation and properties tests
-  - Roundtrip accuracy tests
-  - Comparison with NumPy's `fft.rfft`
-  - Multi-component field tests
-
-0.104.0 (10Jan26)
------------------
-
-- API: FFTEngine field methods now use `components` parameter instead of `nb_components`
-  - `real_space_field(name, components=())` - creates scalar field by default
-  - `fourier_space_field(name, components=())` - creates scalar field by default
-  - `register_real_space_field(name, components=())` - creates scalar field by default
-  - `register_fourier_space_field(name, components=())` - creates scalar field by
-    default
-  - This makes the API consistent with `FieldCollection.real_field()` and
-    `CartesianDecomposition.real_field()`
-- API: Scalar fields now have different shapes than unit component fields
-  - Scalar field (`components=()`): `.p.shape = (nx, ny)`, `.s.shape = (1, nx, ny)`
-  - Unit component (`components=(1,)`): `.p.shape = (1, nx, ny)`, `.s.shape = (1, 1, nx,
-    ny)`
-  - Use `components=(1,)` explicitly if you need the component dimension
-- ENH: Added `Shape_t` overloads for all FFTEngine field registration methods
-  - Supports arbitrary component shapes like `(3,)` for vectors or `(3, 3)` for tensors
-  - Available for CPU, CUDA, and ROCm backends
-- DOC: Updated `fourier_derivative.py` example for scalar field indexing
-
-0.103.0 (07Jan26)
------------------
-
-- ENH: Kernel operators now use stencil-based iteration bounds
-  - Operators compute results for all points where the stencil has valid input data
-  - If ghost region is larger than stencil requirement, extra ghost points get computed
-    results
-  - Example: Laplace with 1-wide stencil and 3 ghosts per side → computes 2 extra layers
-    beyond interior
-- ENH: Updated all operators for stencil-based computation region
-  - `GenericLinearOperator`: Dynamic stencil requirements from stencil shape
-  - `LaplaceOperator2D/3D`: Requires 1 left, 1 right (centered 5/7-point stencil)
-  - `FEMGradientOperator2D/3D`: apply requires 0 left, 1 right; transpose requires 1
-    left, 0 right
-  - `IsotropicStiffnessOperator2D/3D`: Requires 1 left, 1 right (CPU and GPU kernels)
-- DOC: Updated `doc/KERNELS.md` with stencil-based iteration semantics
-
-0.102.0 (05Jan26)
------------------
-
-- API: Replaced `MemoryLocation` enum with new `Device` class for device selection
-  - New `Device` class with factory methods: `Device.cpu()`, `Device.cuda(id)`,
-    `Device.rocm(id)`, `Device.gpu(id)`
-  - New `DeviceType` enum following DLPack conventions (CPU, CUDA, CUDAHost, ROCm,
-    ROCmHost)
-  - Supports multi-GPU systems with device IDs (e.g., `Device.cuda(1)` for GPU 1)
-- API: Renamed `memory_location` parameter to `device` in Python wrappers
-  - Affects `GlobalFieldCollection`, `LocalFieldCollection`, `CartesianDecomposition`
-  - Accepts strings (`"cpu"`, `"gpu"`, `"cuda"`, `"cuda:N"`, `"rocm"`, `"rocm:N"`) or
-    `Device` objects
-- API: Pythonic string-based parameter handling
-  - `device`: `"cpu"`, `"gpu"`, `"cuda"`, `"cuda:0"`, `"rocm:1"`, etc.
-  - `open_mode` (FileIONetCDF): `"read"`, `"write"`, `"overwrite"`, `"append"`
-- API: Renamed `StencilGradientOperator` to `GenericLinearOperator`
-  - Clearer naming that reflects the operator's purpose as a general linear convolution
-    operator
-  - Python bindings updated accordingly
-- API: Simplified CG solver interface - removed `hessp_vecdot` parameter
-  - CG solver now uses only `hessp` for the Hessian-vector product
-  - Fused operations handled internally via `axpy_norm_sq` in linalg module
-- API: Removed `apply_vecdot` and `transpose_vecdot` from convolution operators
-  - Removed from `ConvolutionOperatorBase`, `ConvolutionOperator`, `LaplaceOperator`,
-    `FEMGradientOperator`
-  - Performance testing showed negligible benefit; simplifies operator interface
-- API: Removed PAPI hardware counter support from Timer class
-  - Timer now provides time-based measurements only
-  - Removes pypapi dependency and cross-platform compatibility issues
-- API: Standardized Python API to use tuples instead of lists for grid dimensions
-  - All docstrings now document parameters as "tuple of int" instead of "list of int"
-  - Affects `GlobalFieldCollection`, `CartesianDecomposition`, `FFTEngine` parameters
-  - Properties like `nb_subdomain_grid_pts` already returned tuples; documentation now
-    matches
-- ENH: Added `IsotropicStiffnessOperator2D` and `IsotropicStiffnessOperator3D` for solid
-  mechanics
-  - Fused elliptic operators computing K @ u = B^T C B @ u for isotropic linear elastic
-    materials
-  - Memory efficient: stores only Lamé parameters (λ, μ) per voxel instead of full
-    stiffness matrix
-  - Reduces memory from O(N × 24²) for full K storage to O(N × 2) for spatially-varying
-    materials
-  - GPU support with optimized CUDA and HIP kernels
-  - Uses linear tetrahedral FEM with 5-tetrahedra decomposition (3D) or 2-triangle
-    decomposition (2D)
-- ENH: Added `linalg` module with efficient linear algebra operations for muGrid fields
-  - `vecdot(a, b)`: Vector dot product (interior only, excludes ghost regions)
-  - `norm_sq(x)`: Squared L2 norm (interior only)
-  - `axpy(alpha, x, y)`: y = alpha * x + y (full buffer)
-  - `scal(alpha, x)`: x = alpha * x (full buffer)
-  - `axpby(alpha, x, beta, y)`: y = alpha * x + beta * y (full buffer, fused operation)
-  - `axpy_norm_sq(alpha, x, y)`: y = alpha * x + y, returns ||y||^2 (fused axpy + norm)
-  - `copy(src, dst)`: dst = src (full buffer)
-  - Avoids GB-scale memory copies from non-contiguous array views in CG solver
-  - CPU implementation using Eigen, GPU implementation for CUDA and HIP
-- ENH: Updated conjugate gradient solver to use new `linalg` module
-  - Uses `axpby` for fused update_p step (2 reads + 1 write instead of 3 reads + 2
-    writes)
-  - Uses `axpy_norm_sq` for fused residual update (saves 1 memory read per iteration)
-- ENH: Native rocFFT backend for AMD GPUs with full stride support
-  - Uses `rocfft_plan_description_set_data_layout()` for arbitrary strides
-  - Enables 3D MPI-parallel FFTs on AMD GPUs (not possible with cuFFT)
-- ENH: Added `Device.gpu()` factory for portable GPU code
-  - Automatically selects CUDA or ROCm based on compile-time configuration
-  - Falls back to CPU if no GPU backend is available
-  - Recommended for code that should work on any GPU platform
-- ENH: Added `parprint` utility function for MPI-safe printing
-  - MPI-aware print function that only outputs on rank 0
-  - Works with NuMPI's MPI stub for compatibility with and without MPI
-  - Available as `muGrid.parprint()` in Python API
-- ENH: Enabled MPI parallel execution of Poisson and homogenization examples
-  - Use `suggest_subdivisions` from NuMPI for automatic domain decomposition
-  - Changed from hardcoded serial execution to dynamic MPI-aware subdivision
-  - Both examples now scale efficiently across multiple MPI ranks
-  - Updated all output to use `parprint` for clean parallel execution
-- BUG: Fixed 3D stiffness kernel on GPUs
-- BUG: Gracefully handle non-initialized MPI
-- BUG: Added guard in cuFFT backend for unsupported strided R2C/C2R transforms
-  - cuFFT does not support strides on real data in R2C/C2R transforms
-  - 3D MPI-parallel FFTs on NVIDIA GPUs now raise clear `RuntimeError`
-  - Workaround: Use CPU FFT backend or 2D grids on NVIDIA hardware
-- MAINT: Restructured operators to separate 2D and 3D implementations into distinct
-  source files
-- MAINT: Updated benchmark scripts for performance testing
-- BUILD: Fixed `nodiscard` warnings in HIP linalg implementation
-- TST: Added laminate homogenization tests for validating effective material properties
-- TST: MPI-parallel laminate homogenization tests
-- TST: Added MPI parallel tests for Poisson and homogenization examples in CI
-  - Tests run with 2 and 4 MPI ranks for both 2D and 3D cases
-  - Validates domain decomposition, ghost communication, and result consistency
-  - Automatically runs in GitHub Actions CI when MPI is enabled
-- TST: Refactored and unified test infrastructure
-- DOC: Added new "Linear Operators" documentation chapter
-  - Comprehensive guide to all operator types in µGrid
-  - Explains generic, gradient/divergence, and fused operators
-  - Details `IsotropicStiffnessOperator` material field requirements
-- DOC: Updated GPU and Python API documentation for new device selection interface
-- DOC: Added GPU FFT documentation explaining backend limitations
-- DOC: Simplified examples to use fused operators for better performance
-
-0.101.2 (29Dec25)
------------------
-
-- ENH: Optimized GPU divergence kernels (2D and 3D) using gather pattern, eliminating
-  atomic operations
-- ENH: Hand-unrolled 3D gradient computation exploiting B matrix sparsity
-- ENH: Shared memory optimization for 3D gradient kernel (cooperative node loading)
-- BUILD: Fixed HIP/CUDA build (missing `d_NODE_OFFSET_3D` constant, `nodiscard`
-  warnings)
-
-0.101.1 (28Dec25)
------------------
-
-- BUG: Fixed `real_space_field` and `fourier_space_field` on `FFTEngine` to return
-  existing fields if they already exist (consistent with `real_field` etc. on
-  `FieldCollection`)
-- API: Added `register_real_space_field` and `register_fourier_space_field` methods to
-  `FFTEngine` that throw an error if a field with that name already exists
-
-0.101.0 (28Dec25)
------------------
-
-- API: Added `fftfreq`, `ifftfreq`, `coords`, `icoords` properties to `FFTEngine`
-  - `fftfreq`: Normalized FFT frequencies for local Fourier subdomain
-  - `ifftfreq`: Integer FFT frequency indices
-  - `coords`: Normalized real-space coordinates for local subdomain
-  - `icoords`: Integer real-space coordinate indices
-  - `coordsg`/`icoordsg`: Same as above but including ghost cells
-  - `spatial_dim`: Returns the spatial dimension (2 or 3)
-- API: Removed standalone FFT frequency functions from module level
-  - `fft_freq`, `fft_freqind`, `rfft_freq`, `rfft_freqind` are no longer available
-  - Use `engine.fftfreq` and `engine.ifftfreq` instead
-- API: Properties now return Python tuples instead of C++ objects
-  - `nb_fourier_grid_pts`, `nb_fourier_subdomain_grid_pts`,
-    `fourier_subdomain_locations`
-  - `nb_subdomain_grid_pts`, `subdomain_locations`, `nb_subdivisions`,
-    `nb_domain_grid_pts`
-- TEST: Comprehensive test suite for FFT frequency and coordinate properties
-
-0.100.0 (28Dec25)
------------------
-
-- ENH: Added `offset`, `shape`, and `coefficients` properties to all discrete
-  convolution operators in Python
-  - `ConvolutionOperator`: Access generic stencil metadata and coefficients
-  - `LaplaceOperator`: Access hardcoded Laplacian stencil structure
-  - `FEMGradientOperator`: Access shape function gradients and node arrangement
-- TEST: Comprehensive test suite for stencil property access across all operator types
-
-0.99.0 (28Dec25)
-----------------
-
-- ENH: Added `fourier()` method to `ConvolutionOperator` for computing Fourier space
-  representations
-- ENH: Vectorized Python bindings for `ConvolutionOperator.fourier()` supporting batch
-  computation
-- TEST: Comprehensive C++ and Python test suites for Fourier method validation
-
-0.98.1 (28Dec25)
-----------------
-
-- BUG: Fixed dynamic version detection in publish workflow (was building as 0.0.0)
-- MAINT: Configured setuptools_scm for automatic version discovery from git tags
-- MAINT: Updated PyPI publish action from deprecated @master to @release/v1
-- MAINT: Consolidated setup.cfg and pytest.ini into pyproject.toml
-- MAINT: Removed legacy discover_version.py, .gitattributes, and unused requirements.txt
-
-0.98.0 (27Dec25)
-----------------
-
-- ENH: **Simplified API**: Streamlined user-facing API for improved usability
-- ENH: **Windows support**: Full Windows platform compatibility with exception traceback
-  support (closes #48)
-- ENH: **3D Poisson solver example**: New example demonstrating 3D Poisson solver usage
-- ENH: **Benchmark suite**: Automatic Poisson benchmark suite with fine-grained timing
-  and GFLOP/s metrics
-- ENH: **FEM gradient operator**: New FEM gradient operator with homogenization example
-- ENH: **Hierarchical Timer**: Timer class with hierarchical timing and context manager
-  support
-- ENH: **Multi-component fields**: Added multi-component field support in
-  FEMGradientOperator
-- ENH: **reduce_ghosts**: Added reduce_ghosts operation to CartesianDecomposition
-- API: Removed standalone FFT field creation functions
-- MAINT: **Unified GPU code**: Consolidated GPU backend code for CUDA and HIP
-- MAINT: **Laplace kernels**: Hard-coded Laplace kernels are now part of the main
-  library
-- MAINT: Removed unused pad_size field functionality
-- CI: Added GPU testing workflow with Tesla T4 runner
-- DOC: Improved API documentation with docstrings and structured references
-- BUG: Fixed obtaining raw data pointer in Laplace operator implementation
-- BUG: Fixed FEMGradientOperator Python wrapper API mismatch
-
-0.97.0 (22Dec25)
-----------------
-
-- ENH: GPU support
-- ENH: New parallel FFT with arbitrary ghost buffers
-- ENH: Sparse stencils
+- ENH: GPU support; new parallel FFT with arbitrary ghost buffers; sparse stencils
 - BUG: NetCDF output of fields with ghost buffers
-- MAINT: Larger code reorganization
-- **muFFT** is now deprecated
+- MAINT: muFFT is deprecated
 
-0.96.0 (15Dec25)
-----------------
+v0.96.0 (15Dec25)
+-----------------
 
-- ENH: Looping over strides fields
-- ENH: Ghost buffers larger than subdomains
-- BUG: Memory leak in `communicate_ghosts`
+- ENH: Looping over strided fields; ghost buffers larger than subdomains
+- BUG: Memory leak in ghost communication
 
-0.95.0 (15Jul25)
-----------------
+v0.95.0 (15Jul25)
+-----------------
 
-- ENH: Accessor properties for field access without (`s`, `p`) and with ghosts (`sg`,
-  `pg`)
-- ENH: Parallel conjugate gradient solver
-- API: Flipped axes order of convolution operator
-- MAINT: Removed support for Python 3.8
+- ENH: Accessor properties for field data with and without ghosts
+- ENH: Parallel conjugate-gradient solver
+- API: Flipped axis order of the convolution operator
+- MAINT: Dropped Python 3.8
 
-0.94.0 (18Feb25)
-----------------
+v0.94.0 (18Feb25)
+-----------------
 
 - ENH: General convolution operator for fields
 - ENH: Domain decomposition with ghost buffer communication
 
-0.93.3 (11Nov24)
-----------------
+v0.93.3 (11Nov24)
+-----------------
 
-- BUG: Don't divide by smallest stride if it is zero
+- BUG: Do not divide by the smallest stride when it is zero
 
-0.93.2 (22Oct24)
-----------------
- 
-- BUG: Fixed strides in `detect_storage_order` for arrays with single components (but
-  non-empty shapes)
-- MAINT: Idiot-check strides when constructing a wrapped field
+v0.93.2 (22Oct24)
+-----------------
 
-0.93.1 (20Oct2024)
-------------------
+- BUG: Storage-order detection for arrays with a single component
 
-- ENH: `NumpyProxy` now determine the iter type that is required for returning a numpy
-  array with exactly the same shape as the input array
+v0.93.1 (20Oct24)
+-----------------
 
-0.93.0 (20Oct2024)
-------------------
+- ENH: Numpy wrappers return arrays with exactly the input's shape
 
-- API: Always return full component shape, do not cut components with one degree of
-  freedom
-- API: Scalar fields are now explicitly supporting by passing an empty tuple as the
+v0.93.0 (20Oct24)
+-----------------
+
+- API: Always return the full component shape; scalar fields take an empty
   component shape
 
-0.92.6 (25Sept2024)
--------------------
+v0.92.6 (25Sep24)
+-----------------
 
 - CI: macOS x86_64 wheels
 
-0.92.5 (11Jul2024)
-------------------
+v0.92.5 (11Jul24)
+-----------------
 
-- BUG: Handle installation without NetCDF
+- BUG: Installation without NetCDF
 
-0.92.4 (30June2024)
--------------------
+v0.92.4 (30Jun24)
+-----------------
 
-- MAINT: Added utility function for copying (rather than wrapping) field into a numpy
-  ndarray
+- MAINT: Utility for copying a field into a numpy array
 
-0.92.3 (15June2024)
--------------------
+v0.92.3 (15Jun24)
+-----------------
 
-- BUILD: Don't override dependencies after dl and execinfo are detected
+- BUILD: Do not override dependencies after dl and execinfo are detected
 
-0.92.2 (14June2024)
--------------------
+v0.92.2 (14Jun24)
+-----------------
 
-- BUILD: (Re)added dl and execinfo as requirements
+- BUILD: Re-added dl and execinfo as requirements
 
-0.92.1 (14June2024)
--------------------
+v0.92.1 (14Jun24)
+-----------------
 
-- BUILD: Require at least eigen3 3.4.0
+- BUILD: Require Eigen 3.4.0 or newer
 
-0.92.0 (04June2024)
--------------------
+v0.92.0 (04Jun24)
+-----------------
 
-- ENH: Added wrapper that allows passing an `mpi4py` communicator to `FileIONetCDF`
-- BUG: Don't import OpenMode if NetCDF is not available
+- ENH: NetCDF I/O accepts an mpi4py communicator
+- BUG: Import without NetCDF
 
-0.91.1 (02June2024)
--------------------
+v0.91.1 (02Jun24)
+-----------------
 
-- BUG: Updated `NumpyProxy` to reflect that a global field collection no longer required
-  number of spatial dimensions as first argument
+- BUG: Numpy wrapper updated for global field collections without a dimension argument
 
-0.91.0 (01June2024)
--------------------
+v0.91.0 (01Jun24)
+-----------------
 
-- ENH: Added attributes `p` and `s` for convenience access to pixel-shaped and
-  sub-point-shaped numpy arrays
-- ENH: Convenience filed accessor function `real_field`, `int_field`, etc. that create
-  fields if they don't exist but return them if they do
-- ENH: Added `OpenMode::Overwrite` which overwrites an existing file
-- MAINT: Default communicator is now MPI_COMM_SELF if MPI is enabled
-- DOC: Documentation of Python bindings
-- DOC: Python examples
+- ENH: Convenience accessors for pixel- and sub-point-shaped arrays; get-or-create
+  field accessors; an overwrite open mode for NetCDF
+- MAINT: The default communicator is the single-process one when MPI is enabled
+- DOC: Documentation and examples of the Python bindings
 
-0.90.1 (23May2024)
-------------------
+v0.90.1 (23May24)
+-----------------
 
-- Fixed wheels and source deployment to PyPI
+- BUILD: Fixed wheel and source deployment to PyPI
 
-0.90.0 (21May2024)
-------------------
+v0.90.0 (21May24)
+-----------------
 
-- Split code into separate repositories: muGrid and muFFT
+- MAINT: Split into separate repositories: muGrid and muFFT
 
-0.27.0 (30Jan2024)
-------------------
+v0.27.0 (30Jan24)
+-----------------
 
-- muSpectre: Sensitivity analysis for 3D problems
-- Fixing meson-python to >= 0.15.0
-- Updated Eigen3 to v3.4 and pybind11 to v2.11
+- ENH: Sensitivity analysis for 3D problems (muSpectre)
+- BUILD: Updated Eigen, pybind11 and the meson-python pin
 
-0.26.4 (04Oct2023)
-------------------
+v0.26.4 (04Oct23)
+-----------------
 
-- Fixing meson-python to 0.13.2 because of a bug in 0.14.0
+- BUILD: Pinned meson-python because of a bug in a newer version
 
-0.26.3 (16Jul2023)
-------------------
+v0.26.3 (16Jul23)
+-----------------
 
-- Same as 0.26.2 (debugging CI)
+- CI: Same as 0.26.2 (debugging CI)
 
-0.26.2 (10Jul2023)
-------------------
+v0.26.2 (10Jul23)
+-----------------
 
-- Same as 0.26.1, fixed deployment procedure
+- CI: Same as 0.26.1, fixed deployment
 
-0.26.1 (08Jul2023)
-------------------
+v0.26.1 (08Jul23)
+-----------------
 
-- macOS wheels
+- CI: macOS wheels
 
-0.26.0 (31Mar2023)
-------------------
+v0.26.0 (31Mar23)
+-----------------
 
-- MPI parallelization of sensitivity analysis
-- Wheels for Python 3.11
+- ENH: MPI parallelisation of the sensitivity analysis; wheels for Python 3.11
 
-0.25.2 (14Jan2023)
-------------------
+v0.25.2 (14Jan23)
+-----------------
 
-- Fixed macOS build
+- BUILD: Fixed the macOS build
 
-0.25.1 (28Dec2022)
-------------------
+v0.25.1 (28Dec22)
+-----------------
 
-- Same as 0.25.0, changed CI configuration for automatic deployment to PyPI
+- CI: Same as 0.25.0, automatic deployment to PyPI
 
-0.25.0 (28Dec2022)
-------------------
+v0.25.0 (28Dec22)
+-----------------
 
-- muSpectre is now distributed with Linux wheels (basic configuration only)
-- muFFT: Added PocketFFT engine (that does not require external dependencies)
-- Added Meson build files (Python package now exclusively build using Meson)
-- Defaulted again to autodetecting MPI
+- ENH: Linux wheels; a PocketFFT engine without external dependencies
+- BUILD: Meson build files; MPI autodetected again
 
-0.24.0 (22Nov2022)
-------------------
+v0.24.0 (22Nov22)
+-----------------
 
-- muFFT: Changed Python install procedure; default to no MPI and MPI now needs to be
-  explicitly enabled
+- BUILD: MPI must be enabled explicitly for the Python install
 
-0.23.1 (24Mar2022)
-------------------
+v0.23.1 (24Mar22)
+-----------------
 
-- muSpectre: A bug fixed in the call of the constructor of FieldCollection
-- muFFT: Fixed `pip install muFFT` on macOS
+- BUG: Field collection constructor call (muSpectre); pip install on macOS (muFFT)
 
-0.23.0 (15Oct2021)
-------------------
+v0.23.0 (15Oct21)
+-----------------
 
-- muSpectre: making vector operation methods in solver classed with communicating inside
-  them
-- muSpectre: added logical reduction on was_last_step_nonlinear evaluation in CellData
+- ENH: Communicating vector operations in solver classes; logical reduction of the
+  nonlinearity flag (muSpectre)
 
-0.22.0 (24Sep2021)
-------------------
+v0.22.0 (24Sep21)
+-----------------
 
-- muSpectre: mean stress control bugs resolved
-- muSpectre: mean stress control is now usable in MPI
-- muSpectre: examples using mean stress control added
+- BUG: Mean-stress control fixed and usable under MPI, with examples (muSpectre)
 
-0.21.0 (26Aug2021)
-------------------
+v0.21.0 (26Aug21)
+-----------------
 
-- CI: Refactoring of the CI with addition of coverage and ccache
+- CI: Refactored CI with coverage and ccache
 
-0.20.2 (04Aug2021)
-------------------
+v0.20.2 (04Aug21)
+-----------------
 
-- muSpectre: deleted an unnecssary parameter from write_2d_class function in
-  iinear_finite_elements.py
+- MAINT: Removed an unneeded parameter from a finite-element helper (muSpectre)
 
-0.20.1 (03Aug2021)
-------------------
+v0.20.1 (03Aug21)
+-----------------
 
-- muSpectre: improve write_2d and write_3d functions, 2D stencil for hexagonal grid
+- ENH: Improved 2D and 3D writers; 2D stencil for hexagonal grids (muSpectre)
 
-0.20.0 (15Jul2021)
-------------------
+v0.20.0 (15Jul21)
+-----------------
 
-- muSpectre: capability to apply mean stress (instead of mean strain added)
+- ENH: Mean-stress control instead of mean strain (muSpectre)
 
-0.19.2 (28Jun2021)
-------------------
+v0.19.2 (28Jun21)
+-----------------
 
-- muGrid: correct bugs in the FileIONetCDF
+- BUG: NetCDF I/O fixes
 
-0.19.1 (23Jun2021)
-------------------
+v0.19.1 (23Jun21)
+-----------------
 
-- muSpectre: Fixed a minor array reshape bug in the tutorial_example_new.py that was
-  jeopardizing the output stress plot
+- BUG: Array reshape in the tutorial example (muSpectre)
 
-0.19.0 (16Jun2021)
-------------------
+v0.19.0 (16Jun21)
+-----------------
 
-- muSpectre: added material_dunnat_tc (bilinear elastic- linear strain softening with
-  tensile-compressive wiegthed norm as strain measure)
-- muSpectre: added material_dunnat_t (bilinear elastic- linear strain softening with
-  maiximum tensile principal strain as strain measure)
+- ENH: Two bilinear elastic, linear strain-softening materials (muSpectre)
 
-0.18.2 (10Jun2021)
-------------------
+v0.18.2 (10Jun21)
+-----------------
 
-- muSpectre: Small bugfix and addition of regularization for slightly non-pd Hessians in
-  phase field fracture material
-- muGrid: Added functions for reporting version
-- muGrid: Added global attributes to FileIONetCDF
+- ENH: Version reporting; global attributes in NetCDF files
+- BUG: Regularisation of slightly non-definite Hessians in the phase-field fracture
+  material (muSpectre)
 
-0.18.1 (02Jun2021)
-------------------
+v0.18.1 (02Jun21)
+-----------------
 
-- muSpectre: Fix, changed the reset criterion for gradient orthogonality in FEM trust
-  region precondtioned Krylov solvers
-- muSpectre: Fix, added calling clear_was_last_step_nonlinear in
-  fem_newton_trust_region_pc solver
-- muSpectre: Fixed get_complemented_positions
-- muFFT: Fixed large transforms
-- muFFT: Fixed segfault when input buffer had wrong shape
+- BUG: Trust-region solver resets and position reconstruction (muSpectre); large
+  transforms and wrongly shaped input buffers (muFFT)
 
-0.18.0 (10May2021)
-------------------
+v0.18.0 (10May21)
+-----------------
 
-- muSpectre: Added trust fem region solver + ability to handle precondtioner
-- muSpectre: re-organized the krylov solver hierarchy to circumvent diamond inheritance
-  by introducing KrylovSolverXXXTraits classes
+- ENH: Trust-region FEM solver with preconditioning; reorganised Krylov solver
+  hierarchy (muSpectre)
 
-0.17.0 (24Apr2021)
-------------------
+v0.17.0 (24Apr21)
+-----------------
 
-- muSpectre: Added trust region solver class and a simplistic damage material
-- muSpectre: physics have their specific name that might be used later for outputs
-- muSpectre: trsut region krylov solver has different resetart strategies available
-- muSpectre: gradient integration for solver class + cell data is now available
+- ENH: Trust-region solver, a damage material, named physics, restart strategies and
+  gradient integration (muSpectre)
 
-0.16.0 (31Mar2021)
-------------------
+v0.16.0 (31Mar21)
+-----------------
 
-- µSpectre: The ProjectionGradient works for vectorial and rank-two-tensor gradient
-  fields and replaces ProjectionFiniteStrainFast
-- µSpectre: The SolverNewtonCG can now handle scalar problems (e.g., diffusion equation,
-  heat equation, etc.)
-- clang: No more warnings are emitted during compilation
+- ENH: The gradient projection handles vector and rank-two gradients; the Newton-CG
+  solver handles scalar problems (muSpectre)
+- BUILD: No warnings with clang
 
-0.15.1 (30Mar2021)
-------------------
+v0.15.1 (30Mar21)
+-----------------
 
-- muSpectre: Added material for phase field fracture simulations
-- muGrid: Fix support for fields with >= 2^32 elements
+- ENH: Phase-field fracture material (muSpectre)
+- BUG: Fields with 2^32 elements or more
 
-0.15.0 (12Mar2021)
-------------------
+v0.15.0 (12Mar21)
+-----------------
 
-- muSpectre: All projection operators now have a gradient argument and can work with
-  discrete derivatives
-- muSpectre: Projection classes now have an `integrate` method that reconstructs the
-  node positions
-- muSpectre: Added `linear_finite_elements` to stencil database
-- muSpectre: Enabled even number of grid points for discrete stencils
-- muFFT: PFFT engine works with pencil decomposition
-- all: Fixed installation via CMake and `make install`
-- all: Fixed cross platform install of NetCDF I/O
+- ENH: Projection operators take a gradient argument and work with discrete
+  derivatives; node positions can be reconstructed (muSpectre)
+- ENH: Pencil decomposition in the PFFT engine (muFFT)
+- BUILD: Fixed CMake installation and cross-platform NetCDF I/O
 
-0.14.0 (04Feb2021)
-------------------
+v0.14.0 (04Feb21)
+-----------------
 
-- muFFT: implement serial wrapper to FFTW hcfft
+- ENH: Serial wrapper for FFTW half-complex transforms (muFFT)
 
-0.13.0 (28Jan2021)
-------------------
+v0.13.0 (28Jan21)
+-----------------
 
-- muSpectre: CellData and Solver classes for multiphysics calculations
-- muSpectre: Sensitivity analysis
-- Bug fix (muFFT): Handle cases where MPI processes have no grid points
+- ENH: Cell data and solver classes for multiphysics; sensitivity analysis (muSpectre)
+- BUG: MPI processes without grid points (muFFT)
 
-0.12.0 (19Nov2020)
-------------------
+v0.12.0 (19Nov20)
+-----------------
 
-- muGrid: Parallel I/O via NetCDF
-- muFFT: Derivatives in 1D
-- muFFT: Second derivatives
+- ENH: Parallel I/O via NetCDF; first and second derivatives in 1D (muFFT)
 
-0.11.0 (07Sep20)
+v0.11.0 (07Sep20)
+-----------------
+
+- ENH: Trust-region Newton-CG solver for nonlinear problems with instabilities
+- BUILD: Updated the Eigen archive URL that broke pip installs
+
+v0.10.0 (22Jul20)
+-----------------
+
+- ENH: Flexible field strides (column-major, row-major, strided pixels); control
+  over buffer copies in muFFT; gradient integration for several quadrature points
+
+v0.9.3 (28Jun20)
 ----------------
 
-- Trust-Region Newton-CG solver for nonlinear problems with instabilities
-- Updated Eigen archive URL which broke installation via pip
+- BUG: Source packaging kept a dirty flag that broke the PyPI package
 
-0.10.0 (22Jul2020)
-------------------
+v0.9.2 (28Jun20)
+----------------
 
-- Support for more flexible strideste in fields: full column-major, row-major and
-  strided pixels portion (#103)
-- User control over buffer copies in muFFT with option to avoid them completely
-- Gradient integration for multiple quadrature points
+- BUG: Strided field copies passed the wrong strides, breaking the MPI-parallel
+  FFTW forward transform
 
-0.9.3 (28Jun2020)
------------------
+v0.9.1 (17Jun20)
+----------------
 
-- Bug fix: Packaging with sdist did not remove dirty flag which lead to a broken PyPI
-  package
+- BUG: Source packaging only included the FFT engines present at packaging time
 
-0.9.2 (28Jun2020)
------------------
+v0.9.0 (17Jun20)
+----------------
 
-- Bug fix: operator= of TypedFieldBase passed wrong strides during strided copy; this
-  broke the MPI-parallel FFTW forward transform (#130)
-
-0.9.1 (17Jun2020)
------------------
-
-- Bug fix: Packaging with sdist only included FFT engines present during the packaging
-  process
-
-0.9.0 (17Jun2020)
------------------
-
-- Initial release of µSpectre
-    * FFT based micromechanical homogeneization
-    * Arbitrary constitutive laws in small and finite strain
-    * Krylov and Newton solver suite
-    * MPI parallelization
-- Initial release of µFFT
-    * Generic wrapper for MPI-parallel FFT libraries
-- Initial release of µGrid
-    * Generic library for managing regular grids
+- ENH: Initial release of µSpectre (FFT-based micromechanical homogenization with
+  arbitrary constitutive laws, Krylov and Newton solvers, MPI), µFFT and µGrid
