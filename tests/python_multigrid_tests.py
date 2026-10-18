@@ -51,10 +51,9 @@ than against a recorded output:
     product rule, component by component.
 """
 
+import muGrid
 import numpy as np
 import pytest
-
-import muGrid
 
 # --------------------------------------------------------------------------- #
 # Independent NumPy reference: the same tensor-product rules, one 1D pass per
@@ -555,7 +554,7 @@ def _global_sum(comm, value):
                  else comm.sum(float(value)))
 
 
-@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16), (2, 24), (3, 12)])
 def test_hybrid_is_the_exact_reference_inverse(comm, dim, n):
     """K (M^-1 r) == r.
 
@@ -763,7 +762,7 @@ def test_hybrid_is_exact_in_single_precision(comm, dim, n):
     assert np.sqrt(err / ref) < 1e-5
 
 
-@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16), (2, 24), (3, 12)])
 def test_hybrid_is_rank_independent(comm, dim, n):
     """The answer does not depend on how the domain was cut.
 
@@ -891,7 +890,6 @@ def test_hybrid_device_matches_host(comm, dim, n):
     merely a residual, which would pass for any exact inverse.
     """
     import cupy as cp
-
     from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
 
     if comm is not None and comm.size > 1:
@@ -953,6 +951,49 @@ def test_hybrid_fused_kernel_matches_the_loop(comm, dim, n):
     fused = prec._solve_local_fused(rhs)
     loop = prec._solve_local(rhs, fused=False)
 
+    scale = float(cp.abs(loop).max())
+    assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
+
+
+@pytest.mark.skipif(not _has_gpu(), reason="needs a GPU")
+@pytest.mark.parametrize("n", [64, 66])
+def test_hybrid_fused_kernel_handles_the_exception_table(comm, n):
+    """The device sweep's exception-table path and its chunk tail.
+
+    The device counterpart of
+    `test_hybrid_host_fused_kernel_handles_the_exception_table`. The sweep runs
+    in chunks of `_BLOCK_THOMAS_CHUNK` planes with a step-by-step tail, so 66
+    planes -- not a multiple of the chunk -- is what exercises the tail in both
+    directions; 64 is the plain case. Both populate the exception table, which
+    the 16- and 32-plane grids above never do.
+    """
+    import cupy as cp
+    from muGrid.Preconditioners import (
+        _BLOCK_THOMAS_CHUNK,
+        HybridFourierTridiagonalPreconditioner,
+    )
+
+    if comm is not None and comm.size > 1:
+        pytest.skip("single-rank comparison")
+    dim = 2
+    cp.cuda.Device(0).use()
+    decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * dim,
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim,
+        device=muGrid.Device.gpu(0))
+    prec = HybridFourierTridiagonalPreconditioner(
+        decomp, (1.0 / n,) * dim, 1.3, 0.7, communicator=comm)
+    assert prec._nb_exc > 0, "expected some modes to need the exception table"
+    if n == 66:
+        assert (prec.nz_local - 1) % _BLOCK_THOMAS_CHUNK, "expected a tail"
+
+    rng = cp.random.default_rng(12)
+    shape = (prec.nz_local,) + prec._mode_shape + (dim, 1)
+    rhs = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+           ).astype(prec._cdtype)
+
+    fused = prec._solve_local_fused(rhs)
+    loop = prec._solve_local(rhs, fused=False)
     scale = float(cp.abs(loop).max())
     assert float(cp.abs(fused - loop).max()) <= 1e-11 * scale
 
