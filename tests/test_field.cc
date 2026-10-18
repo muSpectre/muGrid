@@ -403,6 +403,29 @@ namespace muGrid {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  //! Per-pixel Eigen maps are column-major matrices with one pixel per
+  //! column: the array-of-structures layout. On structure-of-arrays storage
+  //! they used to read entries of different pixels silently (audit L7).
+  BOOST_AUTO_TEST_CASE(eigen_pixel_map_refuses_soa_storage) {
+    const DynGridIndex nb_grid_pts{3, 2};
+    GlobalFieldCollection soa{nb_grid_pts, nb_grid_pts, DynGridIndex{0, 0},
+                              FieldCollection::SubPtMap_t{{"quad", 2}},
+                              StorageOrder::StructureOfArrays};
+    auto & field{dynamic_cast<TypedField<Real> &>(
+        soa.register_real_field("v", 3, "quad"))};
+    BOOST_CHECK_THROW(field.eigen_pixel(), FieldError);
+    BOOST_CHECK_THROW(field.eigen_sub_pt(), FieldError);
+    BOOST_CHECK_NO_THROW(field.eigen_vec());  // flat, layout-independent
+
+    GlobalFieldCollection aos{nb_grid_pts, nb_grid_pts, DynGridIndex{0, 0},
+                              FieldCollection::SubPtMap_t{{"quad", 2}},
+                              StorageOrder::ArrayOfStructures};
+    auto & aos_field{dynamic_cast<TypedField<Real> &>(
+        aos.register_real_field("v", 3, "quad"))};
+    BOOST_CHECK_NO_THROW(aos_field.eigen_pixel());
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

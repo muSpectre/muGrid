@@ -289,6 +289,8 @@ void add_field(py::module &mod) {
             .def_property_readonly("nb_buffer_entries", &Field::get_nb_buffer_entries)
             .def_property_readonly("is_global", &Field::is_global)
             .def_property_readonly("sub_division", &Field::get_sub_division_tag)
+            .def_property_readonly("nb_sub_pts", &Field::get_nb_sub_pts)
+            .def_property_readonly("storage_order", &Field::get_storage_order)
             .def_property_readonly("spatial_dim", &Field::get_spatial_dim)
             // Device introspection for GPU-aware interop
             .def_property_readonly(

@@ -87,10 +87,16 @@ two.
 The `Transpose` class handles the MPI all-to-all communication that
 redistributes data between pencil orientations.
 
-!!! warning
-    Transpose operations currently assume AoS layout. With GPU memory this may
-    require a storage-order conversion or an update to the `Transpose` class to
-    handle SoA.
+!!! note
+    `Transpose` takes the storage order of the fields it redistributes and
+    handles both layouts (AoS on the host, SoA on the device), so no
+    storage-order conversion is needed around the all-to-all.
+
+!!! note
+    FFT plans and work buffers are cached per engine and released with it. The
+    device reduction and ghost-accumulation scratch buffers are cached per
+    device for the lifetime of the process and only ever grow; they are sized
+    by the largest reduction or halo seen, a small fraction of a field.
 
 !!! note
     The FFT module is designed so MPI communication needs no explicit packing

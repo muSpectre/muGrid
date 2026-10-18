@@ -151,6 +151,14 @@ namespace muGrid {
      * power-of-two grid satisfies this; anything else is rejected with an
      * explicit error rather than silently producing garbage at the seams.
      *
+     * The interpolation is multilinear, i.e. the Q1 one: for Q1 operators the
+     * Galerkin product R K_h P equals the rediscretised K_2h. For P1 (simplex)
+     * operators it does not -- P1 coarse functions are interpolated along the
+     * simplex edges, not multilinearly -- so a P1 multigrid built on these
+     * transfers is not Galerkin-exact (0.26 / 0.50 relative difference in 2D
+     * / 3D). The multigrid preconditioner rediscretises every level and only
+     * converges somewhat more slowly for P1; it remains correct.
+     *
      * The caller is responsible for the ghost exchange: `prolong` reads the
      * coarse field's ghosts, `restrict` reads the fine field's, so
      * `communicate_ghosts` must have been called on the *input* field. Neither

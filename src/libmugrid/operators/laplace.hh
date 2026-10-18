@@ -52,6 +52,10 @@
 #include "memory/memory_space.hh"
 #include "operators/linear.hh"
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/gpu_runtime.hh"
+#endif
+
 #include <array>
 #include <sstream>
 #include <string>
@@ -141,6 +145,17 @@ namespace muGrid {
      * an anisotropic grid: the two neighbours along axis d carry
      * `scale / h_d^2` and the centre `-2 scale * sum_d 1 / h_d^2`. Without
      * one every axis carries `scale`, the unit-spacing stencil above.
+     *
+     * Conventions to keep in mind when mixing it with other operators:
+     * - With scale = 1/h^2 this is the finite-difference div grad, which is
+     *   negative semidefinite; CG needs scale = -1/h^2. The FE stiffness of
+     *   FEMGradientOperator, transpose(apply(u)), is the positive
+     *   semidefinite -h^(d-2) div grad (the cell-volume weighting h^d times
+     *   1/h^2 per derivative).
+     * - Without a grid spacing the single scale applies to every axis;
+     *   pass the grid spacing for anisotropic grids (the generic
+     *   operator with per-axis coefficients 1/h_d^2 is the slower
+     *   equivalent).
      *
      * The hard-coded implementation provides significantly better performance
      * (~3-10x) than the generic convolution operator due to compile-time known
@@ -520,6 +535,7 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & input_field,
             TypedFieldBase<T, DefaultDeviceSpace> & output_field, T alpha,
             bool increment) const {
+            DeviceGuard device_guard{input_field.get_device_id()};
             const auto & collection =
                 this->validate_fields(input_field, output_field);
             const auto nb_grid_pts =

@@ -34,6 +34,8 @@
 
 #include "memory/allocation_profiler.hh"
 
+#include "core/environment.hh"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -97,10 +99,7 @@ namespace muGrid {
         static AllocationProfiler * profiler{[] {
             auto * p{new AllocationProfiler{}};
             // Opt-in via the environment, mirroring MUGRID_GPU_AWARE_MPI.
-            const char * env{std::getenv("MUGRID_PROFILE_ALLOCATIONS")};
-            if (env != nullptr && std::strlen(env) > 0 &&
-                (env[0] == '1' || env[0] == 'y' || env[0] == 'Y' ||
-                 env[0] == 't' || env[0] == 'T')) {
+            if (environment_flag("MUGRID_PROFILE_ALLOCATIONS") == 1) {
                 p->enable();
             }
             return p;

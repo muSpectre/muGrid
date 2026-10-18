@@ -178,7 +178,10 @@ class CommunicatorWrapper:
         if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
             return self._sum_gpu(arg)
 
-        # For CPU scalars and arrays, use the C++ implementation
+        # CPU arrays: the C++ overloads for arrays match on dtype. CPU
+        # scalars: dispatch on dtype too (see _reduce_host_scalar).
+        if np.ndim(arg) == 0:
+            return self._reduce_host_scalar(arg, "sum")
         return self._cpp.sum(arg)
 
     def isum(self, arg):
@@ -228,13 +231,11 @@ class CommunicatorWrapper:
 
     def _sum_gpu(self, arg):
         """GPU-aware sum reduction."""
-        cp = _get_cupy()
-
         # Serial case: no reduction needed, return as-is
         if self.size == 1:
             return arg
 
-        # MPI case: use GPU-aware MPI
+        # MPI case (device buffers or host staging, see _allreduce_device)
         if self._mpi_comm is None:
             raise RuntimeError(
                 "MPI communicator not available for GPU reduction. "
@@ -247,17 +248,35 @@ class CommunicatorWrapper:
             # Convert to 1-D for MPI, then back to 0-D
             arg = arg.reshape(1)
 
-        # Allocate output buffer on GPU
-        result = cp.empty_like(arg)
-
-        # Use GPU-aware MPI Allreduce
-        self._mpi_comm.Allreduce(arg, result, op=MPI.SUM)
+        result = self._allreduce_device(arg, MPI.SUM)
 
         # Convert back to 0-D if input was scalar
         if is_scalar:
             result = result.reshape(())
 
         return result
+
+    def _allreduce_device(self, arr, mpi_op):
+        """Allreduce a CuPy array across ranks, returning a CuPy array.
+
+        Device pointers go to MPI only when it is GPU-aware
+        (`_muGrid.Communicator.gpu_aware_mpi`: MUGRID_GPU_AWARE_MPI, else the
+        MPI library's own report), as in the C++ ghost exchange; otherwise the
+        values are staged through the host. Handing device buffers to an MPI
+        that is not GPU-aware made it read them as host memory -- a crash, or
+        wrong sums. Either way the current stream is synchronised first: MPI
+        does not order itself after the kernel that produced `arr`.
+        """
+        cp = _get_cupy()
+        cp.cuda.get_current_stream().synchronize()
+        if _muGrid.Communicator.gpu_aware_mpi:
+            result = cp.empty_like(arr)
+            self._mpi_comm.Allreduce(arr, result, op=mpi_op)
+            return result
+        host = cp.asnumpy(arr)
+        result = np.empty_like(host)
+        self._mpi_comm.Allreduce(host, result, op=mpi_op)
+        return cp.asarray(result)
 
     def max(self, arg):
         """
@@ -281,18 +300,25 @@ class CommunicatorWrapper:
         if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
             return self._max_gpu(arg)
 
-        # For CPU scalars and arrays, use the C++ implementation
+        # CPU scalars: dispatch on dtype (see _reduce_host_scalar)
+        if np.ndim(arg) == 0:
+            return self._reduce_host_scalar(arg, "max")
         return self._cpp.max(arg)
+
+    def min(self, arg):
+        """Min reduction of a CPU scalar across all processes, with the MPI
+        datatype taken from its dtype (see `_reduce_host_scalar`)."""
+        if np.ndim(arg) == 0 and not self._is_gpu(arg):
+            return self._reduce_host_scalar(arg, "min")
+        return self._cpp.min(arg)
 
     def _max_gpu(self, arg):
         """GPU-aware max reduction."""
-        cp = _get_cupy()
-
         # Serial case: no reduction needed, return as-is
         if self.size == 1:
             return arg
 
-        # MPI case: use GPU-aware MPI
+        # MPI case (device buffers or host staging, see _allreduce_device)
         if self._mpi_comm is None:
             raise RuntimeError("MPI communicator not available for GPU reduction.")
 
@@ -301,11 +327,7 @@ class CommunicatorWrapper:
         if is_scalar:
             arg = arg.reshape(1)
 
-        # Allocate output buffer on GPU
-        result = cp.empty_like(arg)
-
-        # Use GPU-aware MPI Allreduce
-        self._mpi_comm.Allreduce(arg, result, op=MPI.MAX)
+        result = self._allreduce_device(arg, MPI.MAX)
 
         if is_scalar:
             result = result.reshape(())
@@ -460,8 +482,16 @@ class CommunicatorWrapper:
         collective)."""
         if a.size:
             return getattr(a, op)()
-        identity = {"sum": 0.0, "min": float("inf"), "max": float("-inf")}[op]
-        dtype = a.dtype if hasattr(a, "dtype") else np.float64
+        dtype = np.dtype(a.dtype if hasattr(a, "dtype") else np.float64)
+        if np.issubdtype(dtype, np.integer):
+            # +-inf does not exist in an integer type: converting it raised
+            # OverflowError on the empty rank only, and the other ranks then
+            # waited forever in the Allreduce.
+            info = np.iinfo(dtype)
+            identity = {"sum": 0, "min": info.max, "max": info.min}[op]
+        else:
+            identity = {"sum": 0.0, "min": float("inf"),
+                        "max": float("-inf")}[op]
         if self._is_gpu(a):
             return _get_cupy().asarray(identity, dtype=dtype)
         return np.asarray(identity, dtype=dtype)
@@ -485,14 +515,28 @@ class CommunicatorWrapper:
                 )
             mpi_op = {"sum": MPI.SUM, "min": MPI.MIN, "max": MPI.MAX}[op]
             buf = cp.asarray(local).reshape(1)
-            result = cp.empty_like(buf)
-            self._mpi_comm.Allreduce(buf, result, op=mpi_op)
-            return result.reshape(())
+            return self._allreduce_device(buf, mpi_op).reshape(())
 
-        # CPU scalar: route through the C++ communicator (consistent with
-        # `sum`/`max`, and robust when `_mpi_comm` is None but the C++
-        # communicator is MPI-backed).
-        return getattr(self._cpp, op)(float(local))
+        # CPU scalar: route through the C++ communicator (robust when
+        # `_mpi_comm` is None but the C++ communicator is MPI-backed).
+        return self._reduce_host_scalar(local, op)
+
+    def _reduce_host_scalar(self, value, op):
+        """Reduce one host scalar with the MPI datatype taken from its dtype.
+
+        Going through ``float()`` dropped the imaginary part of complex values
+        and rounded integers beyond 2^53; picking the C++ overload by value
+        could also make two ranks use different datatypes in one collective.
+        The dtype kind is the same on every rank, so this cannot."""
+        value = np.asarray(value)
+        kind = value.dtype.kind
+        if kind == "c":
+            if op != "sum":
+                raise TypeError(f"no {op} for complex values")
+            return getattr(self._cpp, "_sum_complex128")(complex(value))
+        if kind in "iub":
+            return getattr(self._cpp, f"_{op}_int64")(int(value))
+        return getattr(self._cpp, f"_{op}_float64")(float(value))
 
     def reduce_sum(self, a):
         """Global sum over all elements of `a` on all ranks (scalar)."""

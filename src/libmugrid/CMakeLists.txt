@@ -22,6 +22,7 @@ set(MUGRID_SOURCES
     # core/
     core/exception.cc
     core/enums.cc
+    core/environment.cc
     core/units.cc
     core/type_descriptor.cc
     # grid/

@@ -104,7 +104,8 @@ namespace muGrid {
      * (Freudenthal) triangulation, which has six tetrahedra sharing the
      * (0,0,0)-(1,1,1) diagonal (thesis Sec. 3.5.1); the five-tetrahedra split
      * has no preferred diagonal and was chosen there for its isotropy
-     * (thesis App. A.1). Note that the thesis' printed z-component of the
+     * (thesis App. A.1), which avoids grid-anisotropy artefacts in mechanical
+     * calculations with plasticity. Note that the thesis' printed z-component of the
      * fourth corner element, "f011 - f011", is a typo for f011 - f010, which
      * is what B holds.
      *

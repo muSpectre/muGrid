@@ -81,6 +81,7 @@ class TestFEMGradientOperator2D_smoke:
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
             **fc_kwargs,
         )
@@ -110,6 +111,7 @@ class TestFEMGradientOperator2D_smoke:
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
             **fc_kwargs,
         )
@@ -152,6 +154,7 @@ class TestFEMGradientOperator3D_smoke:
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts, self.nb_z_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
             **fc_kwargs,
         )
@@ -179,6 +182,7 @@ class TestFEMGradientOperator3D_smoke:
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts, self.nb_z_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
             **fc_kwargs,
         )
@@ -224,6 +228,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
             device=muGrid.Device.gpu(),
         )
@@ -251,6 +256,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_host = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
@@ -262,6 +268,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_device = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
             device=muGrid.Device.gpu(),
         )
@@ -293,6 +300,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_host = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
@@ -304,6 +312,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_device = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
             device=muGrid.Device.gpu(),
         )
@@ -336,6 +345,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_host = muGrid.GlobalFieldCollection(
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
@@ -347,6 +357,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_device = muGrid.GlobalFieldCollection(
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
             device=muGrid.Device.gpu(),
         )
@@ -379,6 +390,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_host = muGrid.GlobalFieldCollection(
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
         )
         nodal_host = fc_host.real_field("nodal", (1,))
@@ -390,6 +402,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc_device = muGrid.GlobalFieldCollection(
             (nb_x, nb_y, nb_z),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1, 1),
             nb_ghosts_right=(1, 1, 1),
             device=muGrid.Device.gpu(),
         )
@@ -421,6 +434,7 @@ class TestFEMGradientOperatorGPUCorrectness:
         fc = muGrid.GlobalFieldCollection(
             (self.nb_x_pts, self.nb_y_pts),
             sub_pts={"quad": fem_grad.nb_quad_pts},
+            nb_ghosts_left=(1, 1),
             nb_ghosts_right=(1, 1),
             device=muGrid.Device.gpu(),
         )
@@ -468,7 +482,8 @@ class TestFEMGradientElements:
         fc_kwargs = {"device": device_obj} if device_obj else {}
         fc = muGrid.GlobalFieldCollection(
             (n,) * dim, sub_pts={"quad": op.nb_quad_pts},
-            nb_ghosts_right=(1,) * dim, **fc_kwargs)
+            nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim,
+            **fc_kwargs)
         nodal = fc.real_field("nodal", (1,))
         gradient = fc.real_field("gradient", (op.nb_output_components,), "quad")
 

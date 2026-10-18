@@ -35,6 +35,7 @@
  */
 
 #include "transpose.hh"
+#include "core/environment.hh"
 #include "core/exception.hh"
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
@@ -95,8 +96,8 @@ namespace muGrid {
 
         // Opt-in: use the contiguous-staging Alltoallv exchange on the host.
         if (!this->on_device) {
-            const char * env{std::getenv("MUGRID_STAGED_TRANSPOSE")};
-            this->staged_host = (env != nullptr && env[0] == '1');
+            this->staged_host =
+                environment_flag("MUGRID_STAGED_TRANSPOSE") == 1;
         }
 
         // Compute how the distributed dimensions are split across ranks

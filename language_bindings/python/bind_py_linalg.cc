@@ -84,12 +84,18 @@ namespace {
     void bind_block_thomas(py::module & mod, const char * name) {
         using Arr = py::array_t<std::complex<T>,
                                 py::array::c_style | py::array::forcecast>;
+        // Outputs are written in place, so they must not be converted: a
+        // forcecast output of the wrong dtype or layout is a temporary copy,
+        // the sweep writes into that, and the caller's array comes back
+        // untouched without an error. Without forcecast and with noconvert()
+        // below, such an array is rejected instead.
+        using OutArr = py::array_t<std::complex<T>, py::array::c_style>;
         mod.def(
             name,
             [](Arr rhs, Arr head, Arr exc,
                py::array_t<int, py::array::c_style | py::array::forcecast>
                    exc_index,
-               Arr A0, Arr A2, Arr y, Arr out) {
+               Arr A0, Arr A2, OutArr y, OutArr out) {
                 // Every buffer_info must be taken while the GIL is held:
                 // `request()` reenters the Python buffer protocol.
                 const auto r = rhs.request();
@@ -107,19 +113,51 @@ namespace {
                 }
                 const muGrid::Index_t nz{r.shape[0]};
                 const muGrid::Index_t nb_modes{r.shape[1]};
+                if (h.ndim != 4 || h.shape[1] != nb_modes || h.shape[2] != Dim ||
+                    h.shape[3] != Dim) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: head must be (nb_head, nb_modes, Dim, "
+                        "Dim)"};
+                }
+                if (e.ndim != 4 || e.shape[0] != nz || e.shape[2] != Dim ||
+                    e.shape[3] != Dim) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: exc must be (nz, nb_exc, Dim, Dim)"};
+                }
                 const muGrid::Index_t nb_head{h.shape[0]};
                 const muGrid::Index_t nb_exc{e.shape[1]};
                 if (ys.size != r.size || os.size != r.size) {
                     throw muGrid::RuntimeError{
                         "block_thomas: y and out must match rhs in size"};
                 }
-                if (xi.shape[0] != nb_modes) {
+                if (a0.size != nb_modes * Dim * Dim ||
+                    a2.size != nb_modes * Dim * Dim) {
+                    throw muGrid::RuntimeError{
+                        "block_thomas: A0 and A2 must be (nb_modes, Dim, Dim)"};
+                }
+                if (xi.ndim != 1 || xi.shape[0] != nb_modes) {
                     throw muGrid::RuntimeError{
                         "block_thomas: exc_index must have one entry per mode"};
                 }
-                if (e.shape[0] != nz) {
+                if (!y.writeable() || !out.writeable()) {
                     throw muGrid::RuntimeError{
-                        "block_thomas: exc must span the whole axis"};
+                        "block_thomas: y and out must be writeable"};
+                }
+                // A slot must address `exc`; a negative one reads `head`,
+                // which then must have a plane (nb_head == 0 indexed -1).
+                {
+                    const auto * idx{static_cast<const int *>(xi.ptr)};
+                    for (muGrid::Index_t m{0}; m < nb_modes; ++m) {
+                        if (idx[m] >= nb_exc) {
+                            throw muGrid::RuntimeError{
+                                "block_thomas: exc_index entry beyond exc"};
+                        }
+                        if (idx[m] < 0 && nb_head == 0) {
+                            throw muGrid::RuntimeError{
+                                "block_thomas: a mode reads head, which has "
+                                "no plane"};
+                        }
+                    }
                 }
 
                 const auto * rhs_p = static_cast<const std::complex<T> *>(r.ptr);
@@ -136,8 +174,8 @@ namespace {
                     rhs_p, head_p, exc_p, idx_p, a0_p, a2_p, y_p, out_p, nz,
                     nb_modes, nb_head, nb_exc);
             },
-            "rhs"_a, "head"_a, "exc"_a, "exc_index"_a, "A0"_a, "A2"_a, "y"_a,
-            "out"_a,
+            "rhs"_a, "head"_a, "exc"_a, "exc_index"_a, "A0"_a, "A2"_a,
+            py::arg("y").noconvert(), py::arg("out").noconvert(),
             "Fused block-Thomas sweep along the distributed axis, batched over "
             "Fourier modes. Host counterpart of the device kernel: two passes "
             "over memory instead of the 4*nz an elementwise formulation costs.");
@@ -156,16 +194,20 @@ namespace {
      */
     template <muGrid::Dim_t Dim, typename T>
     void bind_green_symbol(py::module & mod, const char * name) {
-        using Arr = py::array_t<std::complex<T>,
-                                py::array::c_style | py::array::forcecast>;
-        using RArr = py::array_t<T, py::array::c_style | py::array::forcecast>;
+        // `field` is modified in place, so it is taken without conversion
+        // (see bind_block_thomas): a forcecast copy would absorb the result.
+        using Arr = py::array_t<std::complex<T>, py::array::c_style>;
+        // The symbol is evaluated in double for either field precision, so
+        // its inputs are double too (see green_symbol.hh).
+        using RArr =
+            py::array_t<Real, py::array::c_style | py::array::forcecast>;
         mod.def(
             name,
             [](Arr field, muGrid::Index_t stride_component,
                muGrid::Index_t stride_mode, RArr stencil,
                std::vector<RArr> q,
                std::vector<muGrid::Index_t> nb_fourier_grid_pts,
-               T normalisation) {
+               Real normalisation) {
                 const auto f = field.request();
                 const auto st = stencil.request();
 
@@ -186,14 +228,24 @@ namespace {
                         "apply_green_symbol: stencil must be 3^Dim x Dim x "
                         "Dim"};
                 }
-                if (f.size < nb_modes * Dim) {
+                if (!field.writeable()) {
                     throw muGrid::RuntimeError{
-                        "apply_green_symbol: field is smaller than nb_modes * "
-                        "Dim"};
+                        "apply_green_symbol: field must be writeable"};
+                }
+                // The kernel addresses component a of mode m at
+                // a * stride_component + m * stride_mode
+                if (stride_component < 0 || stride_mode < 0 ||
+                    (nb_modes > 0 &&
+                     (Dim - 1) * stride_component +
+                             (nb_modes - 1) * stride_mode >=
+                         f.size)) {
+                    throw muGrid::RuntimeError{
+                        "apply_green_symbol: the strides address elements "
+                        "beyond the field"};
                 }
 
                 std::vector<py::buffer_info> qb;
-                std::vector<const T *> qp;
+                std::vector<const Real *> qp;
                 qb.reserve(Dim);
                 qp.reserve(Dim);
                 for (muGrid::Dim_t d = 0; d < Dim; ++d) {
@@ -203,11 +255,11 @@ namespace {
                             "apply_green_symbol: frequency table length does "
                             "not match the mode count of its axis"};
                     }
-                    qp.push_back(static_cast<const T *>(qb.back().ptr));
+                    qp.push_back(static_cast<const Real *>(qb.back().ptr));
                 }
 
                 auto * field_p = static_cast<std::complex<T> *>(f.ptr);
-                const auto * stencil_p = static_cast<const T *>(st.ptr);
+                const auto * stencil_p = static_cast<const Real *>(st.ptr);
 
                 py::gil_scoped_release release{};
                 muGrid::green_symbol::apply_inverse<Dim, T>(
@@ -215,12 +267,15 @@ namespace {
                     qp.data(), nb_fourier_grid_pts.data(), normalisation,
                     nb_modes);
             },
-            "field"_a, "stride_component"_a, "stride_mode"_a, "stencil"_a,
-            "q"_a, "nb_fourier_grid_pts"_a, "normalisation"_a,
+            py::arg("field").noconvert(), "stride_component"_a,
+            "stride_mode"_a, "stencil"_a, "q"_a, "nb_fourier_grid_pts"_a,
+            "normalisation"_a,
             "Apply the inverse symbol of a uniform stencil operator to a "
             "Fourier field, in place, evaluating the symbol per mode instead "
             "of reading a stored one. The q = 0 block is the rigid-body null "
-            "space and is projected out.");
+            "space and is projected out. The symbol is built and inverted in "
+            "double for either field precision; stencil, q and normalisation "
+            "are taken in double.");
     }
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -274,14 +329,15 @@ namespace {
      */
     template <muGrid::Dim_t Dim, typename T>
     void bind_green_symbol_gpu(py::module & mod, const char * name) {
-        using RArr = py::array_t<T, py::array::c_style | py::array::forcecast>;
+        using RArr =
+            py::array_t<Real, py::array::c_style | py::array::forcecast>;
         mod.def(
             name,
             [](std::uintptr_t field, muGrid::Index_t stride_component,
                muGrid::Index_t stride_mode, RArr stencil,
                std::vector<std::uintptr_t> q,
                std::vector<muGrid::Index_t> nb_fourier_grid_pts,
-               T normalisation) {
+               Real normalisation) {
                 const auto st = stencil.request();
                 if (static_cast<muGrid::Dim_t>(q.size()) != Dim ||
                     static_cast<muGrid::Dim_t>(nb_fourier_grid_pts.size()) !=
@@ -300,12 +356,12 @@ namespace {
                 for (auto n : nb_fourier_grid_pts) {
                     nb_modes *= n;
                 }
-                std::vector<const T *> qp;
+                std::vector<const Real *> qp;
                 qp.reserve(Dim);
                 for (auto p : q) {
-                    qp.push_back(reinterpret_cast<const T *>(p));
+                    qp.push_back(reinterpret_cast<const Real *>(p));
                 }
-                const auto * stencil_p = static_cast<const T *>(st.ptr);
+                const auto * stencil_p = static_cast<const Real *>(st.ptr);
                 py::gil_scoped_release release{};
                 muGrid::green_symbol::apply_inverse_gpu<Dim, T>(
                     reinterpret_cast<std::complex<T> *>(field),
@@ -316,7 +372,8 @@ namespace {
             "q"_a, "nb_fourier_grid_pts"_a, "normalisation"_a,
             "Device counterpart of apply_green_symbol. `field` and each entry "
             "of `q` are device addresses (CuPy `array.data.ptr`); the stencil "
-            "is a host array.");
+            "is a host array. The frequency tables must be float64 for every "
+            "field precision: the symbol is evaluated in double.");
     }
 #endif
 

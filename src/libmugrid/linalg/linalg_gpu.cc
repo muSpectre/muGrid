@@ -54,6 +54,8 @@
 #include "core/exception.hh"
 
 #include "memory/gpu_runtime.hh"
+
+#include <map>
 #include "memory/device_alloc.hh"
 
 #include <algorithm>
@@ -731,19 +733,27 @@ bool has_ghosts(const GlobalFieldCollection& coll) {
  * call sites (MPI ranks are separate processes).
  */
 Real* reduction_scratch(int slot, Index_t n_reals) {
-    static Real* ptr[2]{nullptr, nullptr};
-    static Index_t cap[2]{0, 0};
-    if (n_reals > cap[slot]) {
-        if (ptr[slot]) {
-            device_deallocate(ptr[slot]);
+    // One cache per device, for the current one (the callers hold a
+    // DeviceGuard on their field's device): a single process-wide buffer
+    // lives on whichever GPU first allocated it, and a reduction on another
+    // GPU then wrote its partial sums into foreign memory.
+    struct Scratch {
+        Real* ptr[2]{nullptr, nullptr};
+        Index_t cap[2]{0, 0};
+    };
+    static std::map<int, Scratch> per_device;
+    Scratch& scratch{per_device[gpu_get_device()]};
+    if (n_reals > scratch.cap[slot]) {
+        if (scratch.ptr[slot]) {
+            device_deallocate(scratch.ptr[slot]);
         }
         // Route through the device allocator chokepoint so this scratch shares
         // the single owner/pool and is visible to the allocation profiler.
-        ptr[slot] = static_cast<Real*>(
+        scratch.ptr[slot] = static_cast<Real*>(
             device_allocate(n_reals * sizeof(Real), "linalg-reduction-scratch"));
-        cap[slot] = n_reals;
+        scratch.cap[slot] = n_reals;
     }
-    return ptr[slot];
+    return scratch.ptr[slot];
 }
 
 //! Reduction scratch typed as a device scalar (sized for `count` of them).
@@ -829,8 +839,9 @@ gpu_kernels::ReduceAcc<DS> reduce_full_dot(const DS* a, const DS* b,
         // would be an invalid configuration
         return Acc{};
     }
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
+    // The kernel is a grid-stride loop: a capped block count amortises the
+    // per-block tree and keeps the single-block final pass short.
+    const int num_blocks = gpu_kernels::reduction_blocks(n);
     Acc* d_partial = scratch_as<Acc>(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel<DS>,
@@ -886,6 +897,7 @@ gpu_kernels::ReduceAcc<DS> reduce_interior_dot(const DS* a, const DS* b,
 template <typename T>
 reduction_result_t<T> vecdot_device(const TypedField<T, DeviceSpace>& a,
                                     const TypedField<T, DeviceSpace>& b) {
+    DeviceGuard device_guard{a.get_device_id()};
     if (&a.get_collection() != &b.get_collection()) {
         throw FieldError("vecdot: fields must belong to the same collection");
     }
@@ -895,6 +907,8 @@ reduction_result_t<T> vecdot_device(const TypedField<T, DeviceSpace>& a,
     if (a.get_nb_sub_pts() != b.get_nb_sub_pts()) {
         throw FieldError("vecdot: fields must have the same number of sub-points");
     }
+    internal::check_contiguous("vecdot", a);
+    internal::check_contiguous("vecdot", b);
     using DS = DeviceScalar<T>;
 
     // For GlobalFieldCollection with ghosts, sum the interior directly;
@@ -918,6 +932,8 @@ reduction_result_t<T> vecdot_device(const TypedField<T, DeviceSpace>& a,
 
 template <typename T>
 reduction_result_t<T> norm_sq_device(const TypedField<T, DeviceSpace>& x) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("norm_sq", x);
     // norm_sq(x) == vecdot(x, x): conj_product(x, x) = |x|^2 for complex
     // (its imaginary part is exactly zero, x_r*x_i - x_i*x_r) and x^2 for real.
     using DS = DeviceScalar<T>;
@@ -925,17 +941,21 @@ reduction_result_t<T> norm_sq_device(const TypedField<T, DeviceSpace>& x) {
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (has_ghosts(global_coll)) {
-            return to_public(reduce_interior_dot<DS>(
-                device_ptr(x), device_ptr(x), interior_box(x, global_coll)));
+            return norm_to_public<T>(std::real(to_public(reduce_interior_dot<DS>(
+                device_ptr(x), device_ptr(x), interior_box(x, global_coll)))));
         }
     }
+    // x^H x is real; the summed conj products can carry a rounding imaginary
+    // part (FMA contraction), which norm_to_public drops.
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    return to_public(reduce_full_dot<DS>(device_ptr(x), device_ptr(x), n));
+    return norm_to_public<T>(std::real(
+        to_public(reduce_full_dot<DS>(device_ptr(x), device_ptr(x), n))));
 }
 
 template <typename T>
 void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
                  TypedField<T, DeviceSpace>& y) {
+    DeviceGuard device_guard{x.get_device_id()};
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy: fields must belong to the same collection");
     }
@@ -943,6 +963,8 @@ void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy: fields must have the same number of entries");
     }
+    internal::check_contiguous("axpy", x);
+    internal::check_contiguous("axpy", y);
     using DS = DeviceScalar<T>;
     // Total scalar elements in the full buffer (get_nb_entries already counts
     // sub-points, so multiply only by the number of components)
@@ -962,6 +984,8 @@ void axpy_device(T alpha, const TypedField<T, DeviceSpace>& x,
 
 template <typename T>
 void scal_device(T alpha, TypedField<T, DeviceSpace>& x) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("scal", x);
     using DS = DeviceScalar<T>;
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
     if (n <= 0) {
@@ -978,6 +1002,7 @@ void scal_device(T alpha, TypedField<T, DeviceSpace>& x) {
 template <typename T>
 void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
                   TypedField<T, DeviceSpace>& y) {
+    DeviceGuard device_guard{x.get_device_id()};
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpby: fields must belong to the same collection");
     }
@@ -985,6 +1010,8 @@ void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpby: fields must have the same number of entries");
     }
+    internal::check_contiguous("axpby", x);
+    internal::check_contiguous("axpby", y);
     using DS = DeviceScalar<T>;
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
     if (n <= 0) {
@@ -1002,6 +1029,7 @@ void axpby_device(T alpha, const TypedField<T, DeviceSpace>& x, T beta,
 template <typename T>
 void copy_device(const TypedField<T, DeviceSpace>& src,
                  TypedField<T, DeviceSpace>& dst) {
+    DeviceGuard device_guard{src.get_device_id()};
     if (&src.get_collection() != &dst.get_collection()) {
         throw FieldError("copy: fields must belong to the same collection");
     }
@@ -1009,6 +1037,8 @@ void copy_device(const TypedField<T, DeviceSpace>& src,
         src.get_nb_components() != dst.get_nb_components()) {
         throw FieldError("copy: fields must have the same number of entries");
     }
+    internal::check_contiguous("copy", src);
+    internal::check_contiguous("copy", dst);
     using DS = DeviceScalar<T>;
     const Index_t n = src.get_nb_entries() * src.get_nb_components();
     if (n <= 0) {
@@ -1026,6 +1056,7 @@ template <typename T>
 reduction_result_t<T> axpy_norm_sq_device(T alpha,
                                           const TypedField<T, DeviceSpace>& x,
                                           TypedField<T, DeviceSpace>& y) {
+    DeviceGuard device_guard{x.get_device_id()};
     if (&x.get_collection() != &y.get_collection()) {
         throw FieldError("axpy_norm_sq: fields must belong to the same collection");
     }
@@ -1033,6 +1064,8 @@ reduction_result_t<T> axpy_norm_sq_device(T alpha,
         x.get_nb_components() != y.get_nb_components()) {
         throw FieldError("axpy_norm_sq: fields must have the same number of entries");
     }
+    internal::check_contiguous("axpy_norm_sq", x);
+    internal::check_contiguous("axpy_norm_sq", y);
     using DS = DeviceScalar<T>;
     const auto& coll = x.get_collection();
     // Total scalar elements in the full buffer (get_nb_entries already counts
@@ -1064,8 +1097,7 @@ reduction_result_t<T> axpy_norm_sq_device(T alpha,
     }
 
     // No ghosts: fused single-pass AXPY + norm_sq (real-valued partial sums).
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
+    const int num_blocks = gpu_kernels::reduction_blocks(n);
     Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel<DS>,
@@ -1084,10 +1116,10 @@ template <typename T>
 void cross_device(const TypedField<T, DeviceSpace>& a,
                   const TypedField<T, DeviceSpace>& b,
                   TypedField<T, DeviceSpace>& out) {
-    const auto& coll = a.get_collection();
-    internal::check_three_vector("cross", a, coll);
-    internal::check_three_vector("cross", b, coll);
-    internal::check_three_vector("cross", out, coll);
+    DeviceGuard device_guard{a.get_device_id()};
+    internal::check_three_vector("cross", a, a);
+    internal::check_three_vector("cross", b, a);
+    internal::check_three_vector("cross", out, a);
     const Index_t npix = a.get_nb_entries();
     // An empty subdomain (e.g. an MPI rank with no local pixels) has nothing to
     // compute. Skip it, including the aliasing check below: empty fields share a
@@ -1277,19 +1309,9 @@ std::array<reduction_result_t<RT>, 3> pipelined_cg_dots_device(
     const TypedField<RT, DeviceSpace>& r,
     const TypedField<RT, DeviceSpace>& u,
     const TypedField<RT, DeviceSpace>& w) {
+    DeviceGuard device_guard{r.get_device_id()};
     using Acc = reduction_result_t<RT>;
-    for (const auto* other : {&u, &w}) {
-        if (&other->get_collection() != &r.get_collection()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must belong to the same collection");
-        }
-        if (other->get_nb_components() != r.get_nb_components() ||
-            other->get_nb_sub_pts() != r.get_nb_sub_pts()) {
-            throw FieldError(
-                "pipelined_cg_dots: fields must have the same number of "
-                "components and sub-points");
-        }
-    }
+    internal::check_pipelined_cg_operands(r, u, w);
     const auto& coll = r.get_collection();
 
     // The pipelined CG fields live on a decomposition (Global collection). For
@@ -1360,6 +1382,7 @@ std::array<Real, 3> pipelined_cg_dots<Real32, DeviceSpace>(
 template <typename RT, typename CT>
 void scal_complex_field_device(const TypedField<RT, DeviceSpace>& alpha,
                                TypedField<CT, DeviceSpace>& x) {
+    DeviceGuard device_guard{alpha.get_device_id()};
     internal::check_field_alpha(alpha, x);
 
     const Index_t npix = x.get_nb_entries();
@@ -1387,6 +1410,7 @@ void scal_complex_field_device(const TypedField<RT, DeviceSpace>& alpha,
 template <typename RT>
 void scal_real_field_device(const TypedField<RT, DeviceSpace>& alpha,
                             TypedField<RT, DeviceSpace>& x) {
+    DeviceGuard device_guard{alpha.get_device_id()};
     internal::check_field_alpha(alpha, x);
 
     const Index_t npix = x.get_nb_entries();
@@ -1444,11 +1468,11 @@ void leray_project_device(const TypedField<RT, DeviceSpace>& k,
                           const TypedField<RT, DeviceSpace>& invk,
                           const TypedField<CT, DeviceSpace>& N,
                           TypedField<CT, DeviceSpace>& out) {
-    const auto& coll = out.get_collection();
-    internal::check_three_vector("leray_project", k, coll);
-    internal::check_three_vector("leray_project", invk, coll);
-    internal::check_three_vector("leray_project", N, coll);
-    internal::check_three_vector("leray_project", out, coll);
+    DeviceGuard device_guard{k.get_device_id()};
+    internal::check_three_vector("leray_project", k, out);
+    internal::check_three_vector("leray_project", invk, out);
+    internal::check_three_vector("leray_project", N, out);
+    internal::check_three_vector("leray_project", out, out);
     const Index_t npix = out.get_nb_entries();
     if (npix <= 0) {
         // e.g. an MPI rank with no local pixels; a zero-block kernel launch

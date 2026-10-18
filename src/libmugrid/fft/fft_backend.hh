@@ -46,6 +46,18 @@
 namespace muGrid {
 
 /**
+ * Thrown when a backend cannot plan a transform for this layout (size,
+ * strides, batching) -- a property of the layout, as opposed to a transient
+ * failure such as running out of memory. The engine falls back to a more
+ * general path, and remembers it, only on this exception; anything else
+ * propagates.
+ */
+class FFTPlanUnsupported : public RuntimeError {
+ public:
+  using RuntimeError::RuntimeError;
+};
+
+/**
  * Abstract interface for 1D FFT operations.
  *
  * Implementations are selected at compile time based on GPU backend configuration

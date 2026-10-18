@@ -95,6 +95,20 @@ namespace muGrid {
     DynGridIndex non_contiguous3({6, 5, 15});
     BOOST_CHECK(
         !CcoordOps::is_buffer_contiguous(nb_grid_pts3, non_contiguous3));
+
+    // A size-1 axis may share its stride with the next one (column-major
+    // strides of (4, 1, 3) are (1, 4, 4)) or carry any stride at all; it is
+    // never stepped along, so the buffer is contiguous either way (audit M7:
+    // the tie was broken arbitrarily and could report it non-contiguous).
+    DynGridIndex with_unit_axis({4, 1, 3});
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(with_unit_axis,
+                                                DynGridIndex({1, 4, 4})));
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(with_unit_axis,
+                                                DynGridIndex({1, 99, 4})));
+    BOOST_CHECK(CcoordOps::is_buffer_contiguous(with_unit_axis,
+                                                DynGridIndex({3, 12, 1})));
+    BOOST_CHECK(!CcoordOps::is_buffer_contiguous(with_unit_axis,
+                                                 DynGridIndex({1, 4, 8})));
   }
 
   BOOST_AUTO_TEST_CASE(test_get_size_large) {

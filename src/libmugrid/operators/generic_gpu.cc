@@ -43,6 +43,7 @@
 #include "operators/generic.hh"
 #include "collection/field_collection_global.hh"
 #include "memory/array.hh"
+#include "memory/gpu_runtime.hh"
 
 namespace muGrid {
 
@@ -66,6 +67,7 @@ namespace muGrid {
     void GenericLinearOperator::apply_increment_device_impl(
         const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field, T alpha,
         TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field) const {
+        DeviceGuard device_guard{nodal_field.get_device_id()};
         // Validate fields using generic version that works with base Field
         const auto & collection = this->validate_fields_generic(nodal_field,
                                                                 quadrature_point_field);
@@ -114,7 +116,7 @@ namespace muGrid {
         const TypedFieldBase<Real, DefaultDeviceSpace> & quadrature_point_field,
         TypedFieldBase<Real, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
-        // set nodal field to zero
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1., nodal_field, weights);
     }
@@ -122,6 +124,7 @@ namespace muGrid {
         const TypedFieldBase<Real32, DefaultDeviceSpace> & quadrature_point_field,
         TypedFieldBase<Real32, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         nodal_field.set_zero();
         this->transpose_increment(quadrature_point_field, 1.f, nodal_field,
                                   weights);
@@ -133,6 +136,8 @@ namespace muGrid {
         const TypedFieldBase<T, DefaultDeviceSpace> & quadrature_point_field,
         T alpha, TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
         const std::vector<Real> & weights) const {
+        DeviceGuard device_guard{quadrature_point_field.get_device_id()};
+        this->check_transpose_weights(weights, "GenericLinearOperator");
         // Validate fields using generic version
         const auto & collection = this->validate_fields_generic(nodal_field,
                                                                 quadrature_point_field,

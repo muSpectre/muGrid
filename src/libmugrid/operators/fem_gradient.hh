@@ -91,8 +91,10 @@ namespace muGrid {
                               const Index_t * nb, const Index_t * nstride,
                               const Index_t * gstride, Index_t gsq, Index_t gsd,
                               const T * h, T alpha, bool increment);
+        // `lo` is the first owned node (the left ghost count) and `nb` the
+        // owned nodes per axis: the divergence writes only those.
         template <class Element, typename T>
-        void fem_divergence_gpu(const T * grad, T * nodal,
+        void fem_divergence_gpu(const T * grad, T * nodal, const Index_t * lo,
                                 const Index_t * nb, const Index_t * nstride,
                                 const Index_t * gstride, Index_t gsq,
                                 Index_t gsd, const T * h,
@@ -195,13 +197,19 @@ namespace muGrid {
             }
         }
 
-        //! Divergence / transpose (quadrature → nodal), scatter with weights:
-        //! f[n] += alpha Σ_q w_q Σ_d B[q][d][n] g[q][d] / h_d.
+        //! Divergence / transpose (quadrature → nodal) with weights:
+        //! f[n] = alpha Σ_e Σ_q w_q Σ_d B[q][d][n] g_e[q][d] / h_d over the
+        //! elements e sharing node n. Writes only the owned nodes
+        //! `[lo, lo + nb)` of each axis, from the elements `[lo - 1, lo + nb -
+        //! 1]`: the element below an owned node lives in the left ghost layer,
+        //! so the caller must have communicated the gradient's ghosts. Ghost
+        //! nodes are not written, so the result never needs a ghost reduction.
         //! Templated on the field scalar type @p T (Real or Real32).
         template <class Element, typename T>
         void fem_divergence_host_generic(
             const T * MUGRID_RESTRICT gradient_input,
-            T * MUGRID_RESTRICT nodal_output, const Index_t * nb_grid_pts,
+            T * MUGRID_RESTRICT nodal_output, const Index_t * lo,
+            const Index_t * nb_grid_pts,
             const Index_t * grad_stride, Index_t grad_stride_q,
             Index_t grad_stride_d, const Index_t * nodal_stride,
             const T * grid_spacing, const T * quad_weights, T alpha,
@@ -229,30 +237,46 @@ namespace muGrid {
                 }
             }
 
-            // The scatter accumulates into shared nodes, so zero the whole
-            // (owned + ghost) nodal region first unless incrementing.
+            for (Dim_t d = 0; d < Dim; ++d) {
+                if (nb_grid_pts[d] == 0) {
+                    return;  // empty subdomain
+                }
+            }
+            // Owned-node index ranges along each axis; elements run one
+            // further down, into the left ghost layer.
+            Index_t node_hi[3]{1, 1, 1}, elem_lo[3]{0, 0, 0},
+                elem_hi[3]{1, 1, 1};
+            for (Dim_t d = 0; d < Dim; ++d) {
+                node_hi[d] = lo[d] + nb_grid_pts[d];
+                elem_lo[d] = lo[d] - 1;
+                elem_hi[d] = node_hi[d];
+            }
+            const Index_t lo2{Dim == 3 ? lo[2] : 0};
+
+            // The scatter accumulates into shared nodes, so zero the owned
+            // nodes first unless incrementing.
             if (!increment) {
-                if constexpr (Dim == 2) {
-                    for (Index_t iy = 0; iy < nb_grid_pts[1]; ++iy) {
-                        for (Index_t ix = 0; ix < nb_grid_pts[0]; ++ix) {
-                            nodal_output[ix * nodal_stride[0] +
-                                         iy * nodal_stride[1]] = 0.0;
-                        }
-                    }
-                } else {
-                    for (Index_t iz = 0; iz < nb_grid_pts[2]; ++iz) {
-                        for (Index_t iy = 0; iy < nb_grid_pts[1]; ++iy) {
-                            for (Index_t ix = 0; ix < nb_grid_pts[0]; ++ix) {
-                                nodal_output[ix * nodal_stride[0] +
-                                             iy * nodal_stride[1] +
-                                             iz * nodal_stride[2]] = 0.0;
+                for (Index_t iz = lo2; iz < node_hi[2]; ++iz) {
+                    for (Index_t iy = lo[1]; iy < node_hi[1]; ++iy) {
+                        for (Index_t ix = lo[0]; ix < node_hi[0]; ++ix) {
+                            Index_t idx = ix * nodal_stride[0] +
+                                          iy * nodal_stride[1];
+                            if constexpr (Dim == 3) {
+                                idx += iz * nodal_stride[2];
                             }
+                            nodal_output[idx] = T(0);
                         }
                     }
                 }
             }
 
-            auto pixel = [&](Index_t grad_base, Index_t nodal_base) {
+            // Node n of an element is owned unless the element is the first
+            // along an axis where n sits at offset 0 (that node is the left
+            // ghost) or the last along an axis where n sits at offset 1 (the
+            // right ghost). Only the elements on the subdomain faces can drop
+            // a node, so `edge` is false almost everywhere.
+            auto pixel = [&](Index_t grad_base, Index_t nodal_base,
+                             const Index_t (&e)[3]) {
                 // Accumulate each node's contribution quad-point by quad-point
                 // (B folds, so only the nodes touched by quad q contribute),
                 // then scatter once — the structure of the hand-written kernel.
@@ -272,27 +296,39 @@ namespace muGrid {
                         }
                     }
                 }
+                bool first[Dim], last[Dim], edge{false};
+                for (Dim_t d = 0; d < Dim; ++d) {
+                    first[d] = e[d] == elem_lo[d];
+                    last[d] = e[d] == elem_hi[d] - 1;
+                    edge = edge || first[d] || last[d];
+                }
                 for (Index_t n = 0; n < NbNodes; ++n) {
-                    nodal_output[nodal_base + node_lin[n]] += fa[n];
+                    bool owned{true};
+                    if (edge) {
+                        for (Dim_t d = 0; d < Dim; ++d) {
+                            const bool upper{fem_node_offset(n, d) != 0};
+                            owned = owned && !(upper ? last[d] : first[d]);
+                        }
+                    }
+                    if (owned) {
+                        nodal_output[nodal_base + node_lin[n]] += fa[n];
+                    }
                 }
             };
 
-            if constexpr (Dim == 2) {
-                for (Index_t iy = 0; iy < nb_grid_pts[1] - 1; ++iy) {
-                    for (Index_t ix = 0; ix < nb_grid_pts[0] - 1; ++ix) {
-                        pixel(ix * grad_stride[0] + iy * grad_stride[1],
-                              ix * nodal_stride[0] + iy * nodal_stride[1]);
-                    }
-                }
-            } else {
-                for (Index_t iz = 0; iz < nb_grid_pts[2] - 1; ++iz) {
-                    for (Index_t iy = 0; iy < nb_grid_pts[1] - 1; ++iy) {
-                        for (Index_t ix = 0; ix < nb_grid_pts[0] - 1; ++ix) {
-                            pixel(ix * grad_stride[0] + iy * grad_stride[1] +
-                                      iz * grad_stride[2],
-                                  ix * nodal_stride[0] + iy * nodal_stride[1] +
-                                      iz * nodal_stride[2]);
+            const Index_t elem_lo2{Dim == 3 ? elem_lo[2] : 0};
+            for (Index_t iz = elem_lo2; iz < elem_hi[2]; ++iz) {
+                for (Index_t iy = elem_lo[1]; iy < elem_hi[1]; ++iy) {
+                    for (Index_t ix = elem_lo[0]; ix < elem_hi[0]; ++ix) {
+                        Index_t gb = ix * grad_stride[0] + iy * grad_stride[1];
+                        Index_t nbase =
+                            ix * nodal_stride[0] + iy * nodal_stride[1];
+                        if constexpr (Dim == 3) {
+                            gb += iz * grad_stride[2];
+                            nbase += iz * nodal_stride[2];
                         }
+                        const Index_t e[3]{ix, iy, iz};
+                        pixel(gb, nbase, e);
                     }
                 }
             }
@@ -321,6 +357,18 @@ namespace muGrid {
      * - Pass an explicit `weights` vector (length NB_QUAD) to override `W`, e.g.
      *   to fold per-quadrature-point material or stress coefficients into the
      *   assembly.
+     *
+     * Ghost protocol (both host and device): **communicate the input's ghosts
+     * first, never reduce the output's.**
+     * - `apply()` reads the nodal field's right ghost layer (one per axis):
+     *   call `communicate_ghosts` on the nodal field first.
+     * - `transpose()` writes only the owned nodes. An owned node also collects
+     *   the element below it, which lives in the left ghost layer of the
+     *   quadrature field: call `communicate_ghosts` on that field first. The
+     *   output's ghost nodes are not written, so `reduce_ghosts` on it would
+     *   add stale values to the neighbours -- do not call it.
+     * So apply() needs one right ghost layer and transpose() one left ghost
+     * layer; `get_ghost_requirement()` reports both.
      *
      * The element-specific data (shape-function-gradient table B, quadrature
      * weights, node count) comes from the @p Element traits (see
@@ -495,17 +543,6 @@ namespace muGrid {
             }
         }
 
-        /**
-         * @brief Ghost layers required by transpose().
-         *
-         * The transpose scatters into the same ghost buffers that apply()
-         * reads (followed by ghost reduction), so it has the same ghost
-         * requirement as apply().
-         */
-        GhostRequirement get_transpose_ghost_requirement() const override {
-            return this->get_apply_ghost_requirement();
-        }
-
         //! Shape function gradients as a flat (Fortran-order) array, scaled by
         //! the inverse grid spacing. Shape (DIM, NB_QUAD, 1, [2]*Dim). Node
         //! order is the binary corner index (x fastest), matching the stencil
@@ -538,12 +575,13 @@ namespace muGrid {
         const GlobalFieldCollection &
         validate_fields(const Field & nodal_field, const Field & gradient_field,
                         Index_t & nb_components,
-                        const StorageOrder expected_storage_order) const {
-            // Same collection, global, matching dimension, ghost layers (the
-            // scatter-style transpose has the same requirement as apply).
+                        const StorageOrder expected_storage_order,
+                        const bool is_transpose = false) const {
+            // Same collection, global, matching dimension, ghost layers for
+            // the operation at hand.
             const auto & global_fc =
                 this->check_fields(nodal_field, gradient_field,
-                                   operator_name());
+                                   operator_name(), is_transpose);
 
             // The traversal kernels hard-code dense column-major pixel
             // addressing and a fixed dof interleaving.
@@ -623,11 +661,15 @@ namespace muGrid {
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
                                       nb_components,
-                                      StorageOrder::ArrayOfStructures);
+                                      StorageOrder::ArrayOfStructures, true);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto nb_owned =
+                collection.get_nb_subdomain_grid_pts_without_ghosts();
+            const auto & nb_ghosts_left = collection.get_nb_ghosts_left();
             const T * gradient = gradient_field.data();
             T * nodal = nodal_field.data();
+            this->check_transpose_weights(weights, operator_name());
             const std::vector<Real> quad_weights_real =
                 weights.empty() ? this->get_quadrature_weights() : weights;
             // Quadrature weights are stored/​passed in double; convert to the
@@ -638,11 +680,12 @@ namespace muGrid {
             }
             const Index_t nb_sub = this->get_nb_input_components();
 
-            std::array<Index_t, Dim> nbg{}, nstride{}, gstride{};
+            std::array<Index_t, Dim> nstride{}, gstride{}, lo{}, own{};
             std::array<T, Dim> h{};
             Index_t span = 1;
             for (Dim_t d = 0; d < Dim; ++d) {
-                nbg[d] = nb_grid_pts[d];
+                lo[d] = nb_ghosts_left[d];
+                own[d] = nb_owned[d];
                 nstride[d] = nb_components * nb_sub * span;
                 gstride[d] = nb_components * DIM * NB_QUAD * span;
                 h[d] = static_cast<T>(grid_spacing[d]);
@@ -653,7 +696,8 @@ namespace muGrid {
 
             for (Index_t comp = 0; comp < nb_components; ++comp) {
                 fem_gradient_kernels::fem_divergence_host_generic<Element, T>(
-                    gradient + comp, nodal + comp, nbg.data(), gstride.data(),
+                    gradient + comp, nodal + comp, lo.data(), own.data(),
+                    gstride.data(),
                     grad_stride_q, grad_stride_d, nstride.data(), h.data(),
                     quad_weights.data(), alpha, increment);
             }
@@ -665,6 +709,7 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
             TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
             T alpha, bool increment) const {
+            DeviceGuard device_guard{nodal_field.get_device_id()};
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
@@ -707,15 +752,20 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
             TypedFieldBase<T, DefaultDeviceSpace> & nodal_field, T alpha,
             bool increment, const std::vector<Real> & weights) const {
+            DeviceGuard device_guard{gradient_field.get_device_id()};
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
                                       nb_components,
-                                      StorageOrder::StructureOfArrays);
+                                      StorageOrder::StructureOfArrays, true);
             const auto nb_grid_pts =
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
+            const auto nb_owned =
+                collection.get_nb_subdomain_grid_pts_without_ghosts();
+            const auto & nb_ghosts_left = collection.get_nb_ghosts_left();
             const T * gradient = gradient_field.view().data();
             T * nodal = nodal_field.view().data();
+            this->check_transpose_weights(weights, operator_name());
             const std::vector<Real> quad_weights_real =
                 weights.empty() ? this->get_quadrature_weights() : weights;
             std::vector<T> quad_weights(quad_weights_real.size());
@@ -724,11 +774,12 @@ namespace muGrid {
             }
             const Index_t nb_input = this->get_nb_input_components();
 
-            std::array<Index_t, Dim> nbg{}, nstride{}, gstride{};
+            std::array<Index_t, Dim> nstride{}, gstride{}, lo{}, own{};
             std::array<T, Dim> h{};
             Index_t span = 1;
             for (Dim_t d = 0; d < Dim; ++d) {
-                nbg[d] = nb_grid_pts[d];
+                lo[d] = nb_ghosts_left[d];
+                own[d] = nb_owned[d];
                 nstride[d] = span;
                 gstride[d] = span;
                 h[d] = static_cast<T>(grid_spacing[d]);
@@ -743,7 +794,8 @@ namespace muGrid {
             for (Index_t comp = 0; comp < nb_components; ++comp) {
                 fem_gradient_kernels::fem_divergence_gpu<Element, T>(
                     gradient + comp * grad_stride_c,
-                    nodal + comp * nodal_stride_c, nbg.data(), nstride.data(),
+                    nodal + comp * nodal_stride_c, lo.data(), own.data(),
+                    nstride.data(),
                     gstride.data(), gsq, gsd, h.data(), quad_weights.data(),
                     alpha, increment);
             }

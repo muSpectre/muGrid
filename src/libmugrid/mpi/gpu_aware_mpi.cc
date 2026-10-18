@@ -33,6 +33,7 @@
  */
 
 #include "mpi/gpu_aware_mpi.hh"
+#include "core/environment.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -48,10 +49,9 @@ namespace muGrid {
 
     namespace {
         bool detect_gpu_aware_mpi() {
-            const char * env{std::getenv("MUGRID_GPU_AWARE_MPI")};
-            if (env != nullptr && std::strlen(env) > 0) {
-                return env[0] == '1' || env[0] == 'y' || env[0] == 'Y' ||
-                       env[0] == 't' || env[0] == 'T';
+            const int env{environment_flag("MUGRID_GPU_AWARE_MPI")};
+            if (env >= 0) {
+                return env == 1;
             }
 #if defined(WITH_MPI) && defined(MPIX_CUDA_AWARE_SUPPORT)
             if (MPIX_Query_cuda_support()) {

@@ -173,7 +173,8 @@ class rocFFTBackend : public GpuFFTBackend<rocFFTBackend, RocfftCachedPlan> {
   /**
    * Check rocFFT result and throw on error.
    */
-  static void check_rocfft_result(rocfft_status result, const char * operation);
+  static void check_rocfft_result(rocfft_status result, const char * operation,
+                                  bool plan_creation = false);
 
   //! Flag to track if rocfft_setup has been called
   static bool rocfft_initialized;
