@@ -5,7 +5,7 @@
 or GPU) and under MPI. This page defines the transforms, describes the
 parallel decomposition and documents the Python API. Implementation details
 (strides, work buffers, the MPI transpose) are in the
-[FFT engine design notes](https://github.com/muSpectre/muGrid/blob/main/doc/FFT.md).
+[FFT engine design notes](fft_design.md).
 
 ## Definitions
 
