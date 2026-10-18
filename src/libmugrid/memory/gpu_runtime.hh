@@ -149,6 +149,15 @@ namespace muGrid {
     }
     //! Make `device` the current device.
     inline void gpu_set_device(int device) { (void)cudaSetDevice(device); }
+    //! Threads per warp of `device`, or 0 if the query failed.
+    inline int gpu_warp_size(int device) {
+        int size{0};
+        if (cudaDeviceGetAttribute(&size, cudaDevAttrWarpSize, device) !=
+            cudaSuccess) {
+            return 0;
+        }
+        return size;
+    }
     //! Free/total device memory in bytes; false if the query failed.
     inline bool gpu_mem_get_info(std::size_t & free_bytes,
                                  std::size_t & total_bytes) {
@@ -242,6 +251,15 @@ namespace muGrid {
     }
     //! Make `device` the current device.
     inline void gpu_set_device(int device) { (void)hipSetDevice(device); }
+    //! Threads per wavefront of `device`, or 0 if the query failed.
+    inline int gpu_warp_size(int device) {
+        int size{0};
+        if (hipDeviceGetAttribute(&size, hipDeviceAttributeWarpSize,
+                                  device) != hipSuccess) {
+            return 0;
+        }
+        return size;
+    }
     //! Free/total device memory in bytes; false if the query failed.
     inline bool gpu_mem_get_info(std::size_t & free_bytes,
                                  std::size_t & total_bytes) {
