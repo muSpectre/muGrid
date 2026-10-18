@@ -65,7 +65,10 @@ laplace = muGrid.LaplaceOperator(dim, scale)
 ```
 
 The `LaplaceOperator` implements the standard 5-point stencil in 2D (7-point in
-3D) with optimized memory access patterns for both CPU and GPU.
+3D) with optimized memory access patterns for both CPU and GPU. On a grid
+whose spacing differs between axes, pass it instead of folding it into the
+scale: `muGrid.LaplaceOperator(dim, -1.0, grid_spacing=[hx, hy])` weights the
+neighbours along each axis by `1 / h_d**2`.
 
 ### Creating fields and setting up the RHS
 

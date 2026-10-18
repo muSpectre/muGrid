@@ -260,7 +260,7 @@ conv_op.transpose(quadrature_field, nodal_field, quad_weights)
 
 Computes gradients at quadrature points from nodal displacements using linear
 finite element (P1) shape functions. In 2D each pixel is split into 2 triangles
-(2 quadrature points); in 3D each voxel into 5 tetrahedra (Kuhn triangulation,
+(2 quadrature points); in 3D each voxel into 5 tetrahedra (the five-tetrahedra split of Leute's thesis, Sec. 3.5.3;
 5 quadrature points).
 
 The gradient at quadrature point q is:
@@ -308,12 +308,18 @@ $$ \nabla^2 u \approx \frac{u[i+1] + u[i-1] - 2u[i]}{h^2} + \ldots $$
 
 It needs 1 ghost cell in each direction (to access neighbors). The operator is
 self-adjoint (transpose equals forward apply), negative semi-definite (positive
-semi-definite with `-scale`), and has a configurable scale factor for grid
-spacing and sign conventions.
+semi-definite with `-scale`), and has a configurable scale factor for sign
+conventions. With a `grid_spacing` the two neighbours along axis $d$ are
+weighted by $\mathrm{scale}/h_d^2$ and the centre by
+$-2\,\mathrm{scale}\sum_d 1/h_d^2$, the finite-difference Laplacian of an
+anisotropic grid; without one every axis is weighted by `scale` alone, so a
+cubic grid can fold $1/h^2$ into the scale.
 
 ```python
-# Laplacian with scale = -1/h^2 for positive-definite form
+# -Laplacian (positive definite) on a cubic grid
 laplace = muGrid.LaplaceOperator3D(scale=-1.0 / h**2)
+# the same on an anisotropic grid
+laplace = muGrid.LaplaceOperator3D([hx, hy, hz], scale=-1.0)
 laplace.apply(u, laplacian_u)
 ```
 
@@ -336,7 +342,7 @@ This reduces memory from O(N × DOF²) for full K to O(N × 2) for spatially
 varying materials.
 
 **Element decomposition:** 2D uses 2 triangles per pixel (quadrature weights
-`[0.5, 0.5]`); 3D uses 5 tetrahedra per voxel (Kuhn triangulation, weights
+`[0.5, 0.5]`); 3D uses 5 tetrahedra per voxel (the same five-tetrahedra split, weights
 `[1/3, 1/6, 1/6, 1/6, 1/6]`).
 
 All fields use **node-based indexing** with the same grid dimensions:

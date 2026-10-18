@@ -45,8 +45,10 @@ namespace muGrid {
             T* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny,
             Index_t stride_x, Index_t stride_y,
-            T scale,
+            const T * w,
             bool increment) {
+            const T wx = w[0], wy = w[1];
+            const T wc = static_cast<T>(-2) * (wx + wy);
 
             // Process all computable points based on stencil requirements.
             // The 5-point stencil needs 1 neighbor on each side, so we iterate
@@ -71,8 +73,8 @@ namespace muGrid {
                     T down   = input[idx - stride_y];
                     T up     = input[idx + stride_y];
 
-                    T result = scale * (left + right + down + up -
-                                        static_cast<T>(4) * center);
+                    T result = wx * (left + right) + wy * (down + up) +
+                               wc * center;
                     if (increment) {
                         output[idx] += result;
                     } else {
@@ -88,8 +90,10 @@ namespace muGrid {
             T* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            T scale,
+            const T * w,
             bool increment) {
+            const T wx = w[0], wy = w[1], wz = w[2];
+            const T wc = static_cast<T>(-2) * (wx + wy + wz);
 
             // Process all computable points based on stencil requirements.
             // The 7-point stencil needs 1 neighbor on each side, so we iterate
@@ -117,8 +121,8 @@ namespace muGrid {
                         T zm = input[idx - stride_z];
                         T zp = input[idx + stride_z];
 
-                        T result = scale * (xm + xp + ym + yp + zm + zp -
-                                            static_cast<T>(6) * center);
+                        T result = wx * (xm + xp) + wy * (ym + yp) +
+                                   wz * (zm + zp) + wc * center;
                         if (increment) {
                             output[idx] += result;
                         } else {
@@ -131,17 +135,17 @@ namespace muGrid {
 
         // Explicit instantiations for double and single precision.
         template void laplace_2d_host<Real>(const Real *, Real *, Index_t,
-                                            Index_t, Index_t, Index_t, Real,
-                                            bool);
+                                            Index_t, Index_t, Index_t,
+                                            const Real *, bool);
         template void laplace_3d_host<Real>(const Real *, Real *, Index_t,
                                             Index_t, Index_t, Index_t, Index_t,
-                                            Index_t, Real, bool);
+                                            Index_t, const Real *, bool);
         template void laplace_2d_host<Real32>(const Real32 *, Real32 *, Index_t,
-                                              Index_t, Index_t, Index_t, Real32,
-                                              bool);
+                                              Index_t, Index_t, Index_t,
+                                              const Real32 *, bool);
         template void laplace_3d_host<Real32>(const Real32 *, Real32 *, Index_t,
                                               Index_t, Index_t, Index_t,
-                                              Index_t, Index_t, Real32, bool);
+                                              Index_t, Index_t, const Real32 *, bool);
 
     }  // namespace laplace_kernels
 

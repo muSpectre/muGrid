@@ -56,6 +56,9 @@
 #include "memory/gpu_runtime.hh"
 #endif
 
+#include <array>
+#include <sstream>
+#include <string>
 #include <vector>
 
 namespace muGrid {
@@ -66,9 +69,11 @@ namespace muGrid {
     namespace laplace_kernels {
 
         /**
-         * @brief Apply 5-point 2D Laplace stencil on host.
+         * @brief Apply the 5-point 2D Laplace stencil on host.
          *
-         * Stencil: scale * [0, 1, 0; 1,-4, 1; 0, 1, 0]
+         * Stencil: w[0] on the two x neighbours, w[1] on the two y
+         * neighbours and -2 (w[0] + w[1]) on the centre; for w = scale * (1, 1)
+         * the classic scale * [0, 1, 0; 1,-4, 1; 0, 1, 0].
          */
         template <typename T>
         void laplace_2d_host(
@@ -76,13 +81,14 @@ namespace muGrid {
             T* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny,
             Index_t stride_x, Index_t stride_y,
-            T scale,
+            const T * w,
             bool increment = false);
 
         /**
-         * @brief Apply 7-point 3D Laplace stencil on host.
+         * @brief Apply the 7-point 3D Laplace stencil on host.
          *
-         * Stencil: center = -6*scale, the six face neighbours = +scale.
+         * Stencil: w[d] on the two face neighbours along axis d and
+         * -2 (w[0] + w[1] + w[2]) on the centre.
          */
         template <typename T>
         void laplace_3d_host(
@@ -90,7 +96,7 @@ namespace muGrid {
             T* MUGRID_RESTRICT output,
             Index_t nx, Index_t ny, Index_t nz,
             Index_t stride_x, Index_t stride_y, Index_t stride_z,
-            T scale,
+            const T * w,
             bool increment = false);
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -100,13 +106,13 @@ namespace muGrid {
         template <typename T>
         void laplace_2d_gpu(
             const T* input, T* output, Index_t nx, Index_t ny,
-            Index_t stride_x, Index_t stride_y, T scale,
+            Index_t stride_x, Index_t stride_y, const T * w,
             bool increment = false);
         template <typename T>
         void laplace_3d_gpu(
             const T* input, T* output, Index_t nx, Index_t ny, Index_t nz,
-            Index_t stride_x, Index_t stride_y, Index_t stride_z, T scale,
-            bool increment = false);
+            Index_t stride_x, Index_t stride_y, Index_t stride_z,
+            const T * w, bool increment = false);
 #endif
 
     }  // namespace laplace_kernels
@@ -135,15 +141,21 @@ namespace muGrid {
      * a scale factor, which can incorporate grid spacing and sign conventions
      * (e.g. for a positive-definite operator usable with CG solvers).
      *
+     * With a grid spacing the stencil is the finite-difference Laplacian of
+     * an anisotropic grid: the two neighbours along axis d carry
+     * `scale / h_d^2` and the centre `-2 scale * sum_d 1 / h_d^2`. Without
+     * one every axis carries `scale`, the unit-spacing stencil above.
+     *
      * Conventions to keep in mind when mixing it with other operators:
      * - With scale = 1/h^2 this is the finite-difference div grad, which is
      *   negative semidefinite; CG needs scale = -1/h^2. The FE stiffness of
      *   FEMGradientOperator, transpose(apply(u)), is the positive
      *   semidefinite -h^(d-2) div grad (the cell-volume weighting h^d times
      *   1/h^2 per derivative).
-     * - The single scale assumes the same spacing on every axis. For
-     *   anisotropic grids use GenericLinearOperator with the per-axis
-     *   coefficients 1/h_d^2, or the FE gradient with its grid spacing.
+     * - Without a grid spacing the single scale applies to every axis;
+     *   pass the grid spacing for anisotropic grids (the generic
+     *   operator with per-axis coefficients 1/h_d^2 is the slower
+     *   equivalent).
      *
      * The hard-coded implementation provides significantly better performance
      * (~3-10x) than the generic convolution operator due to compile-time known
@@ -165,10 +177,25 @@ namespace muGrid {
             LaplaceTraits<Dim>::nb_stencil_pts;
 
         /**
-         * @brief Construct a Laplace operator.
+         * @brief Construct a Laplace operator on a unit-spacing grid.
          * @param scale Scale factor applied to the output (default: 1.0)
          */
-        explicit LaplaceOperator(Real scale = 1.0) : Parent{}, scale{scale} {}
+        explicit LaplaceOperator(Real scale = 1.0)
+            : Parent{}, scale{scale}, grid_spacing{unit_spacing()},
+              weights{compute_weights(scale, grid_spacing)} {}
+
+        /**
+         * @brief Construct a Laplace operator on an anisotropic grid.
+         * @param grid_spacing Grid spacing per axis (`Dim` positive values);
+         *        the two neighbours along axis d are weighted by
+         *        `scale / h_d^2`
+         * @param scale Scale factor applied to the output (default: 1.0)
+         */
+        LaplaceOperator(const std::vector<Real> & grid_spacing,
+                        Real scale = 1.0)
+            : Parent{}, scale{scale},
+              grid_spacing{checked_spacing(grid_spacing)},
+              weights{compute_weights(scale, this->grid_spacing)} {}
 
         //! Default constructor is deleted
         LaplaceOperator() = delete;
@@ -322,6 +349,15 @@ namespace muGrid {
         //! Scale factor applied to the output.
         Real get_scale() const { return scale; }
 
+        //! Grid spacing per axis (all 1 for the scale-only constructor)
+        std::vector<Real> get_grid_spacing() const {
+            return std::vector<Real>(grid_spacing.begin(), grid_spacing.end());
+        }
+
+        //! Stencil weight of the two neighbours along each axis,
+        //! `scale / h_d^2`
+        const std::array<Real, Dim> & get_weights() const { return weights; }
+
         //! Stencil offset in pixels (centered: -1 in every direction).
         Shape_t get_offset() const override {
             if constexpr (Dim == 2) {
@@ -341,32 +377,90 @@ namespace muGrid {
         }
 
         /**
-         * @brief Stencil coefficients in reshaped (row-major) form, scaled.
+         * @brief Stencil coefficients as a flat column-major (x fastest)
+         *        3^Dim array, the layout `GenericLinearOperator` and the
+         *        Python `coefficients` property use.
          *
-         * 2D: [0, 1, 0, 1, -4, 1, 0, 1, 0] * scale.
-         * 3D: 27 entries, center (index 13) = -6*scale, six face neighbours
-         *     = scale, rest zero.
+         * 2D: [0, w_y, 0, w_x, -2 (w_x + w_y), w_x, 0, w_y, 0] with
+         *     w_d = scale / h_d^2 (all equal to `scale` on a unit grid).
+         * 3D: 27 entries, center (index 13) = -2 (w_x + w_y + w_z), the two
+         *     neighbours along x (index 13 +- 1) = w_x, along y (+- 3) = w_y,
+         *     along z (+- 9) = w_z, rest zero. (The z neighbours used to sit
+         *     at +- 1 and the x neighbours at +- 9, i.e. the exported stencil
+         *     had x and z swapped; invisible while every axis had the same
+         *     weight.)
          */
         std::vector<Real> get_coefficients() const {
+            const auto & w{this->weights};
             if constexpr (Dim == 2) {
-                return {0.0, scale, 0.0,
-                        scale, -4.0 * scale, scale,
-                        0.0, scale, 0.0};
+                return {0.0, w[1], 0.0,
+                        w[0], -2.0 * (w[0] + w[1]), w[0],
+                        0.0, w[1], 0.0};
             } else {
                 std::vector<Real> stencil(27, 0.0);
-                stencil[13] = -6.0 * scale;  // center [1,1,1]
-                stencil[13 - 1] = scale;     // [1,1,0]
-                stencil[13 + 1] = scale;     // [1,1,2]
-                stencil[13 - 3] = scale;     // [1,0,1]
-                stencil[13 + 3] = scale;     // [1,2,1]
-                stencil[13 - 9] = scale;     // [0,1,1]
-                stencil[13 + 9] = scale;     // [2,1,1]
+                stencil[13] = -2.0 * (w[0] + w[1] + w[2]);  // center [1,1,1]
+                stencil[13 - 1] = w[0];                     // [0,1,1]
+                stencil[13 + 1] = w[0];                     // [2,1,1]
+                stencil[13 - 3] = w[1];                     // [1,0,1]
+                stencil[13 + 3] = w[1];                     // [1,2,1]
+                stencil[13 - 9] = w[2];                     // [1,1,0]
+                stencil[13 + 9] = w[2];                     // [1,1,2]
                 return stencil;
             }
         }
 
     private:
         Real scale;
+        std::array<Real, Dim> grid_spacing;
+        //! scale / h_d^2 per axis
+        std::array<Real, Dim> weights;
+
+        static std::array<Real, Dim> unit_spacing() {
+            std::array<Real, Dim> h{};
+            h.fill(1.0);
+            return h;
+        }
+
+        static std::array<Real, Dim>
+        checked_spacing(const std::vector<Real> & grid_spacing) {
+            if (grid_spacing.size() != static_cast<std::size_t>(Dim)) {
+                std::stringstream err_msg{};
+                err_msg << operator_name() << ": grid_spacing must have "
+                        << Dim << " entries, got " << grid_spacing.size();
+                throw RuntimeError{err_msg.str()};
+            }
+            std::array<Real, Dim> h{};
+            for (Dim_t d = 0; d < Dim; ++d) {
+                if (!(grid_spacing[d] > 0.0)) {
+                    std::stringstream err_msg{};
+                    err_msg << operator_name()
+                            << ": grid_spacing must be positive, got "
+                            << grid_spacing[d] << " on axis " << d;
+                    throw RuntimeError{err_msg.str()};
+                }
+                h[d] = grid_spacing[d];
+            }
+            return h;
+        }
+
+        static std::array<Real, Dim>
+        compute_weights(Real scale, const std::array<Real, Dim> & h) {
+            std::array<Real, Dim> w{};
+            for (Dim_t d = 0; d < Dim; ++d) {
+                w[d] = scale / (h[d] * h[d]);
+            }
+            return w;
+        }
+
+        //! The per-axis weights times alpha, in the field precision
+        template <typename T>
+        std::array<T, Dim> effective_weights(T alpha) const {
+            std::array<T, Dim> w{};
+            for (Dim_t d = 0; d < Dim; ++d) {
+                w[d] = alpha * static_cast<T>(this->weights[d]);
+            }
+            return w;
+        }
 
         //! Operator name used in validation error messages.
         static const char * operator_name() {
@@ -418,19 +512,19 @@ namespace muGrid {
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * input = input_field.data();
             T * output = output_field.data();
-            const T effective_scale = alpha * static_cast<T>(this->scale);
+            const auto w = this->effective_weights<T>(alpha);
 
             // ArrayOfStructures layout: stride_x = 1, stride_y = nx,
             // stride_z = nx*ny.
             if constexpr (Dim == 2) {
                 laplace_kernels::laplace_2d_host<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
-                    nb_grid_pts[0], effective_scale, increment);
+                    nb_grid_pts[0], w.data(), increment);
             } else {
                 laplace_kernels::laplace_3d_host<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1],
                     nb_grid_pts[2], 1, nb_grid_pts[0],
-                    nb_grid_pts[0] * nb_grid_pts[1], effective_scale, increment);
+                    nb_grid_pts[0] * nb_grid_pts[1], w.data(), increment);
             }
         }
 
@@ -448,17 +542,17 @@ namespace muGrid {
                 collection.get_nb_subdomain_grid_pts_with_ghosts();
             const T * input = input_field.view().data();
             T * output = output_field.view().data();
-            const T effective_scale = alpha * static_cast<T>(this->scale);
+            const auto w = this->effective_weights<T>(alpha);
 
             if constexpr (Dim == 2) {
                 laplace_kernels::laplace_2d_gpu<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1], 1,
-                    nb_grid_pts[0], effective_scale, increment);
+                    nb_grid_pts[0], w.data(), increment);
             } else {
                 laplace_kernels::laplace_3d_gpu<T>(
                     input, output, nb_grid_pts[0], nb_grid_pts[1],
                     nb_grid_pts[2], 1, nb_grid_pts[0],
-                    nb_grid_pts[0] * nb_grid_pts[1], effective_scale, increment);
+                    nb_grid_pts[0] * nb_grid_pts[1], w.data(), increment);
             }
         }
 #endif

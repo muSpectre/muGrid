@@ -61,7 +61,7 @@ __global__ void laplace_2d_kernel(
     T* MUGRID_RESTRICT output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
-    T scale,
+    T wx, T wy,
     bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
@@ -72,15 +72,16 @@ __global__ void laplace_2d_kernel(
     if (ix < nx - 1 && iy < ny - 1) {
         Index_t idx = ix * stride_x + iy * stride_y;
 
-        // 5-point stencil: [0,1,0; 1,-4,1; 0,1,0]
+        // 5-point stencil: wx on the x neighbours, wy on the y neighbours,
+        // -2 (wx + wy) on the centre ([0,1,0; 1,-4,1; 0,1,0] for wx = wy = 1)
         T center = input[idx];
         T left   = input[idx - stride_x];
         T right  = input[idx + stride_x];
         T down   = input[idx - stride_y];
         T up     = input[idx + stride_y];
 
-        T result = scale * (left + right + down + up -
-                            static_cast<T>(4) * center);
+        T result = wx * (left + right) + wy * (down + up) -
+                   static_cast<T>(2) * (wx + wy) * center;
         if (increment) {
             output[idx] += result;
         } else {
@@ -99,7 +100,7 @@ __global__ void laplace_3d_kernel(
     T* MUGRID_RESTRICT output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    T scale,
+    T wx, T wy, T wz,
     bool increment) {
 
     // Thread indices (offset by 1 for ghost layer)
@@ -111,7 +112,8 @@ __global__ void laplace_3d_kernel(
     if (ix < nx - 1 && iy < ny - 1 && iz < nz - 1) {
         Index_t idx = ix * stride_x + iy * stride_y + iz * stride_z;
 
-        // 7-point stencil: center=-6, neighbors=+1
+        // 7-point stencil: w_d on the two face neighbours along axis d,
+        // -2 (wx + wy + wz) on the centre (center -6, neighbours +1 for w = 1)
         T center = input[idx];
         T xm = input[idx - stride_x];
         T xp = input[idx + stride_x];
@@ -120,8 +122,8 @@ __global__ void laplace_3d_kernel(
         T zm = input[idx - stride_z];
         T zp = input[idx + stride_z];
 
-        T result = scale * (xm + xp + ym + yp + zm + zp -
-                            static_cast<T>(6) * center);
+        T result = wx * (xm + xp) + wy * (ym + yp) + wz * (zm + zp) -
+                   static_cast<T>(2) * (wx + wy + wz) * center;
         if (increment) {
             output[idx] += result;
         } else {
@@ -137,7 +139,7 @@ void laplace_2d_gpu(
     T* output,
     Index_t nx, Index_t ny,
     Index_t stride_x, Index_t stride_y,
-    T scale,
+    const T * w,
     bool increment) {
 
     // Compute grid dimensions (for interior points only)
@@ -152,7 +154,7 @@ void laplace_2d_gpu(
 
     auto kern = laplace_2d_kernel<T>;
     GPU_LAUNCH_KERNEL(kern, grid, block,
-        input, output, nx, ny, stride_x, stride_y, scale, increment);
+        input, output, nx, ny, stride_x, stride_y, w[0], w[1], increment);
 }
 
 // Launch wrapper for 3D - uses unified macro
@@ -162,7 +164,7 @@ void laplace_3d_gpu(
     T* output,
     Index_t nx, Index_t ny, Index_t nz,
     Index_t stride_x, Index_t stride_y, Index_t stride_z,
-    T scale,
+    const T * w,
     bool increment) {
 
     // Compute grid dimensions (for interior points only)
@@ -179,20 +181,21 @@ void laplace_3d_gpu(
 
     auto kern = laplace_3d_kernel<T>;
     GPU_LAUNCH_KERNEL(kern, grid, block,
-        input, output, nx, ny, nz, stride_x, stride_y, stride_z, scale, increment);
+        input, output, nx, ny, nz, stride_x, stride_y, stride_z, w[0], w[1],
+        w[2], increment);
 }
 
 // Explicit instantiations for double and single precision.
 template void laplace_2d_gpu<Real>(const Real *, Real *, Index_t, Index_t,
-                                   Index_t, Index_t, Real, bool);
+                                   Index_t, Index_t, const Real *, bool);
 template void laplace_3d_gpu<Real>(const Real *, Real *, Index_t, Index_t,
-                                   Index_t, Index_t, Index_t, Index_t, Real,
-                                   bool);
+                                   Index_t, Index_t, Index_t, Index_t,
+                                   const Real *, bool);
 template void laplace_2d_gpu<Real32>(const Real32 *, Real32 *, Index_t, Index_t,
-                                     Index_t, Index_t, Real32, bool);
+                                     Index_t, Index_t, const Real32 *, bool);
 template void laplace_3d_gpu<Real32>(const Real32 *, Real32 *, Index_t, Index_t,
-                                     Index_t, Index_t, Index_t, Index_t, Real32,
-                                     bool);
+                                     Index_t, Index_t, Index_t, Index_t,
+                                     const Real32 *, bool);
 
 }  // namespace laplace_kernels
 }  // namespace muGrid

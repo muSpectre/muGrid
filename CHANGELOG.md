@@ -4,6 +4,19 @@ Change log for µGrid
 v1.5.0 (08Oct26)
 ----------------
 
+- ENH: `LaplaceOperator` takes a `grid_spacing`: the two neighbours along
+  axis `d` are then weighted by `scale / h_d^2`, the finite-difference
+  Laplacian of an anisotropic grid. Host, device and single-precision kernels
+  take the per-axis weights; `coefficients` reports the weighted stencil and
+  `grid_spacing` the spacing. Without it the operator is unchanged (every axis
+  weighted by `scale`). Also fixed on the way: the 3D `coefficients` property
+  had the x and z neighbours swapped (invisible while they were equal), and
+  `apply_increment` on float64 device fields was not bound
+- DOC: `P1Tet3D` is the five-tetrahedra voxel of Leute's thesis (Sec. 3.5.3),
+  not a Kuhn triangulation as its summary said; its tables, volume fractions
+  and the 19-point Laplacian stencil it assembles are now pinned by
+  `tests/python_fem_element_tests.py`, and the docstring records why the
+  split is the same in every voxel
 - PERF: `HybridFourierTridiagonalPreconditioner` on a GPU. The rank-local
   FFTs run in the order the field lies in memory -- distributed axis first,
   `x` fastest and halved -- instead of over interior axes of the field in

@@ -526,7 +526,12 @@ void add_laplace_operator_2d(py::module & mod) {
         for slightly better performance (avoids virtual dispatch).
         )pbdoc")
             .def(py::init<Real>(), "scale"_a = 1.0,
-                 "Construct a 2D Laplace operator with optional scale factor")
+                 "Construct a 2D Laplace operator on a unit-spacing grid with "
+                 "an optional scale factor")
+            .def(py::init<const std::vector<Real> &, Real>(), "grid_spacing"_a,
+                 "scale"_a = 1.0,
+                 "Construct a 2D Laplace operator on an anisotropic grid: the "
+                 "neighbours along axis d are weighted by scale / h_d^2")
             .def("apply", static_cast<ApplyHostFn>(&LaplaceOperator2D::apply),
                  "input_field"_a, "output_field"_a,
                  "Apply the Laplace operator to host (CPU) fields")
@@ -547,6 +552,8 @@ void add_laplace_operator_2d(py::module & mod) {
             .def_property_readonly("nb_stencil_pts",
                                    &LaplaceOperator2D::get_nb_stencil_pts)
             .def_property_readonly("scale", &LaplaceOperator2D::get_scale)
+            .def_property_readonly("grid_spacing",
+                                   &LaplaceOperator2D::get_grid_spacing)
             .def_property_readonly("offset",
                                    [](const LaplaceOperator2D & op) {
                                        const auto & offset = op.get_offset();
@@ -576,10 +583,17 @@ void add_laplace_operator_2d(py::module & mod) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     using ApplyDeviceFn = void (LaplaceOperator2D::*)(const RealFieldDevice &,
                                                       RealFieldDevice &) const;
-    laplace_op.def("apply",
-                   static_cast<ApplyDeviceFn>(&LaplaceOperator2D::apply),
-                   "input_field"_a, "output_field"_a,
-                   "Apply the Laplace operator to device (GPU) fields");
+    using ApplyIncrementDeviceFn = void (LaplaceOperator2D::*)(
+        const RealFieldDevice &, const Real &, RealFieldDevice &) const;
+    laplace_op
+        .def("apply", static_cast<ApplyDeviceFn>(&LaplaceOperator2D::apply),
+             "input_field"_a, "output_field"_a,
+             "Apply the Laplace operator to device (GPU) fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(
+                 &LaplaceOperator2D::apply_increment),
+             "input_field"_a, "alpha"_a, "output_field"_a,
+             "Add alpha * Laplace(input) to output on device (GPU) fields");
 #endif
     add_laplace_real32_overloads(laplace_op);
 }
@@ -605,7 +619,12 @@ void add_laplace_operator_3d(py::module & mod) {
         for slightly better performance (avoids virtual dispatch).
         )pbdoc")
             .def(py::init<Real>(), "scale"_a = 1.0,
-                 "Construct a 3D Laplace operator with optional scale factor")
+                 "Construct a 3D Laplace operator on a unit-spacing grid with "
+                 "an optional scale factor")
+            .def(py::init<const std::vector<Real> &, Real>(), "grid_spacing"_a,
+                 "scale"_a = 1.0,
+                 "Construct a 3D Laplace operator on an anisotropic grid: the "
+                 "neighbours along axis d are weighted by scale / h_d^2")
             .def("apply", static_cast<ApplyHostFn>(&LaplaceOperator3D::apply),
                  "input_field"_a, "output_field"_a,
                  "Apply the Laplace operator to host (CPU) fields")
@@ -626,6 +645,8 @@ void add_laplace_operator_3d(py::module & mod) {
             .def_property_readonly("nb_stencil_pts",
                                    &LaplaceOperator3D::get_nb_stencil_pts)
             .def_property_readonly("scale", &LaplaceOperator3D::get_scale)
+            .def_property_readonly("grid_spacing",
+                                   &LaplaceOperator3D::get_grid_spacing)
             .def_property_readonly("offset",
                                    [](const LaplaceOperator3D & op) {
                                        const auto & offset = op.get_offset();
@@ -655,10 +676,17 @@ void add_laplace_operator_3d(py::module & mod) {
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     using ApplyDeviceFn = void (LaplaceOperator3D::*)(const RealFieldDevice &,
                                                       RealFieldDevice &) const;
-    laplace_op.def("apply",
-                   static_cast<ApplyDeviceFn>(&LaplaceOperator3D::apply),
-                   "input_field"_a, "output_field"_a,
-                   "Apply the Laplace operator to device (GPU) fields");
+    using ApplyIncrementDeviceFn = void (LaplaceOperator3D::*)(
+        const RealFieldDevice &, const Real &, RealFieldDevice &) const;
+    laplace_op
+        .def("apply", static_cast<ApplyDeviceFn>(&LaplaceOperator3D::apply),
+             "input_field"_a, "output_field"_a,
+             "Apply the Laplace operator to device (GPU) fields")
+        .def("apply_increment",
+             static_cast<ApplyIncrementDeviceFn>(
+                 &LaplaceOperator3D::apply_increment),
+             "input_field"_a, "alpha"_a, "output_field"_a,
+             "Add alpha * Laplace(input) to output on device (GPU) fields");
 #endif
     add_laplace_real32_overloads(laplace_op);
 }

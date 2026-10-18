@@ -1423,23 +1423,36 @@ class LaplaceOperator:
         Spatial dimension (2 or 3).
     scale : float, optional
         Scaling factor for the Laplacian. Default is 1.0.
+    grid_spacing : sequence of float, optional
+        Grid spacing per axis. With it the operator is the finite-difference
+        Laplacian of an anisotropic grid, ``scale * sum_d (u[i+e_d] - 2 u[i] +
+        u[i-e_d]) / h_d**2``. Without it every axis is weighted by ``scale``
+        alone, i.e. the unit-spacing stencil (pass ``scale=1/h**2`` for a
+        cubic grid).
 
     Examples
     --------
-    >>> # Create a 2D Laplacian
+    >>> # -Laplacian (positive definite) on a unit-spacing 2D grid
     >>> laplace = LaplaceOperator(2, scale=-1.0)
     >>> laplace.apply(input_field, output_field)
+    >>> # the same on a grid with spacing (0.5, 2.0)
+    >>> laplace = LaplaceOperator(2, scale=-1.0, grid_spacing=[0.5, 2.0])
     """
 
-    def __init__(self, spatial_dim: int, scale: float = 1.0) -> None:
+    def __init__(self, spatial_dim: int, scale: float = 1.0,
+                 grid_spacing: Optional[Sequence[float]] = None) -> None:
         if spatial_dim == 2:
-            self._cpp = _muGrid.LaplaceOperator2D(scale)
+            cls = _muGrid.LaplaceOperator2D
         elif spatial_dim == 3:
-            self._cpp = _muGrid.LaplaceOperator3D(scale)
+            cls = _muGrid.LaplaceOperator3D
         else:
             raise ValueError(
                 f"spatial_dim must be 2 or 3, got {spatial_dim}"
             )
+        if grid_spacing is None:
+            self._cpp = cls(scale)
+        else:
+            self._cpp = cls([float(h) for h in grid_spacing], scale)
 
     def apply(self, input_field: Field, output_field: Field) -> None:
         """
@@ -1501,7 +1514,9 @@ class LaplaceOperator:
         return getattr(self._cpp, name)
 
     def __repr__(self) -> str:
-        return f"LaplaceOperator(spatial_dim={self._cpp.spatial_dim})"
+        return (f"LaplaceOperator(spatial_dim={self._cpp.spatial_dim}, "
+                f"scale={self._cpp.scale}, "
+                f"grid_spacing={list(self._cpp.grid_spacing)})")
 
 
 class FEMGradientOperator:
