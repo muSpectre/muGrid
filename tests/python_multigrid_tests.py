@@ -962,16 +962,14 @@ def test_hybrid_fused_kernel_handles_the_exception_table(comm, n):
 
     The device counterpart of
     `test_hybrid_host_fused_kernel_handles_the_exception_table`. The sweep runs
-    in chunks of `_BLOCK_THOMAS_CHUNK` planes with a step-by-step tail, so 66
-    planes -- not a multiple of the chunk -- is what exercises the tail in both
-    directions; 64 is the plain case. Both populate the exception table, which
-    the 16- and 32-plane grids above never do.
+    in chunks of `linalg.block_thomas_gpu_chunk` planes with a step-by-step
+    tail, so 66 planes -- not a multiple of the chunk -- is what exercises the
+    tail in both directions; 64 is the plain case. Both populate the
+    exception table, which the 16- and 32-plane grids above never do.
     """
     import cupy as cp
-    from muGrid.Preconditioners import (
-        _BLOCK_THOMAS_CHUNK,
-        HybridFourierTridiagonalPreconditioner,
-    )
+    from muGrid import linalg
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
 
     if comm is not None and comm.size > 1:
         pytest.skip("single-rank comparison")
@@ -985,7 +983,8 @@ def test_hybrid_fused_kernel_handles_the_exception_table(comm, n):
         decomp, (1.0 / n,) * dim, 1.3, 0.7, communicator=comm)
     assert prec._nb_exc > 0, "expected some modes to need the exception table"
     if n == 66:
-        assert (prec.nz_local - 1) % _BLOCK_THOMAS_CHUNK, "expected a tail"
+        assert (prec.nz_local - 1) % linalg.block_thomas_gpu_chunk, \
+            "expected a tail"
 
     rng = cp.random.default_rng(12)
     shape = (prec.nz_local,) + prec._mode_shape + (dim, 1)

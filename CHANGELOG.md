@@ -19,6 +19,8 @@ Change log for µGrid
 v1.5.0 (18Oct26)
 ----------------
 
+- PERF: The hybrid preconditioner's GPU sweep is compiled into the library with the
+  same tuning as before, so it no longer compiles a kernel at run time through CuPy
 - ENH: The Laplace operator takes a grid spacing per axis, so it is correct on
   anisotropic grids. Without one it behaves as before
 - ENH: Per-frame NetCDF variables are written as keyword arguments of a frame,

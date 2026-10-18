@@ -412,6 +412,12 @@ void add_linalg_functions(py::module &mod) {
     bind_block_thomas_gpu<3, Real>(linalg, "block_thomas_gpu_3d");
     bind_block_thomas_gpu<2, Real32>(linalg, "block_thomas_gpu_2d_f32");
     bind_block_thomas_gpu<3, Real32>(linalg, "block_thomas_gpu_3d_f32");
+    // Launch shape compiled into the device sweep, for tests that must
+    // reach its chunk tail.
+    linalg.attr("block_thomas_gpu_chunk") =
+        muGrid::block_thomas::DEVICE_CHUNK;
+    linalg.attr("block_thomas_gpu_threads") =
+        muGrid::block_thomas::DEVICE_THREADS;
     bind_green_symbol_gpu<2, Real>(linalg, "apply_green_symbol_gpu_2d");
     bind_green_symbol_gpu<3, Real>(linalg, "apply_green_symbol_gpu_3d");
     bind_green_symbol_gpu<2, Real32>(linalg, "apply_green_symbol_gpu_2d_f32");
