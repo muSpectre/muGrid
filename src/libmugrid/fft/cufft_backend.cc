@@ -103,7 +103,8 @@ NdLayout derive_nd_layout(const std::vector<Index_t> & shape,
 }  // namespace
 
 void cuFFTBackend::check_cufft_result(cufftResult result,
-                                      const char * operation) {
+                                      const char * operation,
+                                      bool plan_creation) {
   if (result != CUFFT_SUCCESS) {
     std::stringstream error;
     error << "cuFFT error during " << operation << ": ";
@@ -162,6 +163,13 @@ void cuFFTBackend::check_cufft_result(cufftResult result,
     default:
       error << "Unknown error code " << result;
       break;
+    }
+    // A plan that cuFFT rejects for its size/layout is unsupported (the
+    // engine may fall back); an allocation failure is not.
+    if (plan_creation &&
+        (result == CUFFT_INVALID_SIZE || result == CUFFT_INVALID_VALUE ||
+         result == CUFFT_INVALID_TYPE || result == CUFFT_NOT_SUPPORTED)) {
+      throw FFTPlanUnsupported(error.str());
     }
     throw RuntimeError(error.str());
   }
@@ -319,7 +327,7 @@ cufftHandle cuFFTBackend::get_nd_plan(cufftType type, const std::vector<int> & n
         &plan, plan_int(n.size()), const_cast<int *>(n.data()),
         const_cast<int *>(inembed.data()), istride, idist,
         const_cast<int *>(onembed.data()), ostride, odist, type, batch);
-    check_cufft_result(result, "N-D plan creation");
+    check_cufft_result(result, "N-D plan creation", true);
     return plan;
   });
 }

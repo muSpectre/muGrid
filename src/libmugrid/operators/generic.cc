@@ -630,6 +630,23 @@ namespace muGrid {
             throw RuntimeError{err_msg.str()};
         }
 
+        // The symbol of an operator with several outputs, quadrature points
+        // or inputs is a matrix; summing its entries into one number (as this
+        // did) mixes unrelated components -- the x- and y-derivatives of a
+        // gradient cancel. Only the scalar case has a scalar symbol.
+        if (this->nb_output_components_ * this->nb_quad_pts_ *
+                this->nb_pixel_input_components_ !=
+            1) {
+            std::stringstream err_msg{};
+            err_msg << "fourier() is only defined for scalar operators (one "
+                       "output component, quadrature point and input "
+                       "component); this one has "
+                    << this->nb_output_components_ << " x "
+                    << this->nb_quad_pts_ << " x "
+                    << this->nb_pixel_input_components_;
+            throw RuntimeError{err_msg.str()};
+        }
+
         // Initialize accumulator
         Complex s{0.0, 0.0};
 

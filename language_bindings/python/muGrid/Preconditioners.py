@@ -155,7 +155,10 @@ class JacobiPreconditioner(Preconditioner):
 
     def _inverse_diagonal_field(self, z):
         """Field holding D⁻¹ on z's collection (created on first use)."""
-        if self._field is None:
+        # One field per precision: a float32 solve needs a float32 D⁻¹ (the
+        # field used to be float64 always, so linalg.scal raised).
+        dtype = np.dtype(z.dtype)
+        if self._field is None or np.dtype(self._field.dtype) != dtype:
             values = self._inverse_diagonal
             # Spatial-only diagonals go into a single-component field that
             # linalg.scal broadcasts over z's components; values that do
@@ -167,11 +170,14 @@ class JacobiPreconditioner(Preconditioner):
                 components = ()
             except ValueError:
                 components = tuple(z.components_shape)
-            field = wrap_field(
-                z.collection.real_field(
-                    f"{self._name}-inverse-diagonal", components
-                )
-            )
+            from .Wrappers import _typed_field
+
+            field = wrap_field(_typed_field(
+                z.collection, f"{self._name}-inverse-diagonal-{dtype.name}",
+                components, "pixel", dtype,
+                {np.dtype(np.float64): "real_field",
+                 np.dtype(np.float32): "register_real32_field"},
+                "real_field"))
             # scal operates on the full buffer; zero ghost entries keep
             # the (later overwritten) ghost values of z finite.
             field.set_zero()
@@ -1550,7 +1556,10 @@ class _MultigridLevel:
             self.inv_diag.s.shape)
         _fill_field(self.inv_diag, values)
 
-    def lambda_max(self, communicator=None, nb_it=100):
+    #: Relative change between power iterations at which lambda_max stops.
+    LAMBDA_MAX_RTOL = 1e-4
+
+    def lambda_max(self, communicator=None, nb_it=500):
         """Largest eigenvalue of ``D⁻¹K`` by power iteration.
 
         ``D⁻¹K`` is invariant under uniform refinement — ``D`` and ``K`` carry
@@ -1568,12 +1577,25 @@ class _MultigridLevel:
 
         linalg.scal(1.0 / norm(self.z), self.z)
         eigenvalue = 0.0
+        change = np.inf
         for _ in range(nb_it):
             self.apply(self.z, self.t)
             linalg.scal(self.inv_diag, self.t)
-            eigenvalue = norm(self.t)
+            previous, eigenvalue = eigenvalue, norm(self.t)
             linalg.copy(self.t, self.z)
             linalg.scal(1.0 / eigenvalue, self.z)
+            change = abs(eigenvalue - previous) / eigenvalue
+            if change < self.LAMBDA_MAX_RTOL:
+                break
+        else:
+            # Power iteration approaches lambda_max from below, and the damping
+            # SAFETY / lambda is only safe while it stays below 2 / lambda_max:
+            # an estimate low by more than 15% makes the smoother diverge.
+            warnings.warn(
+                f"lambda_max: power iteration did not converge in {nb_it} "
+                f"iterations (last relative change {change:.1e}); the "
+                "smoother damping may be too large. Pass omega explicitly or "
+                "raise nb_it.", RuntimeWarning, stacklevel=2)
         self.z.set_zero()
         self.t.set_zero()
         return eigenvalue
@@ -1676,7 +1698,11 @@ class MultigridReferencePreconditioner(Preconditioner):
 
         if element is None:
             element = _muGrid.FEMElement.q1
-        if communicator is not None and communicator.size > 1:
+        # The decomposition is the reliable signal: a parallel one without a
+        # communicator argument used to slip through and run the serial
+        # algorithm with rank-local reductions.
+        distributed = int(np.prod(list(decomposition.nb_subdivisions))) > 1
+        if distributed or (communicator is not None and communicator.size > 1):
             raise NotImplementedError(
                 "MultigridReferencePreconditioner is serial for now. The MPI "
                 "path needs nested power-of-two subdivisions pinned across "
@@ -2694,7 +2720,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         The reduced system is block-circulant: every rank holds the same number
         of planes and the operator is uniform, so each rank's spike blocks are
-        *bit-identical* (verified, not assumed -- the constructor checks it).
+        *bit-identical* (verified, not assumed -- checked below on every rank).
         The elimination coefficients at every level are therefore the same on
         every rank and can be built here without communication, leaving only
         right-hand sides to exchange per apply.
@@ -2718,7 +2744,26 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         dim = self.dim
         m = 2 * dim
 
-        # A and C from this rank's spikes; identical everywhere by construction.
+        # A and C from this rank's spikes, identical everywhere by
+        # construction -- and checked: the coefficients below are built from
+        # the local spikes alone, so a rank whose spikes differed would
+        # eliminate with the wrong ones and the result would be silently
+        # wrong. Two fingerprints, reduced to min and max: identical blocks
+        # give identical floats on every rank.
+        comm = self._comm
+        if comm.size > 1:
+            spikes = self._spike_ends
+            weights = xp.arange(1, spikes.size + 1, dtype=np.float64).reshape(
+                spikes.shape)
+            prints = (float(xp.abs(spikes).sum()),
+                      float((xp.real(spikes) * weights).sum()))
+            for value in prints:
+                if comm.max(value) != comm.min(value):
+                    raise RuntimeError(
+                        "block-Thomas preconditioner: the spike blocks differ "
+                        "between ranks, so the parallel cyclic reduction "
+                        "would eliminate with wrong coefficients. The planes "
+                        "must be distributed evenly over the ranks.")
         V0, V1, W0, W1 = (self._spike_ends[..., i, :, :] for i in range(4))
         zero = xp.zeros_like(V0)
         # u_p = (L_p, R_p); L_p couples to R_{p-1} and L_{p+1}, likewise R_p.

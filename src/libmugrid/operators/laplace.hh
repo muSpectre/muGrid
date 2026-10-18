@@ -135,6 +135,16 @@ namespace muGrid {
      * a scale factor, which can incorporate grid spacing and sign conventions
      * (e.g. for a positive-definite operator usable with CG solvers).
      *
+     * Conventions to keep in mind when mixing it with other operators:
+     * - With scale = 1/h^2 this is the finite-difference div grad, which is
+     *   negative semidefinite; CG needs scale = -1/h^2. The FE stiffness of
+     *   FEMGradientOperator, transpose(apply(u)), is the positive
+     *   semidefinite -h^(d-2) div grad (the cell-volume weighting h^d times
+     *   1/h^2 per derivative).
+     * - The single scale assumes the same spacing on every axis. For
+     *   anisotropic grids use GenericLinearOperator with the per-axis
+     *   coefficients 1/h_d^2, or the FE gradient with its grid spacing.
+     *
      * The hard-coded implementation provides significantly better performance
      * (~3-10x) than the generic convolution operator due to compile-time known
      * memory access patterns that enable SIMD vectorization.

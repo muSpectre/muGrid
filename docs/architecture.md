@@ -87,10 +87,16 @@ two.
 The `Transpose` class handles the MPI all-to-all communication that
 redistributes data between pencil orientations.
 
-!!! warning
-    Transpose operations currently assume AoS layout. With GPU memory this may
-    require a storage-order conversion or an update to the `Transpose` class to
-    handle SoA.
+!!! note
+    `Transpose` takes the storage order of the fields it redistributes and
+    handles both layouts (AoS on the host, SoA on the device), so no
+    storage-order conversion is needed around the all-to-all.
+
+!!! note
+    FFT plans and work buffers are cached per engine and released with it. The
+    device reduction and ghost-accumulation scratch buffers are cached per
+    device for the lifetime of the process and only ever grow; they are sized
+    by the largest reduction or halo seen, a small fraction of a field.
 
 !!! note
     The FFT module is designed so MPI communication needs no explicit packing
@@ -254,8 +260,9 @@ conv_op.transpose(quadrature_field, nodal_field, quad_weights)
 
 Computes gradients at quadrature points from nodal displacements using linear
 finite element (P1) shape functions. In 2D each pixel is split into 2 triangles
-(2 quadrature points); in 3D each voxel into 5 tetrahedra (Kuhn triangulation,
-5 quadrature points).
+(2 quadrature points); in 3D each voxel into 6 tetrahedra (Kuhn triangulation
+around the main diagonal, 6 quadrature points), which keeps the P1 space
+conforming across voxel faces.
 
 The gradient at quadrature point q is:
 
@@ -330,8 +337,8 @@ This reduces memory from O(N × DOF²) for full K to O(N × 2) for spatially
 varying materials.
 
 **Element decomposition:** 2D uses 2 triangles per pixel (quadrature weights
-`[0.5, 0.5]`); 3D uses 5 tetrahedra per voxel (Kuhn triangulation, weights
-`[1/3, 1/6, 1/6, 1/6, 1/6]`).
+`[0.5, 0.5]`); 3D uses 6 tetrahedra per voxel (Kuhn triangulation, weights
+`1/6` each).
 
 All fields use **node-based indexing** with the same grid dimensions:
 

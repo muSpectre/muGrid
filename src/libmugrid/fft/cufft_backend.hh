@@ -146,7 +146,8 @@ class cuFFTBackend : public GpuFFTBackend<cuFFTBackend, cufftHandle> {
   /**
    * Check cuFFT result and throw on error.
    */
-  static void check_cufft_result(cufftResult result, const char * operation);
+  static void check_cufft_result(cufftResult result, const char * operation,
+                                 bool plan_creation = false);
 };
 
 }  // namespace muGrid

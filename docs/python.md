@@ -453,8 +453,17 @@ Attributes:
 | `ifftfreq` | Integer FFT frequency indices for the local Fourier subdomain. |
 | `coords` | Normalized real-space coordinates of the local subdomain (no ghosts), values in `[0, 1)`. |
 | `icoords` | Integer real-space coordinate indices of the local subdomain (no ghosts). |
-| `coordsg` | Like `coords` but including ghost cells. |
-| `icoordsg` | Like `icoords` but including ghost cells. |
+| `coordsg` | Like `coords` but including ghost cells. Ghost coordinates wrap periodically: the left ghost of `x = 0` reports `(N - 1) / N`, not `-1 / N`. |
+| `icoordsg` | Like `icoords` but including ghost cells, wrapped the same way (`N - 1`, not `-1`). |
+
+The coordinates are fractions of the domain (grid index / number of grid
+points), not physical positions: multiply by the domain length -- the grid
+spacing times the number of grid points -- for those. Note that
+`nb_subdomain_grid_pts` and `nb_domain_grid_pts` are the local and the global
+extent; the `nb_grid_pts` argument of most constructors is the global one.
+
+In MPI builds, `import muGrid` initialises MPI (through mpi4py), so a script
+that imports it runs as an MPI program even when it never communicates.
 
 For MPI-parallel runs, the frequency and coordinate arrays return only the
 portion owned by the local rank.

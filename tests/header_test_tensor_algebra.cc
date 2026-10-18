@@ -336,6 +336,25 @@ namespace muGrid {
     auto && err_4{testGoodies::rel_error(Fix::m4, m4_back)};
     BOOST_CHECK_LT(err_4, Fix::tol);
   }
+  /* ---------------------------------------------------------------------- */
+  //! Iasymm is the deviatoric projector: it removes tr/dim, so it annihilates
+  //! the identity and is idempotent in every dimension (it removed tr/3, wrong
+  //! in 2D; audit L9).
+  BOOST_FIXTURE_TEST_CASE_TEMPLATE(test_deviatoric_projector, Fix,
+                                   testGoodies::dimlist, Fix) {
+    using Matrices::Tens2_t;
+    using Matrices::tensmult;
+    constexpr Dim_t dim{Fix::dim};
+    using T2 = Tens2_t<dim>;
+    const auto dev = Matrices::Iasymm<dim>();
+    BOOST_CHECK_LT(tensmult(dev, T2::Identity().eval()).norm(), tol);
+    T2 F;
+    F.setRandom();
+    const T2 dF = tensmult(dev, F);
+    BOOST_CHECK_LT(std::abs(dF.trace()), tol);
+    BOOST_CHECK_LT((tensmult(dev, dF) - dF).norm(), tol);
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

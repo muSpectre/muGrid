@@ -1092,13 +1092,13 @@ namespace muGrid {
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fourier_zero_phase, Fix, ConvolutionFixtures,
                                    Fix) {
-    // At zero phase, fourier should return the sum of all operator coefficients
+    // These fixtures are gradients, with one output per direction: their
+    // symbol is a vector, not a number. fourier() used to sum its components
+    // (here zero only because every component vanishes at zero phase); it now
+    // refuses operators that are not scalar (audit O7). The scalar case is
+    // covered by the 1D tests below.
     Eigen::VectorXd phase = Eigen::VectorXd::Zero(Fix::Dim);
-    Complex result = Fix::op.fourier(phase);
-
-    // For gradient operators, the sum of coefficients should be zero
-    // (finite differences sum to zero for translational invariance)
-    BOOST_CHECK_SMALL(std::abs(result), tol);
+    BOOST_CHECK_THROW(Fix::op.fourier(phase), RuntimeError);
   }
 
   BOOST_FIXTURE_TEST_CASE_TEMPLATE(fourier_dimension_validation, Fix,

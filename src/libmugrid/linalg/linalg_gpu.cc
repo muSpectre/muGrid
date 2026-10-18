@@ -839,8 +839,9 @@ gpu_kernels::ReduceAcc<DS> reduce_full_dot(const DS* a, const DS* b,
         // would be an invalid configuration
         return Acc{};
     }
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
+    // The kernel is a grid-stride loop: a capped block count amortises the
+    // per-block tree and keeps the single-block final pass short.
+    const int num_blocks = gpu_kernels::reduction_blocks(n);
     Acc* d_partial = scratch_as<Acc>(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::dot_reduce_kernel<DS>,
@@ -940,12 +941,15 @@ reduction_result_t<T> norm_sq_device(const TypedField<T, DeviceSpace>& x) {
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (has_ghosts(global_coll)) {
-            return to_public(reduce_interior_dot<DS>(
-                device_ptr(x), device_ptr(x), interior_box(x, global_coll)));
+            return norm_to_public<T>(std::real(to_public(reduce_interior_dot<DS>(
+                device_ptr(x), device_ptr(x), interior_box(x, global_coll)))));
         }
     }
+    // x^H x is real; the summed conj products can carry a rounding imaginary
+    // part (FMA contraction), which norm_to_public drops.
     const Index_t n = x.get_nb_entries() * x.get_nb_components();
-    return to_public(reduce_full_dot<DS>(device_ptr(x), device_ptr(x), n));
+    return norm_to_public<T>(std::real(
+        to_public(reduce_full_dot<DS>(device_ptr(x), device_ptr(x), n))));
 }
 
 template <typename T>
@@ -1093,8 +1097,7 @@ reduction_result_t<T> axpy_norm_sq_device(T alpha,
     }
 
     // No ghosts: fused single-pass AXPY + norm_sq (real-valued partial sums).
-    const int num_blocks = (n + gpu_kernels::REDUCE_BLOCK_SIZE - 1) /
-                           gpu_kernels::REDUCE_BLOCK_SIZE;
+    const int num_blocks = gpu_kernels::reduction_blocks(n);
     Real* d_partial = reduction_scratch(0, num_blocks);
 
     GPU_LAUNCH_KERNEL(gpu_kernels::axpy_norm_sq_kernel<DS>,

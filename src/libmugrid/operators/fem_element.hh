@@ -16,7 +16,7 @@
  * points with weights w_q. The element type only changes the numbers in that
  * table — not the kernel structure — so all element-specific data lives here
  * and the kernels are templated on the element. This covers linear simplices
- * (the historical 2-triangle / 5-tetrahedron decompositions) and, by adding a
+ * (the 2-triangle / 6-tetrahedron simplex decompositions) and, by adding a
  * traits struct, Q1 (bilinear quad / trilinear hex) elements, with no new
  * kernel code.
  *
@@ -94,39 +94,52 @@ namespace muGrid {
 
     /**
      * @struct P1Tet3D
-     * @brief 3D voxel split into 5 linear tetrahedra (Kuhn triangulation).
+     * @brief 3D voxel split into 6 linear tetrahedra (Kuhn/Freudenthal
+     *        triangulation).
      *
-     * Quadrature point 0 is the central tetrahedron (volume fraction 1/3); the
-     * four corner tetrahedra each have volume fraction 1/6.
+     * Every tetrahedron runs from node 0 to node 7 along the voxel's main
+     * diagonal, stepping one axis at a time (one tetrahedron per order of
+     * the three axes), so each face is cut by the diagonal through its own
+     * lowest and highest corner. Translated voxels therefore meet with matching
+     * face triangulations and the P1 space is conforming. (The previous
+     * 5-tetrahedron split cut opposite faces along crossing diagonals: across
+     * every voxel face the piecewise-linear functions of the two voxels
+     * disagreed.) One quadrature point per tetrahedron, volume fraction 1/6.
      */
     struct P1Tet3D {
         static constexpr Dim_t SpatialDim = 3;
         static constexpr Index_t NbNodes = 8;
-        static constexpr Index_t NbQuad = 5;
+        static constexpr Index_t NbQuad = 6;
         //! B[q][d][n]; node order is the binary corner indexing (x fastest).
+        //! Tetrahedron q steps along the axes in the order given.
         static constexpr Real B[NbQuad][SpatialDim][NbNodes] = {
-            // q0: central tetrahedron (nodes 1,2,4,7)
-            {{0.0, 0.5, -0.5, 0.0, -0.5, 0.0, 0.0, 0.5},
-             {0.0, -0.5, 0.5, 0.0, -0.5, 0.0, 0.0, 0.5},
-             {0.0, -0.5, -0.5, 0.0, 0.5, 0.0, 0.0, 0.5}},
-            // q1: corner at (0,0,0) — nodes 0,1,2,4
+            // x -> y -> z: nodes 0,1,3,7
             {{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-             {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-             {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},
-            // q2: corner at (1,1,0) — nodes 1,2,3,7
-            {{0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},
              {0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0},
              {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}},
-            // q3: corner at (1,0,1) — nodes 1,4,5,7
-            {{0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},
+            // x -> z -> y: nodes 0,1,5,7
+            {{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
              {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
              {0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0}},
-            // q4: corner at (0,1,1) — nodes 2,4,6,7
+            // y -> x -> z: nodes 0,2,3,7
+            {{0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0},
+             {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+             {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}},
+            // y -> z -> x: nodes 0,2,6,7
+            {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0},
+             {-1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}},
+            // z -> x -> y: nodes 0,4,5,7
+            {{0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0},
+             {0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0},
+             {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},
+            // z -> y -> x: nodes 0,4,6,7
             {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0},
              {0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0},
-             {0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0}},
+             {-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0}},
         };
-        static constexpr Real Wfrac[NbQuad] = {1.0 / 3.0, 1.0 / 6.0, 1.0 / 6.0,
+        static constexpr Real Wfrac[NbQuad] = {1.0 / 6.0, 1.0 / 6.0,
+                                               1.0 / 6.0, 1.0 / 6.0,
                                                1.0 / 6.0, 1.0 / 6.0};
     };
 
@@ -398,7 +411,7 @@ namespace muGrid {
     struct P1Tet3DMomentRef {
         static constexpr Index_t NbPts = 27;
         static constexpr Index_t NbCorners = 4;
-        static constexpr Index_t NbSimplices = 5;
+        static constexpr Index_t NbSimplices = 6;
         //! Barycentric coordinates of each point.
         static constexpr Real Lambda[NbPts][NbCorners] = {
             {0.74966452822169316, 0.072994024073149588, 0.082121567863442366, 0.095219879841714927},
@@ -441,17 +454,19 @@ namespace muGrid {
             0.011443220489890717, 0.018309152783825139, 0.011443220489890717,
             0.0034856118950243142, 0.0055769790320389003, 0.0034856118950243142,
         };
-        //! Cell-node index of each sub-simplex's corners.
+        //! Cell-node index of each sub-simplex's corners: the 6 Kuhn
+        //! tetrahedra of P1Tet3D, in the same order.
         static constexpr Index_t Nodes[NbSimplices][NbCorners] = {
-            {1, 2, 4, 7},
-            {0, 1, 2, 4},
-            {1, 2, 3, 7},
-            {1, 4, 5, 7},
-            {2, 4, 6, 7},
+            {0, 1, 3, 7},
+            {0, 1, 5, 7},
+            {0, 2, 3, 7},
+            {0, 2, 6, 7},
+            {0, 4, 5, 7},
+            {0, 4, 6, 7},
         };
         //! Volume of each sub-simplex as a fraction of the cell.
         static constexpr Real Frac[NbSimplices] = {
-            0.33333333333333331, 0.16666666666666666, 0.16666666666666666, 0.16666666666666666, 0.16666666666666666};
+            1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0};
     };
 
     /**

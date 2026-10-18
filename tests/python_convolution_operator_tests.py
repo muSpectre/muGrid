@@ -947,12 +947,41 @@ class FEMGradientOperatorStencilAccess(unittest.TestCase):
 
         # Check coefficients
         coeffs = op.coefficients
-        # Shape: (nb_operators=3, nb_quad_pts=5, nb_nodal_pts=1, 2, 2, 2)
-        self.assertEqual(coeffs.shape, (3, 5, 1, 2, 2, 2))
+        # Shape: (nb_operators=3, nb_quad_pts=6, nb_nodal_pts=1, 2, 2, 2)
+        self.assertEqual(coeffs.shape, (3, 6, 1, 2, 2, 2))
 
         # Check that we have x, y, z derivatives
         self.assertEqual(op.nb_output_components, 3)
-        self.assertEqual(op.nb_quad_pts, 5)
+        self.assertEqual(op.nb_quad_pts, 6)
+
+    def test_fem_3d_p1_split_is_conforming(self):
+        """Opposite voxel faces must be triangulated alike, or neighbouring
+        voxels' linear pieces disagree across the shared face. The former
+        5-tetrahedron split cut opposite faces along crossing diagonals
+        (audit finding O5)."""
+        op = muGrid.FEMGradientOperator(
+            3, element=muGrid.FEMElement.p1, grid_spacing=[1.0, 1.0, 1.0]
+        )
+        coeffs = op.coefficients[:, :, 0]  # (dim, quad, 2, 2, 2) over corners
+        tets = [
+            {c for c in np.ndindex(2, 2, 2)
+             if np.any(coeffs[:, q][(slice(None),) + c] != 0)}
+            for q in range(op.nb_quad_pts)
+        ]
+        self.assertTrue(all(len(t) == 4 for t in tets))
+        for axis in range(3):
+            faces = []
+            for side in (0, 1):
+                triangles = set()
+                for t in tets:
+                    on_face = frozenset(
+                        tuple(v for i, v in enumerate(c) if i != axis)
+                        for c in t if c[axis] == side)
+                    if len(on_face) == 3:
+                        triangles.add(on_face)
+                faces.append(triangles)
+            self.assertEqual(len(faces[0]), 2)
+            self.assertEqual(faces[0], faces[1])
 
     def test_fem_consistency(self):
         """Test consistency between properties."""

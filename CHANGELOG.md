@@ -138,6 +138,46 @@ v1.5.0 (08Oct26)
 - DOC: `GenericLinearOperator.transpose` defaults to unit weights (the bare
   `Bᵀ`), `FEMGradientOperator.transpose` to the physical quadrature weights
   (`Bᵀ W`); both docstrings now say so and how to get the other
+- BUG: The 3D P1 element split each voxel into 5 tetrahedra whose diagonals
+  crossed on opposite faces, so the piecewise-linear space was not conforming
+  across voxel faces. It is now the 6-tetrahedron Kuhn (Freudenthal) split
+  around the main diagonal; `nb_quad_pts` of 3D P1 operators is 6 (was 5)
+- BUG: `GenericLinearOperator.fourier()` summed the entries of a multi-
+  component operator's symbol into one number; it now raises unless the
+  operator is scalar
+- BUG: `Iasymm<dim>` (the deviatoric projector) removed tr/3 in every
+  dimension; it now removes tr/dim
+- BUG: Linalg details: complex `norm_sq` could carry a rounding imaginary part
+  (now exactly real); the host single-precision `leray_project` accumulated in
+  complex64 (now double, as on the device); per-pixel Eigen maps of
+  structure-of-arrays fields read entries of different pixels (now refused);
+  full-buffer GPU reductions launched one block per 256 elements (now capped)
+- BUG: FFT details: `fftfreq` reported an even Nyquist mode on the
+  half-complex axis as -0.5 instead of +0.5 (now `rfftfreq`, as the C++
+  `rfft_freq`); serial float64 1D/2D transforms use the backend's N-D
+  transform where it can plan the layout, and every serial N-D transform falls
+  back to the per-axis path when it cannot (rocFFT on some ghost-padded grids)
+  instead of failing; the slab fast path no longer treats a transient failure
+  such as running out of memory as "unsupported" for the rest of the engine's
+  life; the pencil process grid avoids leaving ranks without data (16 ranks on
+  a (16, 16, 3) grid left four empty)
+- BUG: `is_buffer_contiguous` could report a contiguous buffer as
+  non-contiguous when a size-1 axis shared its stride with another axis
+- BUG: The ghost exchange now refuses fields whose pixels are not column-major
+  instead of exchanging the wrong slices
+- BUG: `CartesianDecomposition` without `nb_subdivisions` raised; it now
+  splits the ranks over the axes automatically
+- BUG: `JacobiPreconditioner` works in float32 solves; the multigrid
+  preconditioner refuses a distributed decomposition even without a
+  communicator argument, and its power iteration checks convergence (warning
+  otherwise); `conjugate_gradients_pipelined` accepts `residual=`; the
+  block-Thomas PCR verifies across ranks that its spike blocks agree
+- API: `FEMGradientOperator(..., dtype=np.float32)` selects the
+  single-precision operator; `NodalMomentOperator` is exported
+- DOC: Fourier-space ghost padding along x, C2R input requirements, the
+  Laplace operator's sign and isotropy, P1 prolongation, `coords` semantics,
+  local/global extents, MPI initialisation on import, transpose layouts and
+  cache lifetimes
 - API: `FileFrame.write()` and `FileIONetCDF.write()` take per-frame variable values
   as keyword arguments, e.g. `fio.append_frame().write(iteration=12, objective=f)`,
   instead of requiring writes into the array `register_frame_variable` returned.

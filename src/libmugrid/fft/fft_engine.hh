@@ -38,6 +38,7 @@
 
 #include <array>
 #include <optional>
+#include <type_traits>
 #include <sstream>
 
 #include "fft_engine_base.hh"
@@ -210,9 +211,7 @@ class FFTEngine : public FFTEngineBase {
     // under MUGRID_FFT_NO_ND=1, which used to throw here -- and on the
     // MPI-decomposed layout it uses the templated per-axis path.
     if (input.get_type_descriptor() == TypeDescriptor::Real32) {
-      if (!this->need_transpose_xy && !this->need_transpose_yz &&
-          this->backend->supports_nd()) {
-        this->transform_serial_nd<Real32, Complex32>(input, output, true);
+      if (this->try_serial_nd<Real32, Complex32>(input, output, true)) {
       } else if (this->spatial_dim == 1) {
         this->template fft_1d<Real32, Complex32>(input, output);
       } else if (this->spatial_dim == 2) {
@@ -223,7 +222,12 @@ class FFTEngine : public FFTEngineBase {
       return;
     }
 
-    if (this->spatial_dim == 1) {
+    // Serial 1D/2D: one planned N-D transform when the backend has one, as
+    // for float32 and 3D. The per-axis 2D path issues a transform (and on the
+    // GPU a synchronisation) per component and axis plus a work-buffer copy.
+    if (this->spatial_dim < 3 &&
+        this->try_serial_nd<Real, Complex>(input, output, true)) {
+    } else if (this->spatial_dim == 1) {
       this->template fft_1d<Real, Complex>(input, output);
     } else if (this->spatial_dim == 2) {
       this->template fft_2d<Real, Complex>(input, output);
@@ -272,9 +276,7 @@ class FFTEngine : public FFTEngineBase {
 
     // Single-precision path (real output is Real32); see fft().
     if (output.get_type_descriptor() == TypeDescriptor::Real32) {
-      if (!this->need_transpose_xy && !this->need_transpose_yz &&
-          this->backend->supports_nd()) {
-        this->transform_serial_nd<Real32, Complex32>(input, output, false);
+      if (this->try_serial_nd<Real32, Complex32>(input, output, false)) {
       } else if (this->spatial_dim == 1) {
         this->template ifft_1d<Real32, Complex32>(input, output);
       } else if (this->spatial_dim == 2) {
@@ -285,7 +287,9 @@ class FFTEngine : public FFTEngineBase {
       return;
     }
 
-    if (this->spatial_dim == 1) {
+    if (this->spatial_dim < 3 &&
+        this->try_serial_nd<Real, Complex>(input, output, false)) {
+    } else if (this->spatial_dim == 1) {
       this->template ifft_1d<Real, Complex>(input, output);
     } else if (this->spatial_dim == 2) {
       this->template ifft_2d<Real, Complex>(input, output);
@@ -302,19 +306,46 @@ class FFTEngine : public FFTEngineBase {
 
  protected:
   /**
-   * Single-precision transform via the backend's N-dimensional entry point.
+   * Run transform_serial_nd if the layout allows it and the backend can plan
+   * it; return false to send the caller to the per-axis path. Some backends
+   * cannot plan certain ghost-padded strided layouts (rocFFT, e.g. a 32 x 32
+   * grid with one ghost layer); plan creation then fails with
+   * FFTPlanUnsupported before anything is written, and the outcome is
+   * remembered per precision so later transforms skip the attempt. Any other
+   * failure propagates.
+   */
+  template <typename RT, typename CT>
+  bool try_serial_nd(const Field & input, Field & output, bool forward) {
+    signed char & ok{this->serial_nd_ok[std::is_same_v<RT, Real32> ? 1 : 0]};
+    if (this->need_transpose_xy || this->need_transpose_yz ||
+        !this->backend->supports_nd() || ok == 0) {
+      return false;
+    }
+    try {
+      this->transform_serial_nd<RT, CT>(input, output, forward);
+    } catch (const FFTPlanUnsupported &) {
+      ok = 0;
+      return false;
+    }
+    ok = 1;
+    return true;
+  }
+
+  /**
+   * Transform via the backend's N-dimensional entry point.
    *
-   * Handles 1D/2D/3D on the serial (non-MPI-decomposed) layout only: the whole
-   * grid is local, so the transform is one planned backend call with no work
-   * buffers or pencil transposes (those remain double-only). @p forward selects
-   * r2c (real @p input → complex @p output) vs c2r. RT/CT are Real32/Complex32.
+   * Handles the serial (non-MPI-decomposed) layout only: the whole grid is
+   * local, so the transform is one planned backend call with no work buffers
+   * or pencil transposes. Used for float32 in every dimension and for float64
+   * in 1D/2D (3D float64 has its own N-D path in fft_3d). @p forward selects
+   * r2c (real @p input → complex @p output) vs c2r.
    */
   template <typename RT, typename CT>
   void transform_serial_nd(const Field & input, Field & output, bool forward) {
     if (!backend->supports_nd()) {
       throw RuntimeError(
-          "single-precision FFT requires a backend with N-dimensional support "
-          "(pocketfft); the MPI/GPU fp32 path is not yet implemented");
+          "transform_serial_nd requires a backend with N-dimensional "
+          "support; callers fall back to the per-axis path otherwise");
     }
     const DynGridIndex & nb_grid_pts = this->get_nb_domain_grid_pts();
     const DynGridIndex local_real =
@@ -718,7 +749,9 @@ class FFTEngine : public FFTEngineBase {
           }
           this->slab_nd_ok = 1;
           slab_done = true;
-        } catch (const RuntimeError &) {
+        } catch (const FFTPlanUnsupported &) {
+          // Only an unsupported layout falls back (and is remembered); a
+          // transient failure such as running out of memory propagates.
           // The backend cannot plan this batched, strided, ghost-padded N-D
           // real transform for the current size (observed with rocFFT). Plan
           // creation fails before any output is written, so the Y-pencil buffer
@@ -1192,7 +1225,9 @@ class FFTEngine : public FFTEngineBase {
           }
           this->slab_nd_ok = 1;
           slab_done = true;
-        } catch (const RuntimeError &) {
+        } catch (const FFTPlanUnsupported &) {
+          // Only an unsupported layout falls back (and is remembered); a
+          // transient failure such as running out of memory propagates.
           // The backend cannot plan this batched, strided, ghost-padded N-D
           // real transform for the current size (observed with rocFFT). Plan
           // creation fails before any output is written and c2r_nd only reads
@@ -1371,6 +1406,10 @@ class FFTEngine : public FFTEngineBase {
   //! and decomposition are fixed per engine, so one probe settles it; caching it
   //! avoids paying the (throwing) failed plan creation on every iteration.
   mutable signed char slab_nd_ok{-1};
+  //! Whether the backend can plan the serial N-D transform of this engine's
+  //! layout, per precision ([0] double, [1] single); -1 unknown, 0 no, 1 yes.
+  //! See try_serial_nd.
+  mutable signed char serial_nd_ok[2]{-1, -1};
 };
 
 // Explicit template instantiation declarations for common memory spaces

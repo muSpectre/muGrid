@@ -608,12 +608,12 @@ class FFTFrequencyTest(unittest.TestCase):
         nx, ny, nz = nb_grid_pts
         engine = muGrid.FFTEngine(nb_grid_pts)
 
-        # Build reference from numpy
+        # Build reference from numpy: rfftfreq on the half-complex axis 0
+        # (an even Nyquist mode is +0.5), fftfreq on the others
         freq_ref = np.array(
-            np.meshgrid(*(np.fft.fftfreq(n) for n in nb_grid_pts), indexing="ij")
+            np.meshgrid(np.fft.rfftfreq(nx), np.fft.fftfreq(ny),
+                        np.fft.fftfreq(nz), indexing="ij")
         )
-        # Slice for half-complex (r2c) transform
-        freq_ref = freq_ref[:, : nx // 2 + 1, :, :]
 
         assert_allclose(engine.fftfreq, freq_ref)
 
@@ -1136,3 +1136,15 @@ class TestGhostCommunicationGuard:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_half_complex_axis_follows_rfftfreq():
+    """The half-complex axis 0 reports rfftfreq, so an even Nyquist mode is
+    +0.5 as in numpy and the C++ rfft_freq; it used to be folded to -0.5
+    (audit finding F6). The other axes follow fftfreq."""
+    engine = muGrid.FFTEngine([8, 6])
+    qx, qy = engine.fftfreq
+    np.testing.assert_array_equal(qx[:, 0], np.fft.rfftfreq(8))
+    np.testing.assert_array_equal(qy[0, :], np.fft.fftfreq(6))
+    iqx, _ = engine.ifftfreq
+    np.testing.assert_array_equal(iqx[:, 0], np.arange(5))

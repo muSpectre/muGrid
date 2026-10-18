@@ -164,6 +164,11 @@ namespace muGrid {
         //! reject them up front.
         void check_field_is_of_this_collection(
             const Field & field, const std::string & operation) const;
+
+        //! Throw unless the field's pixels are column-major (first axis
+        //! fastest, possibly padded), the layout the ghost exchange slices.
+        void check_ghost_layout(const Field & field,
+                                const std::string & operation) const;
     };
 }  // namespace muGrid
 

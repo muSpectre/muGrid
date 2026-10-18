@@ -2927,7 +2927,7 @@ namespace muGrid {
       // to NetCDF dimension order plus a single varn_all would scale better at
       // the cost of re-implementing the index map.
       const size_t nb_requests{
-          static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
+          static_cast<size_t>(comm.max(static_cast<Index_t>(num_requests)))};
       const std::vector<IOSize_t> empty_start(ndims, 0);
       const std::vector<IOSize_t> empty_count(ndims, 0);
       for (size_t i = 0; i < nb_requests; i++) {
@@ -3005,7 +3005,7 @@ namespace muGrid {
       // (non-collective) call per local pixel. See NetCDFVarBase::write() for
       // the full rationale.
       const size_t nb_requests{
-          static_cast<size_t>(comm.max(static_cast<Int>(num_requests)))};
+          static_cast<size_t>(comm.max(static_cast<Index_t>(num_requests)))};
       const std::vector<IOSize_t> empty_start(ndims, 0);
       const std::vector<IOSize_t> empty_count(ndims, 0);
       for (size_t i = 0; i < nb_requests; i++) {

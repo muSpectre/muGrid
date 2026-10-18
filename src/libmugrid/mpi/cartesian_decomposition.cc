@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <iterator>
 #include <optional>
+#include <string>
 #include <vector>
 
 #ifdef WITH_MPI
@@ -213,8 +215,30 @@ namespace muGrid {
         }
     }
 
+    void CartesianDecomposition::check_ghost_layout(
+        const Field & field, const std::string & operation) const {
+        const auto & collection{field.get_collection()};
+        const auto strides{collection.get_pixels_strides()};
+        const auto & nb_pts{this->get_nb_subdomain_grid_pts_with_ghosts()};
+        Index_t expected{1};
+        for (Dim_t d{0}; d < this->get_spatial_dim(); ++d) {
+            if (nb_pts[d] > 1 && strides[d] < expected) {
+                throw RuntimeError(
+                    operation + ": the ghost exchange needs column-major pixel "
+                    "storage (first axis fastest), but field '" +
+                    field.get_name() + "' has pixel stride " +
+                    std::to_string(strides[d]) + " on axis " +
+                    std::to_string(d) + " where at least " +
+                    std::to_string(expected) + " was expected");
+            }
+            expected = std::max(expected, strides[d]) * nb_pts[d];
+        }
+    }
+
+    /* ---------------------------------------------------------------------- */
     void CartesianDecomposition::communicate_ghosts(const Field & field) const {
         this->check_field_is_of_this_collection(field, "communicate_ghosts");
+        this->check_ghost_layout(field, "communicate_ghosts");
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // The exchange launches pack/accumulate kernels and copies on the
         // current device, which must be the field's (see DeviceGuard).
@@ -251,12 +275,12 @@ namespace muGrid {
         // Get type descriptor for communication
         TypeDescriptor type_desc{field.get_type_descriptor()};
 
-        // FIXME! The code below assumes a specific form of data layout,
-        // essentially column-major but with potentially varying slides
-        // --- i.e. the first axis needs to be fastest and then it becomes
-        // slower in order of the axes. It also assumes an array of structures
-        // layout. We should either generalize or introduce a guard that fails
-        // if the data layout is wrong.
+        // The code below assumes column-major pixels, possibly padded: the
+        // first axis fastest, each slower axis stepping over at least a whole
+        // row of the previous one. check_ghost_layout refuses anything else
+        // (e.g. a collection with row-major pixel storage) instead of
+        // exchanging the wrong slices. The dof layout (AoS or SoA) is handled
+        // through the SubPt strides.
 
         // For each direction...
         for (Dim_t direction{0}; direction < spatial_dims; ++direction) {
@@ -410,6 +434,7 @@ namespace muGrid {
 
     void CartesianDecomposition::reduce_ghosts(const Field & field) const {
         this->check_field_is_of_this_collection(field, "reduce_ghosts");
+        this->check_ghost_layout(field, "reduce_ghosts");
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
         // The exchange launches pack/accumulate kernels and copies on the
         // current device, which must be the field's (see DeviceGuard).
