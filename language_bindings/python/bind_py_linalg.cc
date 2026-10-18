@@ -36,6 +36,7 @@
 #include "core/types.hh"
 #include "field/field_typed.hh"
 #include "linalg/linalg.hh"
+#include "linalg/block_matvec.hh"
 #include "linalg/block_thomas.hh"
 #include "linalg/green_symbol.hh"
 
@@ -286,8 +287,7 @@ namespace {
      * because the buffers are CuPy arrays rather than muGrid fields and nothing
      * in the buffer protocol describes device memory. The caller passes
      * `array.data.ptr`. Nothing here can validate those addresses, so the
-     * Python side is responsible for the shapes -- which is why this stays
-     * behind an opt-in and the tested CuPy kernel remains the default.
+     * Python side is responsible for the shapes.
      */
     template <muGrid::Dim_t Dim, typename T>
     void bind_block_thomas_gpu(py::module & mod, const char * name) {
@@ -327,6 +327,46 @@ namespace {
      * structure-of-arrays, so the caller passes `stride_component = nb_modes`
      * and `stride_mode = 1` -- the opposite of the host binding.
      */
+    /**
+     * Bind the device per-mode block product for one precision. Device
+     * addresses as integers, as for the sweep; see `linalg/block_matvec.hh`
+     * for the layouts.
+     */
+    template <typename T>
+    void bind_block_matvec_gpu(py::module & mod, const char * hermitian_name,
+                               const char * dense_name) {
+        mod.def(
+            hermitian_name,
+            [](muGrid::Index_t n, std::uintptr_t diag, std::uintptr_t upper,
+               std::uintptr_t field, muGrid::Index_t component_stride,
+               muGrid::Index_t nb_modes) {
+                py::gil_scoped_release release{};
+                muGrid::block_matvec::hermitian_gpu<T>(
+                    n, reinterpret_cast<const T *>(diag),
+                    reinterpret_cast<const std::complex<T> *>(upper),
+                    reinterpret_cast<std::complex<T> *>(field),
+                    component_stride, nb_modes);
+            },
+            "n"_a, "diag"_a, "upper"_a, "field"_a, "component_stride"_a,
+            "nb_modes"_a,
+            "In-place z_i = sum_j K_ij s_j per Fourier mode with Hermitian "
+            "blocks: real diagonal (n, nb_modes) and packed strict upper "
+            "triangle (n(n-1)/2, nb_modes). Device addresses, not buffers.");
+        mod.def(
+            dense_name,
+            [](muGrid::Index_t n, std::uintptr_t blocks, std::uintptr_t field,
+               muGrid::Index_t component_stride, muGrid::Index_t nb_modes) {
+                py::gil_scoped_release release{};
+                muGrid::block_matvec::dense_gpu<T>(
+                    n, reinterpret_cast<const std::complex<T> *>(blocks),
+                    reinterpret_cast<std::complex<T> *>(field),
+                    component_stride, nb_modes);
+            },
+            "n"_a, "blocks"_a, "field"_a, "component_stride"_a, "nb_modes"_a,
+            "In-place z_i = sum_j K_ij s_j per Fourier mode with general "
+            "blocks (n, n, nb_modes). Device addresses, not buffers.");
+    }
+
     template <muGrid::Dim_t Dim, typename T>
     void bind_green_symbol_gpu(py::module & mod, const char * name) {
         using RArr =
@@ -423,6 +463,12 @@ void add_linalg_functions(py::module &mod) {
                &muGrid::block_thomas::launch_threads,
                "Threads per block the device block-Thomas sweep launches on "
                "the current device: one warp, at most 64.");
+    bind_block_matvec_gpu<Real>(linalg, "block_matvec_hermitian_gpu",
+                                "block_matvec_dense_gpu");
+    bind_block_matvec_gpu<Real32>(linalg, "block_matvec_hermitian_gpu_f32",
+                                  "block_matvec_dense_gpu_f32");
+    linalg.attr("block_matvec_gpu_max_components") =
+        muGrid::block_matvec::MAX_COMPONENTS;
     bind_green_symbol_gpu<2, Real>(linalg, "apply_green_symbol_gpu_2d");
     bind_green_symbol_gpu<3, Real>(linalg, "apply_green_symbol_gpu_3d");
     bind_green_symbol_gpu<2, Real32>(linalg, "apply_green_symbol_gpu_2d_f32");

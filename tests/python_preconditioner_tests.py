@@ -1447,3 +1447,54 @@ def test_stored_symbol_is_accurate_and_compact_in_single_precision(comm):
     scale = comm.max(float(np.abs(a).max()) if a.size else 0.0)
     assert error / scale < 1e-5
     assert hermitian[np.float32]
+
+
+@pytest.mark.parametrize("hermitian", [True, False])
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
+@pytest.mark.parametrize("dtype", [np.float64, np.float32])
+@pytest.mark.parametrize("shape", [(12, 10), (8, 6, 5)])
+def test_block_fourier_compiled_device_product_matches_host(
+        comm, shape, dtype, n, hermitian):
+    """On a device the per-mode block product z_i = Σ_j K_ij s_j is one
+    compiled kernel (linalg/block_matvec.hh) that indexes blocks and field by
+    a flat mode index in the field's memory order; it must equal the host
+    component loop for Hermitian (packed triangle) and general blocks, every
+    compiled component count and both precisions, in 2D and 3D."""
+    skip_if_gpu_unavailable("gpu")
+    import cupy
+
+    from muGrid import linalg
+
+    host = muGrid.FFTEngine(shape, comm)
+    device = muGrid.FFTEngine(shape, comm, device=create_device("gpu"))
+    fourier = tuple(host.nb_fourier_subdomain_grid_pts)
+    rng = np.random.default_rng(n)
+    a = (rng.standard_normal((n, n) + fourier)
+         + 1j * rng.standard_normal((n, n) + fourier))
+    if hermitian:
+        a = a + np.conj(np.swapaxes(a, 0, 1))
+    tag = f"{len(shape)}-{np.dtype(dtype).name}-{n}-{hermitian}"
+    p_host = BlockFourierPreconditioner(host, a, name=f"bh-{tag}",
+                                        dtype=dtype)
+    p_dev = BlockFourierPreconditioner(device, a, name=f"bd-{tag}",
+                                       dtype=dtype)
+    assert p_dev._hermitian is hermitian
+    assert p_dev._compiled is not None
+    assert n <= linalg.block_matvec_gpu_max_components
+
+    components = (n,)
+    r_h = host.real_space_field(f"r-{tag}", components=components, dtype=dtype)
+    z_h = host.real_space_field(f"z-{tag}", components=components, dtype=dtype)
+    r_d = device.real_space_field(f"r-{tag}", components=components,
+                                  dtype=dtype)
+    z_d = device.real_space_field(f"z-{tag}", components=components,
+                                  dtype=dtype)
+    values = rng.standard_normal(r_h.s.shape).astype(dtype)
+    r_h.s[...] = values
+    r_d.s[...] = cupy.asarray(values)
+    p_host(r_h, z_h)
+    p_dev(r_d, z_d)
+    expected = np.asarray(z_h.s)
+    rtol = 1e-4 if dtype == np.float32 else 1e-11
+    np.testing.assert_allclose(cupy.asnumpy(z_d.s), expected, rtol=0,
+                               atol=rtol * np.abs(expected).max())
