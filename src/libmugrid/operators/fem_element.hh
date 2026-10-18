@@ -98,6 +98,13 @@ namespace muGrid {
      *
      * Quadrature point 0 is the central tetrahedron (volume fraction 1/3); the
      * four corner tetrahedra each have volume fraction 1/6.
+     *
+     * The 5-tetrahedron split is intentional. Unlike the 6-tetrahedron Kuhn
+     * split, it has no preferred main diagonal, which avoids grid-anisotropy
+     * artefacts in mechanical calculations with plasticity. The same split is
+     * used in every voxel, so opposite voxel faces are cut along crossing
+     * diagonals and the piecewise-linear space is not conforming across voxel
+     * faces; this is the accepted price for the isotropy.
      */
     struct P1Tet3D {
         static constexpr Dim_t SpatialDim = 3;

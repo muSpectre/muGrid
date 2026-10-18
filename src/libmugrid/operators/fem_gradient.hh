@@ -709,6 +709,7 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & nodal_field,
             TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
             T alpha, bool increment) const {
+            DeviceGuard device_guard{nodal_field.get_device_id()};
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,
@@ -751,6 +752,7 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & gradient_field,
             TypedFieldBase<T, DefaultDeviceSpace> & nodal_field, T alpha,
             bool increment, const std::vector<Real> & weights) const {
+            DeviceGuard device_guard{gradient_field.get_device_id()};
             Index_t nb_components;
             const auto & collection =
                 this->validate_fields(nodal_field, gradient_field,

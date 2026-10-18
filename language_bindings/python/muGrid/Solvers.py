@@ -463,6 +463,7 @@ def conjugate_gradients_pipelined(
         rtol: float = None,
         atol: float = 0.0,
         replacement_interval: int = None,
+        residual=None,
 ):
     """
     Pipelined preconditioned conjugate gradients (Ghysels & Vanroose, 2014).
@@ -532,6 +533,11 @@ def conjugate_gradients_pipelined(
         apart much faster (at 50, float32 solves at condition number 1e4
         failed to converge). ``0`` disables periodic replacement; the
         true-residual check on convergence is always performed.
+
+    residual : muGrid.Field, optional
+        If given, the final residual ``r = b - Ax`` is copied into this field
+        on (converged) return. Convergence is confirmed on the true residual,
+        so this is ``b - Ax`` itself, at the cost of one field copy.
 
     Raises
     ------
@@ -705,6 +711,8 @@ def conjugate_gradients_pipelined(
                                        "|b - Ax|^2", iteration, dtype,
                                        "conjugate_gradients_pipelined")
                     if true_rr <= tol_sq:
+                        if residual is not None:
+                            linalg.copy(r, residual)
                         return x
                     if last_true_rr is not None and true_rr >= last_true_rr:
                         raise ConvergenceError(

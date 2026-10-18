@@ -603,7 +603,9 @@ void add_fft_engine(py::module & mod) {
            Get array of normalized FFT frequencies for the local Fourier subdomain.
 
            Returns an array of shape [dim, local_fx, local_fy, ...] where each
-           element is the normalized frequency in range [-0.5, 0.5).
+           element is the normalized frequency: rfftfreq on the half-complex
+           axis 0 (an even Nyquist mode is +0.5), fftfreq in [-0.5, 0.5) on the
+           others.
 
            For MPI parallel runs, this returns only the frequencies for the
            local subdomain owned by this rank.

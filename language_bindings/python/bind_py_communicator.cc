@@ -36,6 +36,7 @@
 #include "bind_py_declarations.hh"
 
 #include "mpi/communicator.hh"
+#include "mpi/gpu_aware_mpi.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -64,6 +65,12 @@ void add_communicator(py::module & mod) {
 #endif
       .def_property_readonly_static(
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
+      // Whether MPI may be handed device pointers (MUGRID_GPU_AWARE_MPI, else
+      // the MPI library's own report); the C++ ghost exchange and transposes
+      // stage through the host otherwise, and so must Python reductions.
+      .def_property_readonly_static(
+          "gpu_aware_mpi",
+          [](py::object) { return muGrid::mpi_is_gpu_aware(); })
       .def_property_readonly("rank", &muGrid::Communicator::rank)
       .def_property_readonly("size", &muGrid::Communicator::size)
       .def("barrier", &muGrid::Communicator::barrier)

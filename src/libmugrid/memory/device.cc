@@ -34,6 +34,7 @@
  */
 
 #include "device.hh"
+#include "core/environment.hh"
 #include "core/exception.hh"
 
 #include <cctype>
@@ -57,13 +58,7 @@ namespace {
     //! where the runtime probe is unreliable (e.g. APUs needing a particular
     //! unified/XNACK mode) or to force the conservative host-staging path.
     int unified_memory_env_override() {
-        const char * env{std::getenv("MUGRID_UNIFIED_MEMORY")};
-        if (env == nullptr || std::strlen(env) == 0) {
-            return -1;
-        }
-        const char c{env[0]};
-        return (c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T') ? 1
-                                                                          : 0;
+        return environment_flag("MUGRID_UNIFIED_MEMORY");
     }
 }  // namespace
 

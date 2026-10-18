@@ -25,6 +25,7 @@ if(Boost_FOUND)
         test_convolution_operator.cc
         test_device_alloc.cc
         test_exception.cc
+        test_environment.cc
         test_field.cc
         test_field_gpu.cc
         test_field_collection.cc

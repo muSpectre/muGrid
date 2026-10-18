@@ -431,6 +431,16 @@ namespace muGrid {
       throw FieldError("Eigen representation is only available for fields with "
                        "contiguous storage.");
     }
+    // The map lays the buffer out as nb_rows x nb_cols, column-major: one
+    // pixel's (or sub-point's) entries per column. That is the
+    // array-of-structures layout; in structure-of-arrays storage the column
+    // would mix entries of different pixels, read silently.
+    if (this->get_storage_order() == StorageOrder::StructureOfArrays and
+        nb_rows > 1) {
+      throw FieldError("Per-pixel and per-sub-point Eigen maps need "
+                       "array-of-structures storage; field '" + this->name +
+                       "' is stored as structure of arrays");
+    }
     return Eigen_map(this->values.data(), nb_rows, nb_cols);
   }
 
@@ -451,6 +461,16 @@ namespace muGrid {
                                             this->get_pixels_strides())) {
       throw FieldError("Eigen representation is only available for fields with "
                        "contiguous storage.");
+    }
+    // The map lays the buffer out as nb_rows x nb_cols, column-major: one
+    // pixel's (or sub-point's) entries per column. That is the
+    // array-of-structures layout; in structure-of-arrays storage the column
+    // would mix entries of different pixels, read silently.
+    if (this->get_storage_order() == StorageOrder::StructureOfArrays and
+        nb_rows > 1) {
+      throw FieldError("Per-pixel and per-sub-point Eigen maps need "
+                       "array-of-structures storage; field '" + this->name +
+                       "' is stored as structure of arrays");
     }
     return Eigen_cmap(this->values.data(), nb_rows, nb_cols);
   }

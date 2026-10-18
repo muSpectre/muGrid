@@ -32,8 +32,11 @@ def vecdot(a, b):
     """
     Compute vector dot product of two fields (interior only).
 
-    Computes sum_i(a[i] * b[i]) over all interior pixels and components.
-    Ghost regions are excluded for correct MPI-parallel semantics.
+    Computes sum_i(conj(a[i]) * b[i]) over all interior pixels and
+    components -- for complex fields the first argument is conjugated, so
+    ``vecdot(a, a)`` is the squared norm. Ghost regions are excluded for
+    correct MPI-parallel semantics. The sum is accumulated in double
+    precision for single-precision fields.
 
     Parameters
     ----------
@@ -102,7 +105,8 @@ def axpy(alpha, x, y):
     Parameters
     ----------
     alpha : float or complex
-        Scalar multiplier
+        Scalar multiplier. It is rounded to the field precision, so for
+        float32 fields it carries about 7 significant digits.
     x : Field
         Input field
     y : Field

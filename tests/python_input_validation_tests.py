@@ -144,3 +144,98 @@ def test_sums_keep_imaginary_parts_and_large_integers(comm):
         comm.size * (4 + 1j)
     assert comm.reduce_sum(np.array([big], dtype=np.int64)) == \
         comm.size * big
+
+
+# --- L6: the squared norm of a complex field is real ---
+
+
+def test_complex_norm_sq_has_no_imaginary_part():
+    """Summed conj products could leave a rounding imaginary part."""
+    fc = muGrid.GlobalFieldCollection((7, 5), nb_ghosts_left=(1, 1),
+                                      nb_ghosts_right=(1, 1))
+    z = fc.complex_field("z", (3,))
+    rng = np.random.default_rng(4)
+    z.p[...] = rng.standard_normal(z.p.shape) + 1j * rng.standard_normal(
+        z.p.shape)
+    n = linalg.norm_sq(z)
+    assert np.imag(n) == 0
+    assert np.isclose(np.real(n), np.sum(np.abs(np.asarray(z.p)) ** 2))
+
+
+# --- S8: float32 Jacobi, pipelined residual=, multigrid MPI guard ---
+
+
+def _diagonal_system(dtype, n=(8, 8)):
+    fc = muGrid.GlobalFieldCollection(n)
+    d = np.linspace(1.0, 10.0, int(np.prod(n))).reshape(n)
+    b = fc.real_field("b", dtype=dtype)
+    x = fc.real_field("x", dtype=dtype)
+    b.p[...] = 1.0
+
+    def hessp(src, dst):
+        dst.p[...] = (d * np.asarray(src.p)).astype(dtype)
+
+    return fc, b, x, hessp, d
+
+
+@pytest.mark.skipif(muGrid.Communicator().size > 1, reason="serial")
+def test_jacobi_preconditioner_in_a_float32_solve():
+    """The inverse diagonal used to be float64 always, so a float32 solve
+    raised in linalg.scal."""
+    from muGrid.Preconditioners import JacobiPreconditioner
+    from muGrid.Solvers import conjugate_gradients
+
+    fc, b, x, hessp, d = _diagonal_system(np.float32)
+    prec = JacobiPreconditioner(d)
+    conjugate_gradients(muGrid.Communicator(), fc, b, x, hessp=hessp,
+                        prec=prec, rtol=1e-5, maxiter=20)
+    np.testing.assert_allclose(np.asarray(x.p), 1.0 / d, rtol=1e-5)
+
+
+@pytest.mark.skipif(muGrid.Communicator().size > 1, reason="serial")
+def test_pipelined_cg_returns_the_residual():
+    from muGrid.Solvers import conjugate_gradients_pipelined
+
+    fc, b, x, hessp, d = _diagonal_system(np.float64)
+    r = fc.real_field("r")
+    conjugate_gradients_pipelined(muGrid.Communicator(), fc, b, x,
+                                  hessp=hessp, rtol=1e-8, maxiter=200,
+                                  residual=r)
+    np.testing.assert_allclose(np.asarray(r.p),
+                               1.0 - d * np.asarray(x.p), atol=1e-12)
+
+
+def test_decomposition_default_subdivisions(comm):
+    """Leaving out nb_subdivisions used to raise (the default was zeros)."""
+    decomposition = muGrid.CartesianDecomposition(comm, [12, 8])
+    assert int(np.prod(decomposition.nb_subdivisions)) == comm.size
+    if comm.size > 1:
+        from muGrid.Preconditioners import MultigridReferencePreconditioner
+
+        # A parallel decomposition without a communicator argument used to
+        # slip past the serial-only guard
+        with pytest.raises(NotImplementedError):
+            MultigridReferencePreconditioner(decomposition, (1.0, 1.0),
+                                             1.0, 1.0)
+
+
+# --- O9 / O7: float32 FEM wrapper; fourier() of non-scalar operators ---
+
+
+def test_fem_gradient_wrapper_in_single_precision():
+    op = muGrid.FEMGradientOperator(2, [0.5, 0.5], dtype=np.float32)
+    fc = muGrid.GlobalFieldCollection((6, 6), sub_pts={"quad": op.nb_quad_pts},
+                                      nb_ghosts_left=(1, 1),
+                                      nb_ghosts_right=(1, 1))
+    u = fc.real_field("u", dtype=np.float32)
+    g = fc.real_field("g", (2,), "quad", dtype=np.float32)
+    u.pg[...] = np.arange(8, dtype=np.float32)[:, None]  # u = x / h, slope 2
+    op.apply(u, g)
+    np.testing.assert_allclose(np.asarray(g.s)[0, :, :-1, :-1], 2.0, rtol=1e-6)
+
+
+def test_fourier_refuses_non_scalar_operators():
+    """Summing a gradient's components into one symbol mixed them."""
+    op = muGrid.GenericLinearOperator([0, 0], np.ones((2, 1, 2, 2)))
+    with pytest.raises(RuntimeError, match="scalar operators"):
+        op.fourier(np.array([0.1, 0.2]))

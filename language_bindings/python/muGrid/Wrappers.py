@@ -686,6 +686,28 @@ class LocalFieldCollection(FieldCollectionMixin):
         return f"LocalFieldCollection(spatial_dim={self._spatial_dim})"
 
 
+def _default_subdivisions(nb_ranks: int, nb_domain_grid_pts: Shape) -> list:
+    """Split `nb_ranks` into one subdivision count per axis.
+
+    Each prime factor of the rank count, largest first, goes to the axis with
+    the most grid points per rank so far, which keeps subdomains close to
+    cubic. (The default used to be all zeros, which the decomposition
+    rejects: leaving out ``nb_subdivisions`` always raised.)
+    """
+    factors, n, p = [], int(nb_ranks), 2
+    while n > 1:
+        while n % p == 0:
+            factors.append(p)
+            n //= p
+        p += 1
+    subdivisions = [1] * len(nb_domain_grid_pts)
+    for factor in sorted(factors, reverse=True):
+        axis = max(range(len(subdivisions)),
+                   key=lambda d: nb_domain_grid_pts[d] / subdivisions[d])
+        subdivisions[axis] *= factor
+    return subdivisions
+
+
 class CartesianDecomposition(FieldCollectionMixin):
     """
     Python wrapper for muGrid CartesianDecomposition.
@@ -758,7 +780,8 @@ class CartesianDecomposition(FieldCollectionMixin):
         # Handle defaults
         nb_dims = len(nb_domain_grid_pts)
         if nb_subdivisions is None:
-            nb_subdivisions = [0] * nb_dims
+            nb_subdivisions = _default_subdivisions(
+                communicator.size, nb_domain_grid_pts)
         nb_ghosts_left, nb_ghosts_right = _resolve_ghosts(
             ghosts, nb_ghosts_left, nb_ghosts_right, nb_dims
         )
@@ -1351,7 +1374,14 @@ class GenericLinearOperator:
         weights: Optional[Sequence[float]] = None,
     ) -> None:
         """
-        Apply transpose convolution to fields.
+        Apply the transpose of :meth:`apply` to fields.
+
+        Without ``weights`` every quadrature point counts once, i.e. this is
+        the bare matrix transpose ``Bᵀ``. Note that
+        :meth:`FEMGradientOperator.transpose` defaults to the
+        quadrature-weighted ``Bᵀ W`` instead (``W = Wfrac · cell_volume``):
+        this operator has a stencil but no grid spacing, so it cannot supply
+        ``W``. Pass ``weights=fem.quadrature_weights`` to get the FEM result.
 
         Parameters
         ----------
@@ -1360,7 +1390,7 @@ class GenericLinearOperator:
         nodal_field : Field
             Output field.
         weights : sequence of float, optional
-            Weights for the transpose operation.
+            One weight per quadrature point (default: all 1).
         """
         if weights is None:
             weights = []
@@ -1478,8 +1508,11 @@ class FEMGradientOperator:
     """
     Python wrapper for muGrid FEMGradientOperator.
 
-    A hard-coded, optimized gradient operator using linear finite element
-    shape functions on triangles (2D) or tetrahedra (3D).
+    A hard-coded, optimized finite-element gradient operator. The element is
+    bilinear/trilinear Q1 (one element per pixel/voxel, 2x2 or 2x2x2 Gauss
+    points) by default, or linear P1 simplices (2 triangles per pixel, 5
+    tetrahedra per voxel, one quadrature point each). ``nb_quad_pts`` reports
+    the count for the chosen element.
 
     Parameters
     ----------
@@ -1487,6 +1520,11 @@ class FEMGradientOperator:
         Spatial dimension (2 or 3).
     grid_spacing : sequence of float, optional
         Grid spacing in each direction. Default is [1.0, ...] for each dimension.
+    element : muGrid.FEMElement, optional
+        ``FEMElement.q1`` (default) or ``FEMElement.p1``.
+    dtype : data-type, optional
+        ``np.float64`` (default) or ``np.float32``: the precision of the
+        fields the operator is applied to.
 
     Examples
     --------
@@ -1497,22 +1535,28 @@ class FEMGradientOperator:
 
     def __init__(
         self, spatial_dim: int, grid_spacing: Optional[Sequence[float]] = None,
-        element=_muGrid.FEMElement.q1
+        element=_muGrid.FEMElement.q1, dtype: Any = np.float64
     ) -> None:
         if grid_spacing is None:
             grid_spacing = []
         gs = list(grid_spacing)
-        q1 = element == _muGrid.FEMElement.q1
-        if spatial_dim == 2:
-            self._cpp = (_muGrid.FEMGradientOperatorQ1_2D(gs) if q1
-                         else _muGrid.FEMGradientOperator2D(gs))
-        elif spatial_dim == 3:
-            self._cpp = (_muGrid.FEMGradientOperatorQ1_3D(gs) if q1
-                         else _muGrid.FEMGradientOperator3D(gs))
-        else:
+        if spatial_dim not in (2, 3):
             raise ValueError(
                 f"spatial_dim must be 2 or 3, got {spatial_dim}"
             )
+        dt = np.dtype(dtype)
+        if dt == np.dtype(np.float64):
+            suffix = ""
+        elif dt == np.dtype(np.float32):
+            suffix = "_32"
+        else:
+            raise ValueError(
+                f"FEMGradientOperator dtype must be float32 or float64, "
+                f"got {dt}")
+        q1 = element == _muGrid.FEMElement.q1
+        name = (f"FEMGradientOperatorQ1_{spatial_dim}D" if q1
+                else f"FEMGradientOperator{spatial_dim}D")
+        self._cpp = getattr(_muGrid, name + suffix)(gs)
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:
         """
@@ -1567,6 +1611,9 @@ class FEMGradientOperator:
 
         Assemble energies/forces via ``transpose(apply(...))`` directly; do **not**
         also multiply by the quadrature weights yourself (that applies ``W`` twice).
+        This default differs from :meth:`GenericLinearOperator.transpose`, which
+        uses unit weights (the bare ``Bᵀ``); ``weights=[1] * nb_quad_pts`` gives
+        that here.
 
         Only the owned nodes of ``nodal_field`` are written. Each collects the
         elements around it, one of which lies in the left ghost layer of
