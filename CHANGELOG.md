@@ -16,9 +16,11 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
-v1.5.1 (not yet released)
--------------------------
+v1.5.1 (18Oct26)
+----------------
 
+- BUG: ROCm builds of 1.5.0 failed to import (undefined symbol): the GPU kernel of
+  the Green preconditioner's block product was compiled for CUDA only
 - BUILD: Builds from a source archive, e.g. an offline pip install of the sdist, report
   their release version (and the commit of a development version) instead of "unknown"
 
