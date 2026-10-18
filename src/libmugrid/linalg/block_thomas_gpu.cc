@@ -74,7 +74,7 @@ namespace muGrid {
              * contiguous reals) lets the buffers be reinterpret_cast.
              */
             template <typename T>
-            struct DevCplx {
+            struct alignas(2 * sizeof(T)) DevCplx {
                 T re, im;
             };
 
