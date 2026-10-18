@@ -1,9 +1,13 @@
 name: Coverage
 
+# Pushes are covered only on main and tags; other branches are covered through
+# their pull request. Running both would upload every leg twice for a PR's
+# head commit, and Codecov's after_n_builds count (codecov.yml) would then be
+# reached before the slow GPU leg has reported.
 on:
   push:
     branches:
-      - '**'
+      - main
     tags:
       - '**'
   pull_request:
