@@ -52,6 +52,9 @@
 #include "core/exception.hh"
 #include "memory/gpu_runtime.hh"
 
+#include <limits>
+#include <map>
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 
 namespace muGrid {
@@ -72,7 +75,7 @@ namespace muGrid {
              * contiguous reals) lets the buffers be reinterpret_cast.
              */
             template <typename T>
-            struct DevCplx {
+            struct alignas(2 * sizeof(T)) DevCplx {
                 T re, im;
             };
 
@@ -102,10 +105,86 @@ namespace muGrid {
                 return head + (clamped * nb_modes + mode) * block;
             }
 
-            constexpr int BLOCK_SIZE{256};
-
+            /**
+             * One forward step from registers:
+             * `prev <- r - A2 (D prev)` with `D = Dinv_{k-1}`, i.e.
+             * `y_k = rhs_k - A2 Dinv_{k-1} y_{k-1}`.
+             */
             template <Dim_t Dim, typename T>
-            __global__ void block_thomas_kernel(
+            __device__ __forceinline__ void
+            forward_step(const DevCplx<T> * r, const DevCplx<T> * d,
+                         const DevCplx<T> * a2, DevCplx<T> * prev) {
+                DevCplx<T> tmp[Dim];
+                for (int i{0}; i < Dim; ++i) {
+                    DevCplx<T> acc{0, 0};
+                    for (int j{0}; j < Dim; ++j) {
+                        const DevCplx<T> t{cmul(d[i * Dim + j], prev[j])};
+                        acc.re += t.re;
+                        acc.im += t.im;
+                    }
+                    tmp[i] = acc;
+                }
+                for (int i{0}; i < Dim; ++i) {
+                    DevCplx<T> acc{r[i]};
+                    for (int j{0}; j < Dim; ++j) {
+                        acc = csub(acc, cmul(a2[i * Dim + j], tmp[j]));
+                    }
+                    prev[i] = acc;
+                }
+            }
+
+            /**
+             * One backward step from registers:
+             * `prev <- D (yk - A0 prev)` with `D = Dinv_k`, i.e.
+             * `out_k = Dinv_k (y_k - A0 out_{k+1})`.
+             */
+            template <Dim_t Dim, typename T>
+            __device__ __forceinline__ void
+            backward_step(const DevCplx<T> * yk, const DevCplx<T> * d,
+                          const DevCplx<T> * a0, DevCplx<T> * prev) {
+                DevCplx<T> rk[Dim];
+                for (int i{0}; i < Dim; ++i) {
+                    DevCplx<T> acc{yk[i]};
+                    for (int j{0}; j < Dim; ++j) {
+                        acc = csub(acc, cmul(a0[i * Dim + j], prev[j]));
+                    }
+                    rk[i] = acc;
+                }
+                for (int i{0}; i < Dim; ++i) {
+                    DevCplx<T> acc{0, 0};
+                    for (int j{0}; j < Dim; ++j) {
+                        const DevCplx<T> t{cmul(d[i * Dim + j], rk[j])};
+                        acc.re += t.re;
+                        acc.im += t.im;
+                    }
+                    prev[i] = acc;
+                }
+            }
+
+            /**
+             * The sweep, one thread per mode `m`, with the two constant
+             * coupling blocks in registers for the whole march.
+             *
+             * The loads of a plane do not depend on the recurrence, only the
+             * arithmetic does, so the planes are processed in chunks of
+             * `CHUNK`: every load of the chunk is issued first, then its
+             * `CHUNK` steps run from registers, so the memory latency of a
+             * chunk overlaps instead of serialising with each step. The
+             * chunk loops are unrolled so the arrays stay in registers; a
+             * tail of fewer than `CHUNK` planes goes step by step.
+             *
+             * `__launch_bounds__(THREADS)` declares the block size the kernel
+             * is launched with. Without it the compiler must allow for
+             * 1024-thread blocks, which caps a thread at 128 registers on
+             * CDNA3; the chunked sweep needs more and then spills (measured on
+             * MI300A: 516 B of spills at CHUNK = 4, running 2x slower).
+             *
+             * Plane and mode indices are `int`, offsets `Index_t`: the
+             * narrower loop state keeps register pressure down, and the caller
+             * guarantees `nz` and `nb_modes` fit.
+             */
+            template <Dim_t Dim, typename T, int CHUNK, int THREADS>
+            __global__ void __launch_bounds__(THREADS) block_thomas_kernel(
                 const DevCplx<T> * MUGRID_RESTRICT rhs,
                 const DevCplx<T> * MUGRID_RESTRICT head,
                 const DevCplx<T> * MUGRID_RESTRICT exc,
@@ -113,94 +192,132 @@ namespace muGrid {
                 const DevCplx<T> * MUGRID_RESTRICT A0,
                 const DevCplx<T> * MUGRID_RESTRICT A2,
                 DevCplx<T> * MUGRID_RESTRICT y, DevCplx<T> * MUGRID_RESTRICT out,
-                Index_t nz, Index_t nb_modes, Index_t nb_head, Index_t nb_exc) {
-                const Index_t m{static_cast<Index_t>(blockIdx.x) * blockDim.x +
-                                threadIdx.x};
+                int nz, int nb_modes, int nb_head, int nb_exc) {
+                const int m{static_cast<int>(blockIdx.x * blockDim.x +
+                                             threadIdx.x)};
                 if (m >= nb_modes) {
                     return;
                 }
-                constexpr Index_t BLOCK{Dim * Dim};
+                constexpr int BLOCK{Dim * Dim};
                 const int slot{exc_index[m]};
+                auto dinv = [&](int plane) {
+                    return diagonal_inverse<T>(head, exc, slot, plane, m,
+                                               nb_modes, nb_head, nb_exc,
+                                               BLOCK);
+                };
+                auto offset = [&](int plane) {
+                    return (static_cast<Index_t>(plane) * nb_modes + m) * Dim;
+                };
 
-                // The coupling blocks do not vary along the axis, so they are
-                // loaded once and kept in registers for the whole march.
-                DevCplx<T> a0[BLOCK], a2[BLOCK];
-                for (Index_t i{0}; i < BLOCK; ++i) {
-                    a0[i] = A0[m * BLOCK + i];
-                    a2[i] = A2[m * BLOCK + i];
+                DevCplx<T> a0[BLOCK], a2[BLOCK], prev[Dim];
+                for (int i{0}; i < BLOCK; ++i) {
+                    a0[i] = A0[static_cast<Index_t>(m) * BLOCK + i];
+                    a2[i] = A2[static_cast<Index_t>(m) * BLOCK + i];
                 }
 
-                DevCplx<T> prev[Dim], cur[Dim];
-
-                // Forward: y_0 = rhs_0, y_k = rhs_k - A2 (Dinv_{k-1} y_{k-1}).
-                for (Index_t i{0}; i < Dim; ++i) {
-                    const DevCplx<T> v{rhs[m * Dim + i]};
-                    y[m * Dim + i] = v;
+                // Forward: y_0 = rhs_0, y_k = rhs_k - A2 Dinv_{k-1} y_{k-1}.
+                for (int i{0}; i < Dim; ++i) {
+                    const DevCplx<T> v{rhs[offset(0) + i]};
+                    y[offset(0) + i] = v;
                     prev[i] = v;
                 }
-                for (Index_t k{1}; k < nz; ++k) {
-                    const DevCplx<T> * dinv{diagonal_inverse<T>(
-                        head, exc, slot, k - 1, m, nb_modes, nb_head, nb_exc,
-                        BLOCK)};
-                    DevCplx<T> tmp[Dim];
-                    for (Index_t i{0}; i < Dim; ++i) {
-                        DevCplx<T> acc{0, 0};
-                        for (Index_t j{0}; j < Dim; ++j) {
-                            const DevCplx<T> t{
-                                cmul(dinv[i * Dim + j], prev[j])};
-                            acc.re += t.re;
-                            acc.im += t.im;
+                int k{1};
+                for (; k + CHUNK <= nz; k += CHUNK) {
+                    DevCplx<T> r[CHUNK][Dim], d[CHUNK][BLOCK];
+#pragma unroll
+                    for (int c{0}; c < CHUNK; ++c) {
+                        const DevCplx<T> * D{dinv(k + c - 1)};
+                        for (int i{0}; i < BLOCK; ++i) {
+                            d[c][i] = D[i];
                         }
-                        tmp[i] = acc;
-                    }
-                    const Index_t off{(k * nb_modes + m) * Dim};
-                    for (Index_t i{0}; i < Dim; ++i) {
-                        DevCplx<T> acc{rhs[off + i]};
-                        for (Index_t j{0}; j < Dim; ++j) {
-                            acc = csub(acc, cmul(a2[i * Dim + j], tmp[j]));
+                        for (int i{0}; i < Dim; ++i) {
+                            r[c][i] = rhs[offset(k + c) + i];
                         }
-                        cur[i] = acc;
                     }
-                    for (Index_t i{0}; i < Dim; ++i) {
-                        y[off + i] = cur[i];
-                        prev[i] = cur[i];
+#pragma unroll
+                    for (int c{0}; c < CHUNK; ++c) {
+                        forward_step<Dim>(r[c], d[c], a2, prev);
+                        for (int i{0}; i < Dim; ++i) {
+                            y[offset(k + c) + i] = prev[i];
+                        }
+                    }
+                }
+                for (; k < nz; ++k) {
+                    DevCplx<T> r[Dim], d[BLOCK];
+                    const DevCplx<T> * D{dinv(k - 1)};
+                    for (int i{0}; i < BLOCK; ++i) {
+                        d[i] = D[i];
+                    }
+                    for (int i{0}; i < Dim; ++i) {
+                        r[i] = rhs[offset(k) + i];
+                    }
+                    forward_step<Dim>(r, d, a2, prev);
+                    for (int i{0}; i < Dim; ++i) {
+                        y[offset(k) + i] = prev[i];
                     }
                 }
 
-                // Backward: out_k = Dinv_k (y_k - A0 out_{k+1}).
-                for (Index_t k{nz - 1}; k >= 0; --k) {
-                    const Index_t off{(k * nb_modes + m) * Dim};
-                    const DevCplx<T> * dinv{diagonal_inverse<T>(
-                        head, exc, slot, k, m, nb_modes, nb_head, nb_exc,
-                        BLOCK)};
-                    DevCplx<T> rhs_k[Dim];
-                    for (Index_t i{0}; i < Dim; ++i) {
-                        DevCplx<T> acc{y[off + i]};
-                        if (k < nz - 1) {
-                            for (Index_t j{0}; j < Dim; ++j) {
-                                acc = csub(acc, cmul(a0[i * Dim + j], prev[j]));
-                            }
+                // Backward: out_k = Dinv_k (y_k - A0 out_{k+1}). The last
+                // plane has no out_{k+1}; a zero `prev` expresses that without
+                // a branch per step.
+                for (int i{0}; i < Dim; ++i) {
+                    prev[i] = DevCplx<T>{0, 0};
+                }
+                k = nz - 1;
+                for (; k + 1 - CHUNK >= 0; k -= CHUNK) {
+                    DevCplx<T> yk[CHUNK][Dim], d[CHUNK][BLOCK];
+#pragma unroll
+                    for (int c{0}; c < CHUNK; ++c) {
+                        const DevCplx<T> * D{dinv(k - c)};
+                        for (int i{0}; i < BLOCK; ++i) {
+                            d[c][i] = D[i];
                         }
-                        rhs_k[i] = acc;
-                    }
-                    for (Index_t i{0}; i < Dim; ++i) {
-                        DevCplx<T> acc{0, 0};
-                        for (Index_t j{0}; j < Dim; ++j) {
-                            const DevCplx<T> t{
-                                cmul(dinv[i * Dim + j], rhs_k[j])};
-                            acc.re += t.re;
-                            acc.im += t.im;
+                        for (int i{0}; i < Dim; ++i) {
+                            yk[c][i] = y[offset(k - c) + i];
                         }
-                        cur[i] = acc;
                     }
-                    for (Index_t i{0}; i < Dim; ++i) {
-                        out[off + i] = cur[i];
-                        prev[i] = cur[i];
+#pragma unroll
+                    for (int c{0}; c < CHUNK; ++c) {
+                        backward_step<Dim>(yk[c], d[c], a0, prev);
+                        for (int i{0}; i < Dim; ++i) {
+                            out[offset(k - c) + i] = prev[i];
+                        }
+                    }
+                }
+                for (; k >= 0; --k) {
+                    DevCplx<T> yk[Dim], d[BLOCK];
+                    const DevCplx<T> * D{dinv(k)};
+                    for (int i{0}; i < BLOCK; ++i) {
+                        d[i] = D[i];
+                    }
+                    for (int i{0}; i < Dim; ++i) {
+                        yk[i] = y[offset(k) + i];
+                    }
+                    backward_step<Dim>(yk, d, a0, prev);
+                    for (int i{0}; i < Dim; ++i) {
+                        out[offset(k) + i] = prev[i];
                     }
                 }
             }
 
         }  // namespace
+
+        int launch_threads() {
+            // Warp size of each device, queried once per device (the sweep
+            // runs on the current device). A failed query is not cached, so
+            // a later call on an initialised device gets the true value.
+            static std::map<int, int> warp_sizes;
+            const int device{gpu_get_device()};
+            auto found{warp_sizes.find(device)};
+            if (found == warp_sizes.end()) {
+                const int warp_size{gpu_warp_size(device)};
+                if (warp_size <= 0) {
+                    return device_threads(0);
+                }
+                found = warp_sizes.emplace(device, warp_size).first;
+            }
+            return device_threads(found->second);
+        }
 
         template <Dim_t Dim, typename T>
         void sweep_gpu(const std::complex<T> * rhs, const std::complex<T> * head,
@@ -209,15 +326,42 @@ namespace muGrid {
                        std::complex<T> * y, std::complex<T> * out, Index_t nz,
                        Index_t nb_modes, Index_t nb_head, Index_t nb_exc) {
             using DC = DevCplx<T>;
-            const Index_t nb_blocks{(nb_modes + BLOCK_SIZE - 1) / BLOCK_SIZE};
-            GPU_LAUNCH_KERNEL(
-                (block_thomas_kernel<Dim, T>), nb_blocks, BLOCK_SIZE,
-                reinterpret_cast<const DC *>(rhs),
-                reinterpret_cast<const DC *>(head),
-                reinterpret_cast<const DC *>(exc), exc_index,
-                reinterpret_cast<const DC *>(A0),
-                reinterpret_cast<const DC *>(A2), reinterpret_cast<DC *>(y),
-                reinterpret_cast<DC *>(out), nz, nb_modes, nb_head, nb_exc);
+            constexpr Index_t int_max{std::numeric_limits<int>::max()};
+            if (nz > int_max || nb_modes > int_max || nb_head > int_max ||
+                nb_exc > int_max) {
+                throw RuntimeError(
+                    "block_thomas::sweep_gpu: nz, nb_modes, nb_head and "
+                    "nb_exc must fit in an int");
+            }
+            if (nz == 0 || nb_modes == 0) {
+                return;
+            }
+            const int threads{launch_threads()};
+            const Index_t nb_blocks{(nb_modes + threads - 1) / threads};
+            const auto * rhs_d{reinterpret_cast<const DC *>(rhs)};
+            const auto * head_d{reinterpret_cast<const DC *>(head)};
+            const auto * exc_d{reinterpret_cast<const DC *>(exc)};
+            const auto * a0_d{reinterpret_cast<const DC *>(A0)};
+            const auto * a2_d{reinterpret_cast<const DC *>(A2)};
+            auto * y_d{reinterpret_cast<DC *>(y)};
+            auto * out_d{reinterpret_cast<DC *>(out)};
+            // Each launch shape is its own instantiation, so that
+            // __launch_bounds__ states the block size actually launched.
+            if (threads == 32) {
+                GPU_LAUNCH_KERNEL(
+                    (block_thomas_kernel<Dim, T, DEVICE_CHUNK, 32>), nb_blocks,
+                    32, rhs_d, head_d, exc_d, exc_index, a0_d, a2_d, y_d,
+                    out_d, static_cast<int>(nz), static_cast<int>(nb_modes),
+                    static_cast<int>(nb_head), static_cast<int>(nb_exc));
+            } else {
+                GPU_LAUNCH_KERNEL(
+                    (block_thomas_kernel<Dim, T, DEVICE_CHUNK,
+                                         DEVICE_THREADS>),
+                    nb_blocks, DEVICE_THREADS, rhs_d, head_d, exc_d,
+                    exc_index, a0_d, a2_d, y_d, out_d, static_cast<int>(nz),
+                    static_cast<int>(nb_modes), static_cast<int>(nb_head),
+                    static_cast<int>(nb_exc));
+            }
             GPU_KERNEL_DEBUG_SYNC("block_thomas");
         }
 
