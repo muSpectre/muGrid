@@ -16,6 +16,15 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.5.2 (not yet released)
+-------------------------
+
+- BUG: GPU-aware MPI is detected with any MPI library that can report it, including
+  MPICH and its derivatives, not only Open MPI; others still stage through the host
+- BUG: On unified-memory APUs, plain device memory is staged through the host for a
+  non-GPU-aware MPI and for NetCDF instead of failing; managed memory is used in place
+- BUILD: Configuring reports which GPU-support queries the MPI library provides
+
 v1.5.1 (18Oct26)
 ----------------
 

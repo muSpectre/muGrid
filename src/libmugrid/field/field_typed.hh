@@ -356,15 +356,16 @@ namespace muGrid {
 
     /**
      * Check whether this field's data is directly host-accessible. Host-space
-     * fields always are; device-space fields are only on unified-memory /
-     * integrated devices, which is queried at runtime from the collection's
-     * Device.
+     * fields always are; device-space fields only when the runtime reports
+     * their allocation host-readable (managed memory on a unified-memory /
+     * integrated device; see host_can_read_device_pointer()).
      */
     bool is_host_accessible() const final {
       if constexpr (is_host_space_v<MemorySpace>) {
         return true;
       } else {
-        return this->get_collection().get_device().is_host_accessible();
+        return this->get_collection().get_device().is_host_accessible() &&
+               host_can_read_device_pointer(this->get_void_data_ptr(false));
       }
     }
 

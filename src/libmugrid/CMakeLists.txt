@@ -182,6 +182,59 @@ target_link_libraries(muGrid PUBLIC mugrid::coverage)
 if(MUGRID_ENABLE_MPI)
     target_compile_definitions(muGrid PUBLIC WITH_MPI)
     target_link_libraries(muGrid PUBLIC MPI::MPI_CXX)
+
+    # Which GPU-support queries the MPI library provides (mpi/gpu_aware_mpi.cc).
+    # Probed by compiling and linking against the MPI in use, so that no MPI
+    # implementation is named: whichever queries exist are asked at run time.
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_LIBRARIES MPI::MPI_CXX)
+    set(CMAKE_REQUIRED_QUIET ON)
+    check_cxx_source_compiles("
+        #include <mpi.h>
+        #include <mpi-ext.h>
+        int main() { return 0; }" MUGRID_HAVE_MPI_EXT_H)
+    if(MUGRID_HAVE_MPI_EXT_H)
+        set(_mugrid_mpi_headers "#include <mpi.h>\n#include <mpi-ext.h>\n")
+    else()
+        set(_mugrid_mpi_headers "#include <mpi.h>\n")
+    endif()
+    set(_mugrid_mpi_queries)
+    foreach(_gpu cuda rocm hip)
+        string(TOUPPER ${_gpu} _GPU)
+        check_cxx_source_compiles("${_mugrid_mpi_headers}
+            int main() { return MPIX_Query_${_gpu}_support(); }"
+            MUGRID_HAVE_MPIX_QUERY_${_GPU}_SUPPORT)
+        if(MUGRID_HAVE_MPIX_QUERY_${_GPU}_SUPPORT)
+            list(APPEND _mugrid_mpi_queries MPIX_Query_${_gpu}_support)
+        endif()
+    endforeach()
+    check_cxx_source_compiles("${_mugrid_mpi_headers}
+        int main() {
+            int a{0}, b{0};
+            MPIX_GPU_query_support(MPIX_GPU_SUPPORT_CUDA, &a);
+            MPIX_GPU_query_support(MPIX_GPU_SUPPORT_HIP, &b);
+            return a + b;
+        }" MUGRID_HAVE_MPIX_GPU_QUERY_SUPPORT)
+    if(MUGRID_HAVE_MPIX_GPU_QUERY_SUPPORT)
+        list(APPEND _mugrid_mpi_queries MPIX_GPU_query_support)
+    endif()
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_REQUIRED_QUIET)
+    foreach(_flag MUGRID_HAVE_MPI_EXT_H
+                  MUGRID_HAVE_MPIX_QUERY_CUDA_SUPPORT
+                  MUGRID_HAVE_MPIX_QUERY_ROCM_SUPPORT
+                  MUGRID_HAVE_MPIX_QUERY_HIP_SUPPORT
+                  MUGRID_HAVE_MPIX_GPU_QUERY_SUPPORT)
+        if(${_flag})
+            target_compile_definitions(muGrid PRIVATE ${_flag})
+        endif()
+    endforeach()
+    if(_mugrid_mpi_queries)
+        message(STATUS "MPI GPU-support queries: ${_mugrid_mpi_queries}")
+    else()
+        message(STATUS "MPI GPU-support queries: none (set "
+                       "MUGRID_GPU_AWARE_MPI=1 at run time for a GPU-aware MPI)")
+    endif()
 endif()
 
 if(MUGRID_ENABLE_NETCDF)

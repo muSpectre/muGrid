@@ -2063,22 +2063,17 @@ def _mpi_is_gpu_aware():
 
     The C++ side's answer (``mpi/gpu_aware_mpi.hh``, exposed as
     ``Communicator.gpu_aware_mpi``): ``MUGRID_GPU_AWARE_MPI`` when set, else
-    the MPI library's own report through the OpenMPI extension. That probe
-    cannot see Cray MPICH's switch, ``MPICH_GPU_SUPPORT_ENABLED=1``, which is
-    what makes that MPI accept device memory, so with the variable unset it
-    counts as a yes too. A ``_muGrid`` that does not expose the property
-    falls back to the variable alone, read as the C++ side reads it.
+    whatever GPU-support query the MPI library provides. A ``_muGrid`` that
+    does not expose the property falls back to the variable alone, read as
+    the C++ side reads it.
     """
     from .Wrappers import _muGrid
 
-    env = os.environ.get("MUGRID_GPU_AWARE_MPI", "")
     probed = getattr(_muGrid.Communicator, "gpu_aware_mpi", None)
     if probed is None:
+        env = os.environ.get("MUGRID_GPU_AWARE_MPI", "")
         probed = bool(env) and env[0] in "1yYtT"
-    if env:
-        return bool(probed)
-    return bool(probed) or (
-        os.environ.get("MPICH_GPU_SUPPORT_ENABLED", "") == "1")
+    return bool(probed)
 
 
 #: Tolerance on ``|A A^-1 - I|``, in units of the working precision's eps. Both
@@ -2415,9 +2410,8 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     Host and device are the same code: the array module follows the
     decomposition, so ``numpy`` and ``cupy`` take the identical path. Only the
     interface exchange can differ: device buffers go to MPI directly when it is
-    GPU-aware (``MUGRID_GPU_AWARE_MPI=1``, or ``MPICH_GPU_SUPPORT_ENABLED=1`` on
-    Cray MPICH) and are staged through the host otherwise, so that any MPI build
-    works.
+    GPU-aware (as the MPI library reports, or ``MUGRID_GPU_AWARE_MPI=1``) and
+    are staged through the host otherwise, so that any MPI build works.
 
     Parameters
     ----------
