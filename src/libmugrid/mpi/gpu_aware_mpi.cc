@@ -108,13 +108,14 @@ namespace muGrid {
 
     bool mpi_is_gpu_aware() {
 #ifdef WITH_MPI
-        // Some MPI libraries only know their GPU support once initialised
-        // (MPICH's queries answer no before MPI_Init). Cache the answer only
-        // from then on, so an early question cannot fix a wrong one.
+        // MPI may only be asked once initialised (MPICH aborts on a query
+        // before MPI_Init). Until then only the environment variable
+        // counts, and nothing is cached, so the question is put to MPI on
+        // the first call after initialisation.
         int initialized{0};
         MPI_Initialized(&initialized);
         if (!initialized) {
-            return detect_gpu_aware_mpi();
+            return environment_flag("MUGRID_GPU_AWARE_MPI") == 1;
         }
 #endif
         static bool gpu_aware{detect_gpu_aware_mpi()};
