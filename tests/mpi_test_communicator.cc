@@ -282,6 +282,34 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_iallreduce_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<Real> send{Real(rank), 1.};
+    std::vector<Real> recv(send.size(), -1.);
+    auto request{comm.iallreduce(send.data(), recv.data(), 2,
+                                 TypeDescriptor::Real, ReduceOp::Sum,
+                                 BufferLocation::Host)};
+    // A moved request is still the same reduction
+    auto moved{std::move(request)};
+    moved.wait();
+    BOOST_CHECK_EQUAL(recv[0], nb_ranks * (nb_ranks - 1) / 2);
+    BOOST_CHECK_EQUAL(recv[1], nb_ranks);
+    moved.wait();  // a no-op once complete
+    request.wait();  // NOLINT(bugprone-use-after-move): emptied, a no-op
+
+    // A request destroyed before it is waited for completes then
+    std::vector<Real> recv_max(send.size(), -1.);
+    {
+      auto pending{comm.iallreduce(send.data(), recv_max.data(), 2,
+                                   TypeDescriptor::Real, ReduceOp::Max,
+                                   BufferLocation::Host)};
+    }
+    BOOST_CHECK_EQUAL(recv_max[0], nb_ranks - 1);
+  }
+
+  // ----------------------------------------------------------------------
   BOOST_AUTO_TEST_CASE(buffer_allgather_test) {
     auto & comm{MPIContext::get_context().comm};
     const int nb_ranks{comm.size()};

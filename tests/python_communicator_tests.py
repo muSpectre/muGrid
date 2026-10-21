@@ -370,3 +370,19 @@ def test_exchanges_reject_unsupported_dtypes():
         comm.allgather(np.zeros(2, dtype=np.int16))
     with pytest.raises(ValueError, match="op"):
         comm.allreduce(np.zeros(2), "prod")
+
+
+def test_isum():
+    comm = _make_comm()
+    n = comm.size * (comm.size + 1) / 2
+    for xp in _array_modules():
+        local = xp.asarray([1.0, 2.0, -1.0]) * (comm.rank + 1)
+        handle = comm.isum(local)
+        total = comm.isum_wait(handle)
+        assert type(total) is type(local)
+        np.testing.assert_array_equal(_on_host(total), [n, 2 * n, -n])
+        # waiting again returns the same result
+        np.testing.assert_array_equal(_on_host(handle.wait()), _on_host(total))
+    # a request dropped without waiting completes when it is collected
+    comm.isum(np.ones(2))
+    assert float(comm.isum_wait(comm.isum(2.0))) == 2.0 * comm.size

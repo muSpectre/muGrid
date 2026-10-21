@@ -97,9 +97,10 @@ class CommunicatorWrapper:
       CuPy arrays on the device, and serial runs without a copy;
     - full-array reductions (``reduce_*``) and a NuMPI-compatible
       ``reduction`` object;
-    - a non-blocking host sum (``isum``) through mpi4py, and the mpi4py
-      communicator itself (``mpi4py_comm``) for tools that gather Python
-      objects.
+    - ``isum``/``isum_wait``, a non-blocking sum on the C++ communicator's
+      ``iallreduce``;
+    - the mpi4py communicator itself (``mpi4py_comm``), for tools that
+      gather Python objects.
 
     Everything else is delegated to the C++ communicator.
     """
@@ -173,47 +174,34 @@ class CommunicatorWrapper:
     def isum(self, arg):
         """Begin a non-blocking sum reduction across all processes.
 
-        Returns an opaque handle to pass to :meth:`isum_wait`. Between the two
-        calls the caller can perform work that does not depend on the reduced
-        value, so the global synchronisation latency is hidden behind that work
-        (the key to pipelined CG; Ghysels & Vanroose 2014).
+        Returns a handle to pass to :meth:`isum_wait`. Between the two calls
+        the caller can perform work that does not depend on the reduced
+        value, so the global synchronisation latency is hidden behind that
+        work (the key to pipelined CG; Ghysels & Vanroose 2014). The handle
+        is the C++ communicator's ``iallreduce`` request; its ``wait()`` does
+        what :meth:`isum_wait` does.
 
-        Only small host arrays are supported (the use case is fusing a handful
-        of inner products into one reduction). When non-blocking MPI is
-        unavailable — serial runs, or a communicator without an mpi4py handle —
-        this falls back to an immediate blocking reduction so callers need no
-        special-casing.
+        Meant for small arrays (the use case is fusing a handful of inner
+        products into one reduction); device arrays are staged through the
+        host. In a serial run the sum is ready at once.
 
         Parameters
         ----------
-        arg : numpy array
-            Local contribution to reduce (small, host-resident).
+        arg : numpy or CuPy array, or scalar
+            Local contribution to reduce. Must not be modified until the
+            reduction completes.
 
         Returns
         -------
         handle
             Pass to :meth:`isum_wait` to obtain the global sum.
         """
-        if self.size == 1 or self._mpi_comm is None or MPI is None:
-            # Nothing to overlap: emulate a non-blocking op with a ready result.
-            return ("ready", self.sum(arg))
-
-        import numpy as np
-
-        sendbuf = np.ascontiguousarray(arg)
-        recvbuf = np.empty_like(sendbuf)
-        request = self._mpi_comm.Iallreduce(sendbuf, recvbuf, op=MPI.SUM)
-        # Keep sendbuf alive in the handle: MPI reads it until the request
-        # completes.
-        return ("pending", request, recvbuf, sendbuf)
+        return self._cpp.iallreduce(arg, "sum")
 
     def isum_wait(self, handle):
-        """Complete a reduction started with :meth:`isum` and return its sum."""
-        if handle[0] == "ready":
-            return handle[1]
-        _, request, recvbuf, _sendbuf = handle
-        request.Wait()
-        return recvbuf
+        """Complete a reduction started with :meth:`isum` and return its sum,
+        an array of the argument's shape and kind."""
+        return handle.wait()
 
     def _sum_gpu(self, arg):
         """Sum of a CuPy array across ranks, on the device."""
@@ -579,8 +567,7 @@ def Communicator(communicator=None):
         ``None`` (default) gives a serial communicator. A
         ``CommunicatorWrapper`` is returned unchanged; a bare
         ``_muGrid.Communicator`` is wrapped (without an mpi4py handle, so
-        :meth:`CommunicatorWrapper.isum` is blocking and device reductions
-        are unavailable). Any object with ``Get_size`` (mpi4py interface) of
+        ``mpi4py_comm`` is None). Any object with ``Get_size`` (mpi4py interface) of
         size 1 gives a serial communicator, and of larger size is wrapped
         together with its mpi4py handle.
 

@@ -42,6 +42,7 @@
 #include <pybind11/eigen.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 using pybind11::literals::operator""_a;
@@ -148,6 +149,15 @@ namespace {
     }
   }
 
+  //! A non-blocking allreduce with the arrays it reads and writes. The
+  //! request is declared last so that it is destroyed -- and so waited
+  //! for -- first, while the arrays are still alive.
+  struct PyAllreduceRequest {
+    py::object send;
+    py::object result;
+    muGrid::AllreduceRequest request;
+  };
+
   muGrid::ReduceOp reduce_op(const std::string & op) {
     if (op == "sum") return muGrid::ReduceOp::Sum;
     if (op == "max") return muGrid::ReduceOp::Max;
@@ -158,6 +168,21 @@ namespace {
 }  // namespace
 
 void add_communicator(py::module & mod) {
+  py::class_<PyAllreduceRequest>(mod, "AllreduceRequest",
+                                 "A reduction started by "
+                                 "Communicator.iallreduce.")
+      .def(
+          "wait",
+          [](PyAllreduceRequest & self) {
+            {
+              py::gil_scoped_release release{};
+              self.request.wait();
+            }
+            return self.result;
+          },
+          "Complete the reduction and return its result (again on later "
+          "calls).");
+
   py::class_<muGrid::Communicator>(mod, "Communicator")
 #ifdef WITH_MPI
       .def(py::init([](size_t comm) {
@@ -201,6 +226,26 @@ void add_communicator(py::module & mod) {
           "a"_a, "op"_a = "sum",
           "Elementwise reduction (op: 'sum', 'max' or 'min') of an array "
           "over all ranks, returned on every rank.")
+      .def(
+          "iallreduce",
+          [](const muGrid::Communicator & comm, const py::object & a,
+             const std::string & op) {
+            const auto send{buffer_of(a)};
+            auto [result, recv]{empty_like(send, send.shape)};
+            const auto reduction{reduce_op(op)};
+            wait_for_writer(send);
+            auto request{std::make_unique<PyAllreduceRequest>()};
+            request->send = send.contiguous;
+            request->result = result;
+            request->request =
+                comm.iallreduce(send.data, recv, send.count, send.type,
+                                reduction, send.location);
+            return request;
+          },
+          "a"_a, "op"_a = "sum",
+          "Start the reduction `allreduce` performs and return at once; the "
+          "returned request's wait() completes it and returns the result. "
+          "Work that does not need the result can run in between.")
       .def(
           "allgather",
           [](const muGrid::Communicator & comm, const py::object & a) {

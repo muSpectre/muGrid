@@ -26,6 +26,8 @@ v1.5.2 (not yet released)
 - BUILD: Configuring reports which GPU-support queries the MPI library provides
 - ENH: The communicator reduces, gathers and exchanges NumPy and CuPy arrays between
   ranks, in C++ and Python, staging device arrays through the host when MPI needs it
+- ENH: Non-blocking reductions, as used by pipelined CG, also work on CuPy arrays and on
+  a communicator created without mpi4py
 - MAINT: Ghost exchange, FFT transposes and Python reductions share one decision on
   whether MPI takes device buffers, instead of each making its own
 

@@ -355,7 +355,11 @@ Python sees the same exchanges on `muGrid.Communicator` (and on
 `_muGrid.Communicator` itself): `allreduce(a, op)`, `allgather(a)` and
 `sendrecv(a, dest, source, tag=0)` take NumPy and CuPy arrays alike and return
 a new array of the same kind, as do the reductions `sum`, `max`, `min` and
-`reduce_*`. Code built on them, such as the preconditioners, therefore never
+`reduce_*`. `iallreduce(a, op)` (and the wrapper's `isum`) starts the
+reduction and returns a request whose `wait()` gives the result; it stages
+device arrays through the host even with GPU-aware MPI, since non-blocking
+collectives on device memory are the least reliably supported part of
+GPU-aware MPI libraries, and it is meant for a few values. Code built on them, such as the preconditioners, therefore never
 needs to know which MPI it runs on; use them rather than mpi4py on device
 arrays. CuPy's current stream is synchronised before the exchange.
 

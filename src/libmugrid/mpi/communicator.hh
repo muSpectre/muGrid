@@ -64,6 +64,38 @@ namespace muGrid {
     //! Elementwise reduction of Communicator::allreduce
     enum class ReduceOp { Sum, Max, Min };
 
+    /**
+     * A reduction started by Communicator::iallreduce. wait() completes it
+     * and leaves the result in the receive buffer; until then neither the
+     * send nor the receive buffer may be touched or freed. Move-only; a
+     * request destroyed before it was waited for is waited for then.
+     */
+    class AllreduceRequest {
+       public:
+        AllreduceRequest() = default;
+        AllreduceRequest(const AllreduceRequest &) = delete;
+        AllreduceRequest(AllreduceRequest && other) noexcept;
+        AllreduceRequest & operator=(const AllreduceRequest &) = delete;
+        AllreduceRequest & operator=(AllreduceRequest && other) noexcept;
+        ~AllreduceRequest();
+
+        //! Complete the reduction (a no-op once complete)
+        void wait();
+
+       protected:
+        friend class Communicator;
+#ifdef WITH_MPI
+        MPI_Request request{MPI_REQUEST_NULL};
+#endif
+        //! Host stand-ins (send, recv) for device buffers; owned by the
+        //! request, since MPI uses them until it completes
+        std::array<std::vector<char>, 2> host_staging{};
+        //! Device receive buffer the result is copied to on completion, or
+        //! null when MPI writes the receive buffer itself
+        void * device_recv{nullptr};
+        std::size_t recv_bytes{0};
+    };
+
 #ifdef WITH_MPI
 
     template <typename T, typename T2 = T>
@@ -474,6 +506,16 @@ namespace muGrid {
                        TypeDescriptor type, ReduceOp op,
                        BufferLocation location) const;
 
+        //! Non-blocking allreduce, completed by the returned request's
+        //! wait(). For overlapping small reductions with computation: device
+        //! buffers are always staged through the host here, since even
+        //! GPU-aware MPI libraries support non-blocking collectives on device
+        //! memory less reliably than blocking ones.
+        AllreduceRequest iallreduce(const void * send, void * recv,
+                                    Index_t count, TypeDescriptor type,
+                                    ReduceOp op,
+                                    BufferLocation location) const;
+
         //! `recv` (size() * `count` elements) = every rank's `send`, in
         //! rank order, on every rank
         void allgather(const void * send, void * recv, Index_t count,
@@ -590,6 +632,10 @@ namespace muGrid {
         void allreduce(const void * send, void * recv, Index_t count,
                        TypeDescriptor type, ReduceOp op,
                        BufferLocation location) const;
+        AllreduceRequest iallreduce(const void * send, void * recv,
+                                    Index_t count, TypeDescriptor type,
+                                    ReduceOp op,
+                                    BufferLocation location) const;
         void allgather(const void * send, void * recv, Index_t count,
                        TypeDescriptor type, BufferLocation location) const;
         void sendrecv(const void * send, Index_t send_count, int dest,

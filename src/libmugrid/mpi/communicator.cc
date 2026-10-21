@@ -46,6 +46,7 @@
 #include <algorithm>
 #include <cstring>
 #include <sstream>
+#include <utility>
 
 namespace muGrid {
 
@@ -100,6 +101,70 @@ namespace muGrid {
                        location);
         }
     }  // namespace
+
+    AllreduceRequest::AllreduceRequest(AllreduceRequest && other) noexcept
+        : host_staging{std::move(other.host_staging)},
+          device_recv{other.device_recv}, recv_bytes{other.recv_bytes} {
+        // Moving the vectors keeps their buffers, which MPI may be using
+#ifdef WITH_MPI
+        this->request = other.request;
+        other.request = MPI_REQUEST_NULL;
+#endif
+        other.device_recv = nullptr;
+    }
+
+    AllreduceRequest &
+    AllreduceRequest::operator=(AllreduceRequest && other) noexcept {
+        if (this != &other) {
+            try {
+                this->wait();
+            } catch (...) {  // NOLINT(bugprone-empty-catch)
+            }
+#ifdef WITH_MPI
+            this->request = other.request;
+            other.request = MPI_REQUEST_NULL;
+#endif
+            this->host_staging = std::move(other.host_staging);
+            this->device_recv = other.device_recv;
+            this->recv_bytes = other.recv_bytes;
+            other.device_recv = nullptr;
+        }
+        return *this;
+    }
+
+    AllreduceRequest::~AllreduceRequest() {
+        try {
+            this->wait();
+        } catch (...) {  // NOLINT(bugprone-empty-catch)
+            // A destructor must not throw; the reduction's result is lost.
+        }
+    }
+
+    void AllreduceRequest::wait() {
+#ifdef WITH_MPI
+        if (this->request != MPI_REQUEST_NULL) {
+            const int status{MPI_Wait(&this->request, MPI_STATUS_IGNORE)};
+            if (status != MPI_SUCCESS) {
+                std::stringstream error{};
+                error << "MPI_Wait on a non-blocking allreduce failed with "
+                      << status;
+                throw RuntimeError(error.str());
+            }
+        }
+#endif
+        if (this->device_recv != nullptr) {
+            void * dst{this->device_recv};
+            this->device_recv = nullptr;
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            if (this->recv_bytes > 0) {
+                GPU_MEMCPY_H2D(dst, this->host_staging[1].data(),
+                               this->recv_bytes);
+            }
+#else
+            (void)dst;
+#endif
+        }
+    }
 
 #ifdef WITH_MPI
 
@@ -243,6 +308,50 @@ namespace muGrid {
         buffers.to_device(recv, 0, bytes);
     }
 
+    AllreduceRequest Communicator::iallreduce(const void * send, void * recv,
+                                              Index_t count,
+                                              TypeDescriptor type,
+                                              ReduceOp op,
+                                              BufferLocation location) const {
+        AllreduceRequest request{};
+        const auto bytes{nb_bytes(count, type)};
+        if (this->comm == MPI_COMM_NULL) {
+            copy_bytes(recv, send, bytes, location);
+            return request;
+        }
+        if (is_complex(type) && op != ReduceOp::Sum) {
+            throw RuntimeError("iallreduce: complex values have no order, so "
+                               "no max or min");
+        }
+        const void * send_buffer{send};
+        void * recv_buffer{recv};
+        if (location == BufferLocation::Device) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
+            auto & host_send{request.host_staging[0]};
+            auto & host_recv{request.host_staging[1]};
+            host_send.resize(bytes);
+            host_recv.resize(bytes);
+            if (bytes > 0) {
+                GPU_MEMCPY_D2H(host_send.data(), send, bytes);
+            }
+            send_buffer = host_send.data();
+            recv_buffer = host_recv.data();
+            request.device_recv = recv;
+            request.recv_bytes = bytes;
+#else
+            throw RuntimeError("buffer exchange: device buffers need a "
+                               "build with GPU support");
+#endif
+        }
+        check_mpi(MPI_Iallreduce(send_buffer, recv_buffer,
+                                 checked_mpi_int(count, "iallreduce count"),
+                                 descriptor_to_mpi_type(type), mpi_op(op),
+                                 this->comm, &request.request),
+                  "MPI_Iallreduce", this->rank());
+        return request;
+    }
+
     void Communicator::allgather(const void * send, void * recv,
                                  Index_t count, TypeDescriptor type,
                                  BufferLocation location) const {
@@ -383,6 +492,14 @@ namespace muGrid {
                                  Index_t count, TypeDescriptor type,
                                  ReduceOp, BufferLocation location) const {
         copy_bytes(recv, send, nb_bytes(count, type), location);
+    }
+
+    AllreduceRequest Communicator::iallreduce(const void * send, void * recv,
+                                              Index_t count,
+                                              TypeDescriptor type, ReduceOp,
+                                              BufferLocation location) const {
+        copy_bytes(recv, send, nb_bytes(count, type), location);
+        return AllreduceRequest{};
     }
 
     void Communicator::allgather(const void * send, void * recv,
