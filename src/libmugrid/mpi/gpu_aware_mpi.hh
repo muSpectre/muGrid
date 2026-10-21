@@ -51,10 +51,13 @@ namespace muGrid {
      *    accepted by environment_flag(), e.g. ``1``/``0``) overrides any
      *    detection — use it for MPI stacks whose support cannot be
      *    queried, or to force the host-staging fallback.
-     * 2. Open MPI is queried via ``MPIX_Query_cuda_support()`` /
-     *    ``MPIX_Query_rocm_support()`` where ``mpi-ext.h`` declares them.
-     * 3. Otherwise the conservative answer is false: device buffers are
-     *    bounced through host staging, which is correct with any MPI.
+     * 2. Otherwise the MPI library is asked for support of the GPU runtime
+     *    muGrid was built for, through whichever of the queries
+     *    ``MPIX_Query_{cuda,rocm,hip}_support()`` and
+     *    ``MPIX_GPU_query_support()`` it provides (determined at configure
+     *    time; Open MPI and MPICH each provide some of them).
+     * 3. Without any query the conservative answer is false: device buffers
+     *    are bounced through host staging, which is correct with any MPI.
      */
     bool mpi_is_gpu_aware();
 

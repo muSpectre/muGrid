@@ -291,3 +291,50 @@ def test_gather():
             a_ref = np.concatenate((a_ref, a_tmp), axis=0)
 
     assert (a_gathered == a_ref.T).all()
+
+
+def _rank_array(xp, rank, dtype=np.complex128):
+    """A small non-contiguous array that differs between ranks."""
+    a = xp.arange(12, dtype=dtype).reshape(3, 4) * (1 + 1j) + rank
+    return a[:, ::2]
+
+
+def _array_modules():
+    """numpy, and CuPy when there is a usable GPU."""
+    try:
+        import cupy
+
+        cupy.zeros(1)
+    except Exception:  # no CuPy, or no usable GPU
+        return [np]
+    return [np, cupy]
+
+
+def _on_host(a):
+    return a.get() if hasattr(a, "get") else a
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.complex128])
+def test_allgather(dtype):
+    # Host and device arrays alike: device ones go to MPI directly or through
+    # the host, whichever the MPI takes, and come back as device arrays.
+    comm = _make_comm()
+    for xp in _array_modules():
+        local = _rank_array(xp, comm.rank, dtype)
+        gathered = comm.allgather(local)
+        assert type(gathered) is type(local)
+        assert gathered.shape == (comm.size,) + local.shape
+        for p in range(comm.size):
+            np.testing.assert_array_equal(_on_host(gathered[p]),
+                                          _rank_array(np, p, dtype))
+
+
+def test_sendrecv_around_a_ring():
+    comm = _make_comm()
+    up, down = (comm.rank + 1) % comm.size, (comm.rank - 1) % comm.size
+    for xp in _array_modules():
+        local = _rank_array(xp, comm.rank)
+        from_down = comm.sendrecv(local, dest=up, source=down, tag=3)
+        assert type(from_down) is type(local)
+        np.testing.assert_array_equal(_on_host(from_down),
+                                      _rank_array(np, down))

@@ -164,6 +164,14 @@ fc = muGrid.GlobalFieldCollection([512, 512, 512], device="gpu")
     no PCIe migration; a modest first-touch / page-fault overhead is still
     possible and worth benchmarking for latency-sensitive runs.
 
+!!! note "MPI and file I/O on an APU"
+    Only managed allocations are host-readable on an APU; plain device
+    allocations are not, even though the device reports itself integrated.
+    µGrid therefore asks the GPU runtime about each buffer before handing it
+    to an MPI that is not GPU-aware or to NetCDF: managed buffers are used in
+    place, plain ones are staged through host memory. No setting is needed
+    for either allocator.
+
 !!! note "Install the allocator before the first device field"
     `use_cupy_allocator()` and the managed pool only govern allocations made
     after they are set, so set them before any GPU field is created. Switching
@@ -321,10 +329,17 @@ distributed FFT. Two properties of MPI implementations shape how this is done:
 
 ### Runtime detection and host fallback
 
-µGrid detects GPU-aware MPI at runtime. With Open MPI (and derivatives such as
-HPC-X), the official `MPIX_Query_cuda_support()` / `MPIX_Query_rocm_support()`
-extensions are queried. For MPI stacks that cannot be queried, the conservative
-answer is *not GPU-aware*.
+µGrid asks the MPI library at runtime whether it accepts device buffers of the
+GPU runtime µGrid was built for. It uses whichever of the queries
+`MPIX_Query_cuda_support()`, `MPIX_Query_rocm_support()`,
+`MPIX_Query_hip_support()` and `MPIX_GPU_query_support()` the MPI library
+provides; which ones exist is found out when µGrid is configured (CMake reports
+them as `MPI GPU-support queries`), so no MPI implementation is singled out.
+Open MPI (and derivatives such as HPC-X) and MPICH (and its derivatives) each
+provide some of them. For MPI stacks that cannot be queried, the conservative
+answer is *not GPU-aware*. `muGrid._muGrid.Communicator.gpu_aware_mpi`
+reports the answer (ask after MPI is initialised, e.g. after importing
+`mpi4py.MPI`).
 
 When MPI is not GPU-aware, the contiguous staging buffers are bounced through host
 memory: pack on the device, copy once to a host buffer, communicate, copy back,
@@ -332,14 +347,22 @@ unpack on the device. This is correct with any MPI library and, because only
 flat buffers are copied, costs one device-to-host and one host-to-device copy
 per message.
 
+The Python communicator does the same for CuPy arrays: its reductions (`sum`,
+`max`, `reduce_*`) and its array exchanges (`allgather`, `sendrecv`) take NumPy
+and CuPy arrays alike and return the kind they were given, handing device
+buffers to MPI directly or staging them through the host as above. Code built
+on it, such as the preconditioners, therefore never needs to know which MPI it
+runs on; use these methods instead of calling mpi4py on device arrays.
+
 ### The `MUGRID_GPU_AWARE_MPI` environment variable
 
 The environment variable `MUGRID_GPU_AWARE_MPI` overrides the detection in both
 directions:
 
 - `MUGRID_GPU_AWARE_MPI=1` forces direct device pointers. Use this for MPI stacks
-  that are GPU-aware but cannot be queried (e.g. some MPICH derivatives), where
-  detection would needlessly fall back to host staging.
+  that are GPU-aware but cannot be queried, or whose query answers no although
+  device buffers work, where detection would needlessly fall back to host
+  staging.
 
 - `MUGRID_GPU_AWARE_MPI=0` forces the host bounce — a kill switch for *broken*
   GPU-aware stacks. GPU support in MPI is a complex, layered feature (UCX

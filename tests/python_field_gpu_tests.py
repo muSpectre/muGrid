@@ -383,6 +383,55 @@ class CupyAllocatorTests(unittest.TestCase):
         self.assertEqual(pool.used_bytes(), used_before)
 
 
+@unittest.skipUnless(
+    GPU_AVAILABLE and HAS_CUPY and muGrid.has_netcdf,
+    "GPU backend, CuPy or NetCDF not available",
+)
+class DeviceFieldNetCDFTests(unittest.TestCase):
+    """A device field round-trips through NetCDF whether its memory is plain
+    or managed. On a unified-memory APU the two take different paths: managed
+    memory, which the runtime reports host-readable, is written in place, and
+    plain device memory is staged through the host."""
+
+    def tearDown(self):
+        muGrid.clear_device_allocator()
+        cp.cuda.set_allocator(cp.get_default_memory_pool().malloc)
+
+    def _round_trip(self, fname):
+        import os
+
+        # Under mpirun every rank runs this serial test: one file per process
+        fname = f"{os.getpid()}_{fname}"
+        nb_grid_pts = [4, 5]
+        fc = muGrid.GlobalFieldCollection(nb_grid_pts, device=muGrid.Device.gpu())
+        field = fc.real_field("rho")
+        ref = cp.arange(np.prod(nb_grid_pts), dtype=float).reshape(nb_grid_pts)
+        field.s[...] = ref
+        if os.path.exists(fname):
+            os.remove(fname)
+        writer = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Write)
+        writer.register_field_collection(fc)
+        writer.append_frame().write()
+        writer.close()
+
+        field.s[...] = 0.0
+        reader = muGrid.FileIONetCDF(fname, muGrid.OpenMode.Read)
+        reader.register_field_collection(fc)
+        reader.read(0)
+        reader.close()
+        os.remove(fname)
+        np.testing.assert_array_equal(cp.asnumpy(field.s).reshape(nb_grid_pts),
+                                      cp.asnumpy(ref))
+
+    def test_plain_device_memory(self):
+        self._round_trip("python_device_field_plain.nc")
+
+    def test_managed_memory(self):
+        cp.cuda.set_allocator(cp.cuda.MemoryPool(cp.cuda.malloc_managed).malloc)
+        muGrid.use_cupy_allocator()
+        self._round_trip("python_device_field_managed.nc")
+
+
 if __name__ == "__main__":
     unittest.main()
 

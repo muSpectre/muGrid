@@ -66,7 +66,8 @@ void add_communicator(py::module & mod) {
       .def_property_readonly_static(
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
       // Whether MPI may be handed device pointers (MUGRID_GPU_AWARE_MPI, else
-      // the MPI library's own report); the C++ ghost exchange and transposes
+      // the MPI library's own report through whichever GPU-support query it
+      // provides); the C++ ghost exchange and transposes
       // stage through the host otherwise, and so must Python reductions.
       .def_property_readonly_static(
           "gpu_aware_mpi",

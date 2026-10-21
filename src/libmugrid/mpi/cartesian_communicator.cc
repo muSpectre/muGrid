@@ -395,12 +395,12 @@ namespace muGrid {
         GPU_STREAM_SYNCHRONIZE_DEFAULT();
 #endif
         // Without GPU-aware MPI, bounce the contiguous staging buffers
-        // through host memory (correct with any MPI library). On a unified-
-        // memory / integrated device the staging buffer is already
-        // host-addressable, so any MPI can read it directly and no bounce is
-        // needed.
+        // through host memory (correct with any MPI library). Staging
+        // buffers the host can dereference (managed memory on a unified-
+        // memory device) go to any MPI directly and need no bounce.
         const bool bounce{!mpi_is_gpu_aware() &&
-                          !Device::current_gpu().is_host_accessible()};
+                          !(host_can_read_device_pointer(send_staging) &&
+                            host_can_read_device_pointer(recv_staging))};
         char * send_buffer{send_staging};
         char * recv_buffer{recv_staging};
         if (bounce) {
@@ -420,16 +420,6 @@ namespace muGrid {
             recv_buffer = host_recv.data();
 #endif
         }
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        if (!bounce && !mpi_is_gpu_aware() && send_bytes > 0) {
-            // Not bouncing only because the device claims to be host-coherent.
-            // Verify that before MPI reads the pointer, so a wrong claim fails
-            // here with a reason instead of as a segfault inside MPI's memcpy.
-            assert_host_can_read_device_pointer(send_buffer,
-                                                "CartesianCommunicator::"
-                                                "sendrecv_staged");
-        }
-#endif
         MPI_Status status;
         // Compute the flat message sizes in Index_t and narrow with a range
         // check: an int * int product would overflow for halo faces of more

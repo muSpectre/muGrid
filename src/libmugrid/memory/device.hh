@@ -100,9 +100,12 @@ class Device {
     //! Check whether memory on this device can be dereferenced directly by the
     //! host CPU. True for plain host memory and pinned host memory, and true
     //! for device memory on a unified-memory / integrated device (e.g. an APU
-    //! such as the AMD MI300A), where the GPU allocation is host-coherent.
+    //! such as the AMD MI300A), where the CPU and GPU share memory.
     //! False for discrete GPUs. The result is queried from the runtime once
     //! per device and cached. (Not constexpr: requires a runtime probe.)
+    //! A property of the device, not of an allocation: on such a device
+    //! only some allocations are host-readable, which
+    //! host_can_read_device_pointer() answers per buffer.
     bool is_host_accessible() const;
 
     //! Get the device type
@@ -258,12 +261,20 @@ constexpr Device memory_space_to_device<ROCmSpace>() {
     void check_gpu_runtime_version();
 
     /**
-     * Throw if `ptr` has no host mapping. Guards the one place that hands a
-     * device pointer to a non-GPU-aware MPI on the strength of the device
-     * reporting itself host-coherent. Checked once per process.
+     * Whether the host CPU can dereference the GPU allocation `ptr` (a null
+     * pointer, which nothing reads, counts as yes). On a unified-memory /
+     * integrated device this depends on how the buffer was allocated, not
+     * only on the device: on an AMD MI300A managed memory is host-readable
+     * but plain hipMalloc memory (XNACK off) is not. The answer is therefore
+     * queried from the runtime for the pointer itself, and is false on a
+     * discrete GPU. ``MUGRID_UNIFIED_MEMORY`` overrides it, as it overrides
+     * Device::is_host_accessible(). Callers use it to decide whether a device
+     * buffer can go to a non-GPU-aware MPI, or to file I/O, without staging.
+     *
+     * Declared unconditionally; without a GPU backend there are no device
+     * pointers and the answer is true.
      */
-    void assert_host_can_read_device_pointer(const void * ptr,
-                                             const char * context);
+    bool host_can_read_device_pointer(const void * ptr);
 
 }  // namespace muGrid
 

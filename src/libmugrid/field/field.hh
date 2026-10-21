@@ -367,8 +367,9 @@ namespace muGrid {
         /**
          * Check whether this field's data can be dereferenced directly by the
          * host CPU. Always true for host-resident fields; true for
-         * device-resident fields only on unified-memory / integrated devices
-         * (e.g. an APU), where the device allocation is host-coherent. When
+         * device-resident fields only when their allocation is host-readable,
+         * i.e. managed memory on a unified-memory / integrated device (e.g.
+         * an APU; plain device allocations there are not). When
          * true, the raw pointer from get_void_data_ptr(false) may be passed to
          * host-side libraries (such as NetCDF) without a staging copy.
          */

@@ -100,48 +100,6 @@ void check_gpu_runtime_version() {
 #endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
 }
 
-void assert_host_can_read_device_pointer(const void * ptr,
-                                         const char * context) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-    // Checked once per process, not per call: the answer depends on the
-    // allocator and the device, not on which buffer is passed, and both
-    // inputs to the decision it guards (mpi_is_gpu_aware, is_host_accessible)
-    // are themselves cached.
-    static const bool checked{[ptr, context] {
-        bool host_readable{false};
-#if defined(MUGRID_ENABLE_CUDA)
-        cudaPointerAttributes attr{};
-        if (cudaPointerGetAttributes(&attr, ptr) == cudaSuccess) {
-            host_readable = (attr.hostPointer != nullptr);
-        }
-#else   // MUGRID_ENABLE_HIP
-        hipPointerAttribute_t attr{};
-        if (hipPointerGetAttributes(&attr, ptr) == hipSuccess) {
-            host_readable = (attr.hostPointer != nullptr);
-        }
-#endif
-        if (!host_readable) {
-            std::stringstream msg{};
-            msg << context << ": about to hand a device pointer to an MPI "
-                   "that does not report GPU support, because the device "
-                   "reports itself host-coherent -- but the runtime says the "
-                   "pointer has no host mapping, so MPI would fault reading "
-                   "it. Either the device property is wrong (see "
-                   "check_gpu_runtime_version) or MUGRID_UNIFIED_MEMORY "
-                   "forces the wrong answer; set MUGRID_UNIFIED_MEMORY=0 to "
-                   "take the host-staging path.";
-            throw RuntimeError(msg.str());
-        }
-        return true;
-    }()};
-    (void)checked;
-#else
-    // No GPU backend: there are no device pointers to check.
-    (void)ptr;
-    (void)context;
-#endif
-}
-
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 namespace {
     //! Query (once per device id, then cache) whether the GPU is an
@@ -175,6 +133,60 @@ namespace {
     }
 }  // namespace
 #endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
+
+bool host_can_read_device_pointer(const void * ptr) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    if (ptr == nullptr) {
+        return true;
+    }
+    const int override{unified_memory_env_override()};
+    if (override >= 0) {
+        return override == 1;
+    }
+    // Not cached: the answer belongs to the allocation, and one process can
+    // hold both kinds (e.g. muGrid's own buffers next to CuPy's managed
+    // pool). The query costs about a microsecond, small against the MPI
+    // message or file write it decides about.
+#if defined(MUGRID_ENABLE_CUDA)
+    cudaPointerAttributes attr{};
+    if (cudaPointerGetAttributes(&attr, ptr) != cudaSuccess) {
+        // Unknown pointer: answer no, which only costs a host copy
+        cudaGetLastError();  // clear the error of the failed query
+        return false;
+    }
+    switch (attr.type) {
+        case cudaMemoryTypeUnregistered:  // plain host memory
+        case cudaMemoryTypeHost:
+            return true;
+        case cudaMemoryTypeManaged:
+            return gpu_is_integrated(attr.device);
+        default:
+            return gpu_is_integrated(attr.device) &&
+                   attr.hostPointer != nullptr;
+    }
+#else   // MUGRID_ENABLE_HIP
+    hipPointerAttribute_t attr{};
+    if (hipPointerGetAttributes(&attr, ptr) != hipSuccess) {
+        (void)hipGetLastError();  // clear the error of the failed query
+        return false;
+    }
+    switch (attr.type) {
+        case hipMemoryTypeHost:
+        case hipMemoryTypeUnregistered:
+            return true;
+        case hipMemoryTypeManaged:
+            return gpu_is_integrated(attr.device);
+        default:
+            return gpu_is_integrated(attr.device) &&
+                   attr.hostPointer != nullptr;
+    }
+#endif
+#else
+    // No GPU backend: there are no device pointers.
+    (void)ptr;
+    return true;
+#endif  // MUGRID_ENABLE_CUDA || MUGRID_ENABLE_HIP
+}
 
 Device Device::current_gpu() {
 #if defined(MUGRID_ENABLE_CUDA)
