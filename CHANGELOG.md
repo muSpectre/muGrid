@@ -24,6 +24,8 @@ v1.5.2 (not yet released)
 - BUG: On unified-memory APUs, plain device memory is staged through the host for a
   non-GPU-aware MPI and for NetCDF instead of failing; managed memory is used in place
 - BUILD: Configuring reports which GPU-support queries the MPI library provides
+- BUG: The FFT-based (Green) preconditioner no longer fails, and leaves the other ranks
+  waiting forever, on a rank whose share of the Fourier grid is empty (small grids, many ranks)
 - ENH: The communicator reduces, gathers and exchanges NumPy and CuPy arrays between
   ranks, in C++ and Python, staging device arrays through the host when MPI needs it
 - ENH: Non-blocking reductions, as used by pipelined CG, also work on CuPy arrays and on
