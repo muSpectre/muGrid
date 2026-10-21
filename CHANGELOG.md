@@ -24,6 +24,8 @@ v1.5.2 (not yet released)
 - BUG: On unified-memory APUs, plain device memory is staged through the host for a
   non-GPU-aware MPI and for NetCDF instead of failing; managed memory is used in place
 - BUILD: Configuring reports which GPU-support queries the MPI library provides
+- ENH: The Python communicator gathers and exchanges NumPy and CuPy arrays between
+  ranks, staging device arrays through the host when MPI is not GPU-aware
 
 v1.5.1 (18Oct26)
 ----------------

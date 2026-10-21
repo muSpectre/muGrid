@@ -48,7 +48,6 @@ Available preconditioners:
   parallel cyclic reduction) solve along the distributed axis.
 """
 
-import os
 import warnings
 from contextlib import nullcontext
 
@@ -876,7 +875,8 @@ class AnalyticReferencePreconditioner(Preconditioner):
 
     In single precision the low-frequency phase sum cancels O(S) terms to
     O(S q²), so a symbol built in float32 alone loses the lowest modes
-    (measured: zeroed outright from N ≈ 2048). On the host the symbol is therefore built and
+    (measured: zeroed outright from N ≈ 2048). On the host the symbol is
+    therefore built and
     inverted in double for either field precision; only the mode's components
     are read and written in the field's. On a device a float32 field is
     finished in single precision per mode, and redone in double only where an
@@ -2058,24 +2058,6 @@ def _array_module(on_device):
     return np
 
 
-def _mpi_is_gpu_aware():
-    """Whether MPI may be handed device buffers directly.
-
-    The C++ side's answer (``mpi/gpu_aware_mpi.hh``, exposed as
-    ``Communicator.gpu_aware_mpi``): ``MUGRID_GPU_AWARE_MPI`` when set, else
-    whatever GPU-support query the MPI library provides. A ``_muGrid`` that
-    does not expose the property falls back to the variable alone, read as
-    the C++ side reads it.
-    """
-    from .Wrappers import _muGrid
-
-    probed = getattr(_muGrid.Communicator, "gpu_aware_mpi", None)
-    if probed is None:
-        env = os.environ.get("MUGRID_GPU_AWARE_MPI", "")
-        probed = bool(env) and env[0] in "1yYtT"
-    return bool(probed)
-
-
 #: Tolerance on ``|A A^-1 - I|``, in units of the working precision's eps. Both
 #: ends are measured: a healthy block lands within a few eps of zero (5.9e-16 in
 #: double, 4.6e-7 in single) and a singular one at 6e-4 and above, so this sits
@@ -2409,9 +2391,9 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
     Host and device are the same code: the array module follows the
     decomposition, so ``numpy`` and ``cupy`` take the identical path. Only the
-    interface exchange can differ: device buffers go to MPI directly when it is
-    GPU-aware (as the MPI library reports, or ``MUGRID_GPU_AWARE_MPI=1``) and
-    are staged through the host otherwise, so that any MPI build works.
+    interface exchange can differ, and the communicator decides that: device
+    buffers go to MPI directly when it is GPU-aware and are staged through the
+    host otherwise, so that any MPI build works.
 
     Parameters
     ----------
@@ -2477,20 +2459,16 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         if element is None:
             element = _muGrid.FEMElement.q1
-        comm = communicator if communicator is not None else Communicator()
+        # The communicator carries the interface exchanges and decides, for
+        # device arrays, whether MPI gets them directly or through the host.
+        comm = Communicator(communicator)
         self._comm = comm
-        self._mpi = comm.mpi4py_comm if comm.size > 1 else None
         self._timer = timer
         self._name = name
 
         self._on_device = not decomposition.device.is_host
         xp = _array_module(self._on_device)
         self._xp = xp
-        # Whether the interface exchange hands its buffers to MPI as they are.
-        # Host arrays always; device arrays only to a GPU-aware MPI -- staging
-        # those through pageable host memory cost 5 ms per apply on two MI300A
-        # and 17 ms on four at 256^3, for a few MB of interface planes.
-        self._mpi_direct = (not self._on_device) or _mpi_is_gpu_aware()
 
         dim = len(tuple(decomposition.nb_domain_grid_pts))
         self.dim = dim
@@ -2767,7 +2745,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         """
         xp = self._xp
         dim, P = self.dim, self.nb_ranks
-        gathered = self._allgather(
+        gathered = self._comm.allgather(
             xp.ascontiguousarray(self._spike_ends))
 
         size = 2 * dim * P
@@ -2949,30 +2927,18 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         ``to_high`` goes to rank ``p+distance`` and ``to_low`` -- ``to_high``
         again unless given -- to rank ``p-distance``. Returns
         ``(from_low, from_high)``: what rank ``p-distance`` sent up and what
-        rank ``p+distance`` sent down, wrapping cyclically. Device buffers go
-        to MPI as they are when it is GPU-aware, else through the host (see
-        :meth:`_outgoing`).
+        rank ``p+distance`` sent down, wrapping cyclically.
         """
         if to_low is None:
             to_low = to_high
-        if self._mpi is None:
-            return to_high, to_low
-
         P = self.nb_ranks
-        send_high = self._outgoing(to_high)
-        send_low = send_high if to_low is to_high else self._outgoing(to_low)
-        from_low = self._incoming(send_high.shape, send_high.dtype)
-        from_high = self._incoming(send_low.shape, send_low.dtype)
         lo = (self.rank - distance) % P
         hi = (self.rank + distance) % P
-        self._before_mpi()
         # Receive from the low side while sending to the high side, then the
         # reverse; two Sendrecvs rather than four blocking calls.
-        self._mpi.Sendrecv(send_high, dest=hi, sendtag=0,
-                           recvbuf=from_low, source=lo, recvtag=0)
-        self._mpi.Sendrecv(send_low, dest=lo, sendtag=1,
-                           recvbuf=from_high, source=hi, recvtag=1)
-        return self._arrived(from_low), self._arrived(from_high)
+        from_low = self._comm.sendrecv(to_high, dest=hi, source=lo, tag=0)
+        from_high = self._comm.sendrecv(to_low, dest=lo, source=hi, tag=1)
+        return from_low, from_high
 
     def _solve_reduced_pcr(self, ends):
         """The interface solve by parallel cyclic reduction.
@@ -3062,50 +3028,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         """
         local = self._xp.ascontiguousarray(
             v[(slice(None),) + self._zero_index][..., 0])
-        full = self._allgather(local).reshape(-1)
+        full = self._comm.allgather(local).reshape(-1)
         return (self._zero_op @ full).reshape(self.nz_local, self.dim)
 
     # -- collectives -------------------------------------------------------- #
-
-    def _allgather(self, local):
-        """Gather one array per rank along a new leading axis."""
-        if self._mpi is None:
-            return local[None]
-        send = self._outgoing(local)
-        out = self._incoming((self.nb_ranks,) + send.shape, send.dtype)
-        self._before_mpi()
-        self._mpi.Allgather(send, out)
-        return self._arrived(out)
-
-    # Buffers for MPI. A host array, or a device array when MPI is GPU-aware
-    # (_mpi_direct), is handed over as it is. Otherwise the device buffer is
-    # staged through host memory, which works with any MPI build but costs a
-    # synchronising copy each way per message -- measured as the dominant
-    # cost of the whole apply on MI300A once there are two or more GPUs.
-
-    def _outgoing(self, a):
-        """``a`` as a contiguous buffer MPI can read."""
-        if self._mpi_direct:
-            return self._xp.ascontiguousarray(a)
-        return np.ascontiguousarray(a.get())
-
-    def _incoming(self, shape, dtype):
-        """A buffer MPI can write ``shape`` elements of ``dtype`` into."""
-        return (self._xp if self._mpi_direct else np).empty(shape, dtype=dtype)
-
-    def _arrived(self, buffer):
-        """A received buffer as an array of this preconditioner's module."""
-        return buffer if self._mpi_direct else self._xp.asarray(buffer)
-
-    def _before_mpi(self):
-        """Let the kernels that fill device send buffers finish.
-
-        MPI reads a device buffer outside the stream it was written on, so the
-        stream must be drained first; the staged path needs no such step,
-        because the copy to the host already synchronises.
-        """
-        if self._on_device and self._mpi_direct:
-            self._xp.cuda.get_current_stream().synchronize()
 
     def _timed(self, label):
         return self._timer(label) if self._timer is not None else nullcontext()
@@ -3185,7 +3111,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
                 if self.nb_ranks == 1:
                     rhs = ends.reshape(self._mode_shape + (2 * dim, 1))
                 else:
-                    gathered = self._allgather(xp.ascontiguousarray(ends))
+                    gathered = self._comm.allgather(xp.ascontiguousarray(ends))
                     rhs = xp.moveaxis(gathered, 0, -3).reshape(
                         self._mode_shape + (2 * dim * self.nb_ranks, 1))
                 first = xp.matmul(self._corr_first, rhs)

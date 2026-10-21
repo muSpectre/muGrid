@@ -347,6 +347,13 @@ unpack on the device. This is correct with any MPI library and, because only
 flat buffers are copied, costs one device-to-host and one host-to-device copy
 per message.
 
+The Python communicator does the same for CuPy arrays: its reductions (`sum`,
+`max`, `reduce_*`) and its array exchanges (`allgather`, `sendrecv`) take NumPy
+and CuPy arrays alike and return the kind they were given, handing device
+buffers to MPI directly or staging them through the host as above. Code built
+on it, such as the preconditioners, therefore never needs to know which MPI it
+runs on; use these methods instead of calling mpi4py on device arrays.
+
 ### The `MUGRID_GPU_AWARE_MPI` environment variable
 
 The environment variable `MUGRID_GPU_AWARE_MPI` overrides the detection in both

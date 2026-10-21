@@ -102,3 +102,19 @@ def test_gpu_reductions_across_ranks(comm):
     np.testing.assert_array_equal(cp.asnumpy(total), expect)
     assert float(comm.reduce_max(x)) == 3 + comm.size - 1
     assert float(comm.reduce_sum(x)) == float(expect.sum())
+
+
+def test_gpu_exchanges_across_ranks(comm):
+    """Run under mpirun with MUGRID_GPU_AWARE_MPI=0, as the reductions above:
+    allgather and sendrecv must stage device arrays through the host."""
+    if not muGrid.has_gpu:
+        pytest.skip("needs a GPU")
+    x = cp.arange(4, dtype=np.float64) + comm.rank
+    gathered = comm.allgather(x)
+    assert isinstance(gathered, cp.ndarray)
+    expect = np.arange(4)[None] + np.arange(comm.size)[:, None]
+    np.testing.assert_array_equal(cp.asnumpy(gathered), expect)
+    up, down = (comm.rank + 1) % comm.size, (comm.rank - 1) % comm.size
+    received = comm.sendrecv(x, dest=up, source=down)
+    assert isinstance(received, cp.ndarray)
+    np.testing.assert_array_equal(cp.asnumpy(received), np.arange(4) + down)

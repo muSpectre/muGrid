@@ -260,24 +260,107 @@ class CommunicatorWrapper:
     def _allreduce_device(self, arr, mpi_op):
         """Allreduce a CuPy array across ranks, returning a CuPy array.
 
-        Device pointers go to MPI only when it is GPU-aware
-        (`_muGrid.Communicator.gpu_aware_mpi`: MUGRID_GPU_AWARE_MPI, else the
-        MPI library's own report), as in the C++ ghost exchange; otherwise the
-        values are staged through the host, because an MPI that is not
-        GPU-aware reads device pointers as host memory (a crash, or wrong
-        sums). Either way the current stream is synchronised first: MPI
-        does not order itself after the kernel that produced `arr`.
+        Directly or staged through the host, see "Array exchanges" below.
         """
+        send = self._outgoing(arr)
+        result = self._incoming(send, send.shape)
+        self._mpi_comm.Allreduce(send, result, op=mpi_op)
+        return self._arrived(result, arr)
+
+    # ------------------------------------------------------------------ #
+    # Array exchanges (numpy or CuPy)                                     #
+    # ------------------------------------------------------------------ #
+    #
+    # Device arrays go to MPI as they are when it is GPU-aware
+    # (`_muGrid.Communicator.gpu_aware_mpi`: MUGRID_GPU_AWARE_MPI, else the
+    # MPI library's own report), as in the C++ ghost exchange, and are staged
+    # through the host otherwise: an MPI that is not GPU-aware reads device
+    # pointers as host memory (a crash, or wrong values). Callers pass numpy
+    # and CuPy arrays alike and get back the kind they passed in.
+
+    def _outgoing(self, a):
+        """`a` as a contiguous buffer MPI can read.
+
+        A device buffer handed over as it is waits for the current stream
+        first: MPI does not order itself after the kernel that wrote it. The
+        copy to the host synchronises by itself."""
+        if not self._is_gpu(a):
+            return np.ascontiguousarray(a)
         cp = _get_cupy()
+        if not _muGrid.Communicator.gpu_aware_mpi:
+            return cp.asnumpy(a)
+        a = cp.ascontiguousarray(a)
         cp.cuda.get_current_stream().synchronize()
-        if _muGrid.Communicator.gpu_aware_mpi:
-            result = cp.empty_like(arr)
-            self._mpi_comm.Allreduce(arr, result, op=mpi_op)
-            return result
-        host = cp.asnumpy(arr)
-        result = np.empty_like(host)
-        self._mpi_comm.Allreduce(host, result, op=mpi_op)
-        return cp.asarray(result)
+        return a
+
+    @staticmethod
+    def _incoming(send, shape):
+        """A buffer for MPI to write into, on the same side as `send`."""
+        xp = _get_cupy() if _is_cupy_array(send) else np
+        return xp.empty(shape, dtype=send.dtype)
+
+    def _arrived(self, buffer, like):
+        """A received `buffer` as the kind of array `like` is."""
+        if self._is_gpu(like) and not self._is_gpu(buffer):
+            return _get_cupy().asarray(buffer)
+        return buffer
+
+    def _require_mpi4py(self, what):
+        if self._mpi_comm is None:
+            raise RuntimeError(
+                f"{what} across {self.size} ranks needs the mpi4py "
+                "communicator; construct this one with muGrid.Communicator("
+                "<mpi4py communicator>)."
+            )
+
+    def allgather(self, a):
+        """Gather an array from every rank, on every rank.
+
+        Parameters
+        ----------
+        a : numpy or CuPy array
+            Local contribution, of the same shape and dtype on every rank.
+
+        Returns
+        -------
+        Same type as input
+            Shape ``(size, *a.shape)``; entry ``p`` is rank ``p``'s `a`. In a
+            serial run, a view of `a`.
+        """
+        if self.size == 1:
+            return a[None]
+        self._require_mpi4py("allgather")
+        send = self._outgoing(a)
+        out = self._incoming(send, (self.size,) + send.shape)
+        self._mpi_comm.Allgather(send, out)
+        return self._arrived(out, a)
+
+    def sendrecv(self, a, dest, source, tag=0):
+        """Send `a` to rank `dest` and receive from rank `source`.
+
+        Parameters
+        ----------
+        a : numpy or CuPy array
+            What to send. What arrives must have the same shape and dtype.
+        dest, source : int
+            Ranks to send to and receive from.
+        tag : int, optional
+            Message tag, the same for the send and the receive.
+
+        Returns
+        -------
+        Same type as input
+            What rank `source` sent. In a serial run (where `dest` and
+            `source` can only be this rank), `a` itself.
+        """
+        if self.size == 1:
+            return a
+        self._require_mpi4py("sendrecv")
+        send = self._outgoing(a)
+        recv = self._incoming(send, send.shape)
+        self._mpi_comm.Sendrecv(send, dest=dest, sendtag=tag, recvbuf=recv,
+                                source=source, recvtag=tag)
+        return self._arrived(recv, a)
 
     def max(self, arg):
         """
@@ -651,7 +734,7 @@ def Communicator(communicator=None):
 
     Parameters
     ----------
-    communicator : mpi4py.MPI.Comm, _muGrid.Communicator, CommunicatorWrapper or None, optional
+    communicator : mpi4py.MPI.Comm, _muGrid.Communicator, CommunicatorWrapper or None
         ``None`` (default) gives a serial communicator. A
         ``CommunicatorWrapper`` is returned unchanged; a bare
         ``_muGrid.Communicator`` is wrapped (without an mpi4py handle, so
