@@ -384,7 +384,7 @@ class CupyAllocatorTests(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    GPU_AVAILABLE and HAS_CUPY and hasattr(muGrid, "FileIONetCDF"),
+    GPU_AVAILABLE and HAS_CUPY and muGrid.has_netcdf,
     "GPU backend, CuPy or NetCDF not available",
 )
 class DeviceFieldNetCDFTests(unittest.TestCase):
