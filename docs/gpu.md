@@ -341,18 +341,29 @@ answer is *not GPU-aware*. `muGrid._muGrid.Communicator.gpu_aware_mpi`
 reports the answer (ask after MPI is initialised, e.g. after importing
 `mpi4py.MPI`).
 
-When MPI is not GPU-aware, the contiguous staging buffers are bounced through host
-memory: pack on the device, copy once to a host buffer, communicate, copy back,
-unpack on the device. This is correct with any MPI library and, because only
-flat buffers are copied, costs one device-to-host and one host-to-device copy
-per message.
+All of this is decided in one place, the buffer exchanges of
+`muGrid::Communicator` (`allreduce`, `allgather`, `allgatherv`, `sendrecv`,
+`alltoallv`),
+which the ghost exchange and the FFT transposes are built on. Given device
+buffers, they hand them to MPI directly when it is GPU-aware or when the host
+can read them (managed memory on a unified-memory device), and otherwise bounce
+them through host memory: copy once to a host buffer, communicate, copy back.
+This is correct with any MPI library and, because only flat buffers are copied,
+costs one device-to-host and one host-to-device copy per message. Strided data
+such as ghost layers is packed into contiguous device buffers first.
 
-The Python communicator does the same for CuPy arrays: its reductions (`sum`,
-`max`, `reduce_*`) and its array exchanges (`allgather`, `sendrecv`) take NumPy
-and CuPy arrays alike and return the kind they were given, handing device
-buffers to MPI directly or staging them through the host as above. Code built
-on it, such as the preconditioners, therefore never needs to know which MPI it
-runs on; use these methods instead of calling mpi4py on device arrays.
+Python sees the same exchanges on `muGrid.Communicator` (and on
+`_muGrid.Communicator` itself): `allreduce(a, op)`, `allgather(a)` (one shape
+on every rank, stacked), `allgatherv(a, axis=0)` (extents along `axis` may
+differ, concatenated) and `sendrecv(a, dest, source, tag=0)` take NumPy and
+CuPy arrays alike and return a new array of the same kind, as do the reductions `sum`, `max`, `min` and
+`reduce_*`. `iallreduce(a, op)` (and the wrapper's `isum`) starts the
+reduction and returns a request whose `wait()` gives the result; it stages
+device arrays through the host even with GPU-aware MPI, since non-blocking
+collectives on device memory are the least reliably supported part of
+GPU-aware MPI libraries, and it is meant for a few values. Code built on them, such as the preconditioners, therefore never
+needs to know which MPI it runs on; use them rather than mpi4py on device
+arrays. CuPy's current stream is synchronised before the exchange.
 
 ### The `MUGRID_GPU_AWARE_MPI` environment variable
 

@@ -791,12 +791,11 @@ class TestMPIFFTProcessGrid:
 
         # Gather all process coordinates
         local_coords = np.array(engine.process_coords, dtype=np.int32).reshape(1, -1)
-        all_coords = comm.gather(local_coords)
+        all_coords = comm.allgatherv(local_coords)
 
         if comm.rank == 0:
             # Check all coordinates are unique
-            # all_coords is concatenated to [comm.size * 2] array after gather
-            # Reshape to [comm.size, 2]
+            # allgatherv concatenates the (1, 2) rows to (comm.size, 2)
             all_coords = all_coords.reshape(comm.size, 2)
             coord_tuples = [tuple(row) for row in all_coords]
             coord_set = set(coord_tuples)

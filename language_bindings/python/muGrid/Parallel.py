@@ -84,39 +84,25 @@ def _is_cupy_array(obj):
     return type(obj).__module__.startswith("cupy")
 
 
-def _get_mpi_dtype(arr):
-    """Get the MPI datatype corresponding to a numpy/cupy array dtype."""
-    dtype = arr.dtype
-    if dtype == np.float64:
-        return MPI.DOUBLE
-    elif dtype == np.float32:
-        return MPI.FLOAT
-    elif dtype == np.int32:
-        return MPI.INT
-    elif dtype == np.int64:
-        return MPI.LONG
-    elif dtype == np.complex128:
-        return MPI.DOUBLE_COMPLEX
-    elif dtype == np.complex64:
-        return MPI.COMPLEX
-    else:
-        raise TypeError(f"Unsupported dtype for MPI reduction: {dtype}")
-
-
 class CommunicatorWrapper:
     """
-    Python wrapper for muGrid Communicator with GPU-aware reduction operations.
+    Python conveniences on top of the C++ communicator (`_muGrid.Communicator`).
 
-    This wrapper provides reduction operations (sum, max, etc.) that work
-    efficiently with both CPU (numpy) and GPU (CuPy) arrays:
+    Array exchanges on NumPy and CuPy arrays (``allreduce``, ``allgather``,
+    ``sendrecv``) are the C++ communicator's own, which hands device buffers
+    to MPI directly when it is GPU-aware and stages them through the host
+    otherwise. On top of those this wrapper adds:
 
-    - For serial execution (size=1): GPU arrays are returned directly without
-      forcing synchronization or device-to-host copies.
-    - For MPI parallel execution: Uses GPU-aware MPI when available to perform
-      reductions directly on GPU memory, and stages through host memory
-      otherwise.
+    - reductions that dispatch on the argument -- host scalars by dtype,
+      CuPy arrays on the device, and serial runs without a copy;
+    - full-array reductions (``reduce_*``) and a NuMPI-compatible
+      ``reduction`` object;
+    - ``isum``/``isum_wait``, a non-blocking sum on the C++ communicator's
+      ``iallreduce``;
+    - the mpi4py communicator itself (``mpi4py_comm``), for tools that
+      gather Python objects.
 
-    The wrapper delegates all other operations to the underlying C++ Communicator.
+    Everything else is delegated to the C++ communicator.
     """
 
     def __init__(self, cpp_comm, mpi_comm=None):
@@ -159,15 +145,20 @@ class CommunicatorWrapper:
 
     def sum(self, arg):
         """
-        Sum reduction across all processes.
+        Sum reduction across all processes, elementwise for arrays.
 
-        For GPU arrays (CuPy), this method avoids unnecessary synchronization:
-        - Serial (size=1): Returns the input array directly (no sync)
-        - MPI parallel: Uses GPU-aware MPI for efficient reduction
+        Arrays -- NumPy or CuPy, of any shape and of dtype float32/64,
+        complex64/128, int32/64 or uint32 -- go through the C++
+        communicator's ``allreduce`` and come back with their shape, dtype
+        and kind; device arrays are handed to MPI directly or staged through
+        the host, as the communicator decides. In a serial run a CuPy array
+        is returned as it is, without waiting for the device. Host scalars
+        are reduced with the MPI datatype of their dtype (see
+        `_reduce_host_scalar`).
 
         Parameters
         ----------
-        arg : scalar, numpy array, or CuPy array
+        arg : scalar, array-like, or CuPy array
             Value to reduce
 
         Returns
@@ -175,248 +166,65 @@ class CommunicatorWrapper:
         Same type as input
             Global sum across all processes
         """
-        # Check if it's a GPU array
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
-            return self._sum_gpu(arg)
-
-        # CPU arrays: the C++ overloads for arrays match on dtype. CPU
-        # scalars: dispatch on dtype too (see _reduce_host_scalar).
-        if np.ndim(arg) == 0:
+        if not self._is_gpu(arg) and np.ndim(arg) == 0:
             return self._reduce_host_scalar(arg, "sum")
-        return self._cpp.sum(arg)
+        return self._allreduce_array(arg, "sum")
 
     def isum(self, arg):
         """Begin a non-blocking sum reduction across all processes.
 
-        Returns an opaque handle to pass to :meth:`isum_wait`. Between the two
-        calls the caller can perform work that does not depend on the reduced
-        value, so the global synchronisation latency is hidden behind that work
-        (the key to pipelined CG; Ghysels & Vanroose 2014).
+        Returns a handle to pass to :meth:`isum_wait`. Between the two calls
+        the caller can perform work that does not depend on the reduced
+        value, so the global synchronisation latency is hidden behind that
+        work (the key to pipelined CG; Ghysels & Vanroose 2014). The handle
+        is the C++ communicator's ``iallreduce`` request; its ``wait()`` does
+        what :meth:`isum_wait` does.
 
-        Only small host arrays are supported (the use case is fusing a handful
-        of inner products into one reduction). When non-blocking MPI is
-        unavailable — serial runs, or a communicator without an mpi4py handle —
-        this falls back to an immediate blocking reduction so callers need no
-        special-casing.
+        Meant for small arrays (the use case is fusing a handful of inner
+        products into one reduction); device arrays are staged through the
+        host. In a serial run the sum is ready at once.
 
         Parameters
         ----------
-        arg : numpy array
-            Local contribution to reduce (small, host-resident).
+        arg : numpy or CuPy array, or scalar
+            Local contribution to reduce. Must not be modified until the
+            reduction completes.
 
         Returns
         -------
         handle
             Pass to :meth:`isum_wait` to obtain the global sum.
         """
-        if self.size == 1 or self._mpi_comm is None or MPI is None:
-            # Nothing to overlap: emulate a non-blocking op with a ready result.
-            return ("ready", self.sum(arg))
-
-        import numpy as np
-
-        sendbuf = np.ascontiguousarray(arg)
-        recvbuf = np.empty_like(sendbuf)
-        request = self._mpi_comm.Iallreduce(sendbuf, recvbuf, op=MPI.SUM)
-        # Keep sendbuf alive in the handle: MPI reads it until the request
-        # completes.
-        return ("pending", request, recvbuf, sendbuf)
+        return self._cpp.iallreduce(arg, "sum")
 
     def isum_wait(self, handle):
-        """Complete a reduction started with :meth:`isum` and return its sum."""
-        if handle[0] == "ready":
-            return handle[1]
-        _, request, recvbuf, _sendbuf = handle
-        request.Wait()
-        return recvbuf
+        """Complete a reduction started with :meth:`isum` and return its sum,
+        an array of the argument's shape and kind."""
+        return handle.wait()
 
-    def _sum_gpu(self, arg):
-        """GPU-aware sum reduction."""
-        # Serial case: no reduction needed, return as-is
-        if self.size == 1:
+    def _allreduce_array(self, arg, op):
+        """Elementwise `op` over all ranks of a host or device array.
+
+        The C++ communicator's ``allreduce``: the result has the shape, dtype
+        and kind (NumPy or CuPy) of `arg`, which can be anything array-like.
+        A CuPy array in a serial run is returned as it is, so that a serial
+        solve never waits for the device."""
+        if self.size == 1 and self._is_gpu(arg):
             return arg
-
-        # MPI case (device buffers or host staging, see _allreduce_device)
-        if self._mpi_comm is None:
-            raise RuntimeError(
-                "MPI communicator not available for GPU reduction. "
-                "This should not happen if the wrapper was created correctly."
-            )
-
-        # Handle 0-D arrays (scalars on GPU)
-        is_scalar = arg.ndim == 0
-        if is_scalar:
-            # Convert to 1-D for MPI, then back to 0-D
-            arg = arg.reshape(1)
-
-        result = self._allreduce_device(arg, MPI.SUM)
-
-        # Convert back to 0-D if input was scalar
-        if is_scalar:
-            result = result.reshape(())
-
-        return result
-
-    def _allreduce_device(self, arr, mpi_op):
-        """Allreduce a CuPy array across ranks, returning a CuPy array.
-
-        Directly or staged through the host, see "Array exchanges" below.
-        """
-        send = self._outgoing(arr)
-        result = self._incoming(send, send.shape)
-        self._mpi_comm.Allreduce(send, result, op=mpi_op)
-        return self._arrived(result, arr)
-
-    # ------------------------------------------------------------------ #
-    # Array exchanges (numpy or CuPy)                                     #
-    # ------------------------------------------------------------------ #
-    #
-    # Device arrays go to MPI as they are when it is GPU-aware
-    # (`_muGrid.Communicator.gpu_aware_mpi`: MUGRID_GPU_AWARE_MPI, else the
-    # MPI library's own report), as in the C++ ghost exchange, and are staged
-    # through the host otherwise: an MPI that is not GPU-aware reads device
-    # pointers as host memory (a crash, or wrong values). Callers pass numpy
-    # and CuPy arrays alike and get back the kind they passed in.
-
-    def _outgoing(self, a):
-        """`a` as a contiguous buffer MPI can read.
-
-        A device buffer handed over as it is waits for the current stream
-        first: MPI does not order itself after the kernel that wrote it. The
-        copy to the host synchronises by itself."""
-        if not self._is_gpu(a):
-            return np.ascontiguousarray(a)
-        cp = _get_cupy()
-        if not _muGrid.Communicator.gpu_aware_mpi:
-            return cp.asnumpy(a)
-        a = cp.ascontiguousarray(a)
-        cp.cuda.get_current_stream().synchronize()
-        return a
-
-    @staticmethod
-    def _incoming(send, shape):
-        """A buffer for MPI to write into, on the same side as `send`."""
-        xp = _get_cupy() if _is_cupy_array(send) else np
-        return xp.empty(shape, dtype=send.dtype)
-
-    def _arrived(self, buffer, like):
-        """A received `buffer` as the kind of array `like` is."""
-        if self._is_gpu(like) and not self._is_gpu(buffer):
-            return _get_cupy().asarray(buffer)
-        return buffer
-
-    def _require_mpi4py(self, what):
-        if self._mpi_comm is None:
-            raise RuntimeError(
-                f"{what} across {self.size} ranks needs the mpi4py "
-                "communicator; construct this one with muGrid.Communicator("
-                "<mpi4py communicator>)."
-            )
-
-    def allgather(self, a):
-        """Gather an array from every rank, on every rank.
-
-        Parameters
-        ----------
-        a : numpy or CuPy array
-            Local contribution, of the same shape and dtype on every rank.
-
-        Returns
-        -------
-        Same type as input
-            Shape ``(size, *a.shape)``; entry ``p`` is rank ``p``'s `a`. In a
-            serial run, a view of `a`.
-        """
-        if self.size == 1:
-            return a[None]
-        self._require_mpi4py("allgather")
-        send = self._outgoing(a)
-        out = self._incoming(send, (self.size,) + send.shape)
-        self._mpi_comm.Allgather(send, out)
-        return self._arrived(out, a)
-
-    def sendrecv(self, a, dest, source, tag=0):
-        """Send `a` to rank `dest` and receive from rank `source`.
-
-        Parameters
-        ----------
-        a : numpy or CuPy array
-            What to send. What arrives must have the same shape and dtype.
-        dest, source : int
-            Ranks to send to and receive from.
-        tag : int, optional
-            Message tag, the same for the send and the receive.
-
-        Returns
-        -------
-        Same type as input
-            What rank `source` sent. In a serial run (where `dest` and
-            `source` can only be this rank), `a` itself.
-        """
-        if self.size == 1:
-            return a
-        self._require_mpi4py("sendrecv")
-        send = self._outgoing(a)
-        recv = self._incoming(send, send.shape)
-        self._mpi_comm.Sendrecv(send, dest=dest, sendtag=tag, recvbuf=recv,
-                                source=source, recvtag=tag)
-        return self._arrived(recv, a)
+        return self._cpp.allreduce(arg, op)
 
     def max(self, arg):
-        """
-        Max reduction across all processes.
-
-        For GPU arrays (CuPy), this method avoids unnecessary synchronization:
-        - Serial (size=1): Returns the input array directly (no sync)
-        - MPI parallel: Uses GPU-aware MPI for efficient reduction
-
-        Parameters
-        ----------
-        arg : scalar, numpy array, or CuPy array
-            Value to reduce
-
-        Returns
-        -------
-        Same type as input
-            Global maximum across all processes
-        """
-        # Check if it's a GPU array
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
-            return self._max_gpu(arg)
-
-        # CPU scalars: dispatch on dtype (see _reduce_host_scalar)
-        if np.ndim(arg) == 0:
+        """Max reduction across all processes, elementwise for arrays; see
+        :meth:`sum` (complex values have no maximum)."""
+        if not self._is_gpu(arg) and np.ndim(arg) == 0:
             return self._reduce_host_scalar(arg, "max")
-        return self._cpp.max(arg)
+        return self._allreduce_array(arg, "max")
 
     def min(self, arg):
-        """Min reduction of a CPU scalar across all processes, with the MPI
-        datatype taken from its dtype (see `_reduce_host_scalar`)."""
-        if np.ndim(arg) == 0 and not self._is_gpu(arg):
+        """Min reduction across all processes; see :meth:`sum`."""
+        if not self._is_gpu(arg) and np.ndim(arg) == 0:
             return self._reduce_host_scalar(arg, "min")
-        return self._cpp.min(arg)
-
-    def _max_gpu(self, arg):
-        """GPU-aware max reduction."""
-        # Serial case: no reduction needed, return as-is
-        if self.size == 1:
-            return arg
-
-        # MPI case (device buffers or host staging, see _allreduce_device)
-        if self._mpi_comm is None:
-            raise RuntimeError("MPI communicator not available for GPU reduction.")
-
-        # Handle 0-D arrays (scalars on GPU)
-        is_scalar = arg.ndim == 0
-        if is_scalar:
-            arg = arg.reshape(1)
-
-        result = self._allreduce_device(arg, MPI.MAX)
-
-        if is_scalar:
-            result = result.reshape(())
-
-        return result
+        return self._allreduce_array(arg, "min")
 
     def all(self, arg):
         """
@@ -486,30 +294,23 @@ class CommunicatorWrapper:
         return self._cpp.cumulative_sum(arg)
 
     def gather(self, arg):
-        """
-        Gather arrays from all processes.
+        """Former name of ``allgatherv``, with its former semantics: 2-D
+        arrays concatenated along their columns (a 1-D array counts as one
+        column), on every rank. Use ``allgatherv(arg, axis=...)``."""
+        import warnings
 
-        Parameters
-        ----------
-        arg : array
-            Local array to gather
-
-        Returns
-        -------
-        array
-            Gathered array containing data from all processes
-        """
-        # Delegated to the C++ implementation, which requires a host array;
-        # device arrays are copied to the host first.
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
-            import warnings
-
-            warnings.warn(
-                "GPU gather not yet implemented, copying to CPU", RuntimeWarning
-            )
+        warnings.warn(
+            "Communicator.gather is deprecated; use allgatherv(a, axis=...), "
+            "which concatenates along any axis",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if self._is_gpu(arg):
             arg = arg.get()
-
-        return self._cpp.gather(arg)
+        arg = np.asarray(arg)
+        if arg.ndim == 1:
+            arg = arg.reshape(-1, 1)
+        return self._cpp.allgatherv(arg, axis=1)
 
     def bcast(self, scalar_arg, root):
         """
@@ -593,14 +394,7 @@ class CommunicatorWrapper:
             return local
 
         if self._is_gpu(local):
-            cp = _get_cupy()
-            if self._mpi_comm is None:
-                raise RuntimeError(
-                    "MPI communicator not available for GPU reduction."
-                )
-            mpi_op = {"sum": MPI.SUM, "min": MPI.MIN, "max": MPI.MAX}[op]
-            buf = cp.asarray(local).reshape(1)
-            return self._allreduce_device(buf, mpi_op).reshape(())
+            return self._cpp.allreduce(local, op)
 
         # CPU scalar: route through the C++ communicator (robust when
         # `_mpi_comm` is None but the C++ communicator is MPI-backed).
@@ -738,8 +532,7 @@ def Communicator(communicator=None):
         ``None`` (default) gives a serial communicator. A
         ``CommunicatorWrapper`` is returned unchanged; a bare
         ``_muGrid.Communicator`` is wrapped (without an mpi4py handle, so
-        :meth:`CommunicatorWrapper.isum` is blocking and device reductions
-        are unavailable). Any object with ``Get_size`` (mpi4py interface) of
+        ``mpi4py_comm`` is None). Any object with ``Get_size`` (mpi4py interface) of
         size 1 gives a serial communicator, and of larger size is wrapped
         together with its mpi4py handle.
 

@@ -341,6 +341,8 @@ namespace muGrid {
         //! Complex32. (The nb_components factor is folded into the MPI block
         //! datatypes and the staging counts, not into this size.)
         std::size_t elem_size{sizeof(Complex)};
+        //! Type of one complex scalar, Complex or Complex32
+        TypeDescriptor elem_type{TypeDescriptor::Complex};
 #ifdef WITH_MPI
         //! MPI datatype of one complex scalar (MPI_C_DOUBLE_COMPLEX /
         //! MPI_C_FLOAT_COMPLEX); the base from which the per-peer block
@@ -364,8 +366,7 @@ namespace muGrid {
         mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
         //! Sizes of the staging buffers in bytes
         mutable std::array<std::size_t, 2> device_staging_size{{0, 0}};
-        //! Host bounce buffers (send, recv) used when the MPI library is
-        //! not GPU-aware (see mpi/gpu_aware_mpi.hh)
+        //! Host staging buffers (send, recv) of the staged host exchange
         mutable std::array<std::vector<char>, 2> host_staging{};
     };
 

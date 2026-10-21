@@ -186,7 +186,10 @@ in sync.
   exact adjoint (adds ghost values to their owners, then zeros the ghosts).
 - `muGrid::Communicator` — wrapper over an MPI communicator for collective and
   point-to-point operations; without `WITH_MPI` it compiles to a serial
-  implementation with the same interface.
+  implementation with the same interface. Its buffer exchanges (`allreduce`,
+  `iallreduce`, `allgather`, `allgatherv`, `sendrecv`, `alltoallv`) take host or device buffers and decide
+  whether MPI gets device buffers directly or through the host (see
+  [GPU-aware MPI](gpu.md)).
 
 ## FFT engine
 

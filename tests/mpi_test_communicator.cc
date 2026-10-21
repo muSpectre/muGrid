@@ -113,7 +113,7 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
-  BOOST_AUTO_TEST_CASE(gather_test) {
+  BOOST_AUTO_TEST_CASE(allgatherv_test) {
     auto & comm{MPIContext::get_context().comm};
     auto rank{comm.rank()};
     const int columns_offset_from_rank{2};
@@ -132,7 +132,7 @@ namespace muGrid {
       send_mat.col(col) = send_mat.col(col).Ones(nb_rows, 1) * (rank + col);
     }
 
-    auto res{comm.template gather<Real>(send_mat)};
+    auto res{comm.template allgatherv<Real>(send_mat)};
     counter = 0;
     for (int lrank{0}; lrank < comm.size(); ++lrank) {
       for (int col{0}; col < lrank + columns_offset_from_rank; ++col) {
@@ -157,7 +157,7 @@ namespace muGrid {
           send_mat_lr.col(col).Ones(nb_rows, 1) * (rank + col);
     }
 
-    auto res_lr{comm.template gather<Real>(send_mat_lr)};
+    auto res_lr{comm.template allgatherv<Real>(send_mat_lr)};
     // check size of gathered matrix
     auto nb_cols_of_res{res_lr.cols()};
     BOOST_CHECK_EQUAL(nb_cols_of_res, comm.size() > 1
@@ -198,7 +198,7 @@ namespace muGrid {
           send_mat_em.col(col).Ones(nb_rows, 1) * (rank + col);
     }
 
-    auto res_em{comm.template gather<Real>(send_mat_em)};
+    auto res_em{comm.template allgatherv<Real>(send_mat_em)};
     // check size of gathered matrix
     auto nb_cols_of_res_em{res_em.cols()};
     auto nb_cols_of_res_em_expected{
@@ -227,7 +227,7 @@ namespace muGrid {
     // be an empty matrix ---
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> send_mat_empty(0, 0);
 
-    auto res_empty{comm.template gather<Real>(send_mat_empty)};
+    auto res_empty{comm.template allgatherv<Real>(send_mat_empty)};
     BOOST_CHECK_EQUAL(res_empty.rows(), 0);
     BOOST_CHECK_EQUAL(res_empty.cols(), 0);
 
@@ -243,7 +243,7 @@ namespace muGrid {
       send_col_vec(col) = rank + col;
     }
 
-    auto res_col_vec{comm.template gather<Real>(send_col_vec)};
+    auto res_col_vec{comm.template allgatherv<Real>(send_col_vec)};
 
     counter = 0;
     int offset{0};
@@ -254,6 +254,147 @@ namespace muGrid {
       }
       offset += counter;
       counter = 0;  // reset counter
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Buffer exchanges on host memory; the device paths share the code and
+  // are exercised by the GPU tests
+  BOOST_AUTO_TEST_CASE(buffer_allreduce_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<Real> send{Real(rank), Real(-rank), 1.};
+    std::vector<Real> recv(send.size());
+    comm.allreduce(send.data(), recv.data(), 3, TypeDescriptor::Real,
+                   ReduceOp::Sum, BufferLocation::Host);
+    BOOST_CHECK_EQUAL(recv[0], nb_ranks * (nb_ranks - 1) / 2);
+    BOOST_CHECK_EQUAL(recv[1], -nb_ranks * (nb_ranks - 1) / 2);
+    BOOST_CHECK_EQUAL(recv[2], nb_ranks);
+    comm.allreduce(send.data(), recv.data(), 3, TypeDescriptor::Real,
+                   ReduceOp::Max, BufferLocation::Host);
+    BOOST_CHECK_EQUAL(recv[0], nb_ranks - 1);
+    BOOST_CHECK_EQUAL(recv[1], 0);
+    comm.allreduce(send.data(), recv.data(), 3, TypeDescriptor::Real,
+                   ReduceOp::Min, BufferLocation::Host);
+    BOOST_CHECK_EQUAL(recv[0], 0);
+    BOOST_CHECK_EQUAL(recv[1], -(nb_ranks - 1));
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_iallreduce_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<Real> send{Real(rank), 1.};
+    std::vector<Real> recv(send.size(), -1.);
+    auto request{comm.iallreduce(send.data(), recv.data(), 2,
+                                 TypeDescriptor::Real, ReduceOp::Sum,
+                                 BufferLocation::Host)};
+    // A moved request is still the same reduction
+    auto moved{std::move(request)};
+    moved.wait();
+    BOOST_CHECK_EQUAL(recv[0], nb_ranks * (nb_ranks - 1) / 2);
+    BOOST_CHECK_EQUAL(recv[1], nb_ranks);
+    moved.wait();  // a no-op once complete
+    request.wait();  // NOLINT(bugprone-use-after-move): emptied, a no-op
+
+    // A request destroyed before it is waited for completes then
+    std::vector<Real> recv_max(send.size(), -1.);
+    {
+      auto pending{comm.iallreduce(send.data(), recv_max.data(), 2,
+                                   TypeDescriptor::Real, ReduceOp::Max,
+                                   BufferLocation::Host)};
+    }
+    BOOST_CHECK_EQUAL(recv_max[0], nb_ranks - 1);
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_allgather_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<Complex> send{Complex(rank, 1), Complex(0, rank)};
+    std::vector<Complex> recv(2 * nb_ranks);
+    comm.allgather(send.data(), recv.data(), 2, TypeDescriptor::Complex,
+                   BufferLocation::Host);
+    for (int p{0}; p < nb_ranks; ++p) {
+      BOOST_CHECK_EQUAL(recv[2 * p], Complex(p, 1));
+      BOOST_CHECK_EQUAL(recv[2 * p + 1], Complex(0, p));
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_allgatherv_test) {
+    // Rank p contributes p + 1 bytes of value p, with a one-byte gap after
+    // each block that must be left alone
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<int> counts(nb_ranks), displs(nb_ranks);
+    int offset{0};
+    for (int p{0}; p < nb_ranks; ++p) {
+      counts[p] = p + 1;
+      displs[p] = offset;
+      offset += p + 2;
+    }
+    std::vector<std::uint8_t> send(rank + 1, std::uint8_t(rank));
+    std::vector<std::uint8_t> recv(offset, 255);
+    comm.allgatherv(send.data(), rank + 1, recv.data(), counts, displs,
+                    TypeDescriptor::Uint8, BufferLocation::Host);
+    for (int p{0}; p < nb_ranks; ++p) {
+      for (int i{0}; i < counts[p]; ++i) {
+        BOOST_CHECK_EQUAL(int(recv[displs[p] + i]), p);
+      }
+      BOOST_CHECK_EQUAL(int(recv[displs[p] + counts[p]]), 255);
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_sendrecv_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    const int up{(rank + 1) % nb_ranks};
+    const int down{(rank - 1 + nb_ranks) % nb_ranks};
+    std::vector<Int> send{rank, 10 * rank};
+    std::vector<Int> recv(2, -1);
+    comm.sendrecv(send.data(), 2, up, recv.data(), 2, down,
+                  TypeDescriptor::Int, BufferLocation::Host, 7);
+    BOOST_CHECK_EQUAL(recv[0], down);
+    BOOST_CHECK_EQUAL(recv[1], 10 * down);
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_alltoallv_test) {
+    // Rank p sends p + q + 1 values to rank q, each p * 100 + q
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<int> send_counts(nb_ranks), send_displs(nb_ranks);
+    std::vector<int> recv_counts(nb_ranks), recv_displs(nb_ranks);
+    int send_total{0}, recv_total{0};
+    for (int q{0}; q < nb_ranks; ++q) {
+      send_counts[q] = rank + q + 1;
+      send_displs[q] = send_total;
+      send_total += send_counts[q];
+      recv_counts[q] = q + rank + 1;
+      recv_displs[q] = recv_total;
+      recv_total += recv_counts[q];
+    }
+    std::vector<Real32> send(send_total), recv(recv_total, -1);
+    for (int q{0}; q < nb_ranks; ++q) {
+      for (int i{0}; i < send_counts[q]; ++i) {
+        send[send_displs[q] + i] = Real32(rank * 100 + q);
+      }
+    }
+    comm.alltoallv(send.data(), send_counts, send_displs, recv.data(),
+                   recv_counts, recv_displs, TypeDescriptor::Real32,
+                   BufferLocation::Host);
+    for (int q{0}; q < nb_ranks; ++q) {
+      for (int i{0}; i < recv_counts[q]; ++i) {
+        BOOST_CHECK_EQUAL(recv[recv_displs[q] + i], Real32(q * 100 + rank));
+      }
     }
   }
 

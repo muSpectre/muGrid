@@ -452,16 +452,13 @@ namespace muGrid {
                              Index_t send_block_len, Index_t nb_recv_blocks,
                              Index_t recv_block_len, void * send_addr,
                              void * recv_addr, Index_t elem_size_in_bytes,
-                             MPI_Datatype mpi_datatype, int dest_rank,
+                             TypeDescriptor type_desc, int dest_rank,
                              int src_rank) const;
 
         //! Contiguous device staging buffers for halo exchange (send, recv)
         mutable std::array<void *, 2> device_staging{{nullptr, nullptr}};
         //! Sizes of the staging buffers in bytes
         mutable std::array<std::size_t, 2> device_staging_size{{0, 0}};
-        //! Host bounce buffers (send, recv) used when the MPI library is
-        //! not GPU-aware (see mpi/gpu_aware_mpi.hh)
-        mutable std::array<std::vector<char>, 2> host_staging{};
 #endif  // WITH_MPI
     };
 }  // namespace muGrid

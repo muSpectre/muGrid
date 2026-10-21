@@ -269,7 +269,7 @@ def test_reduce_gpu_matches_numpy():
         assert np.isclose(float(res), ref, rtol=1e-12)
 
 
-def test_gather():
+def test_allgatherv():
     try:
         from mpi4py import MPI
 
@@ -280,7 +280,7 @@ def test_gather():
     # gather arrays "a" with different lengths on the ranks
     a = np.arange(comm.rank * 2 + 4).reshape((-1, 2)).T
 
-    a_gathered = comm.gather(a)
+    a_gathered = comm.allgatherv(a, axis=1)
 
     # construct reference
     for i in range(comm.size):
@@ -291,6 +291,10 @@ def test_gather():
             a_ref = np.concatenate((a_ref, a_tmp), axis=0)
 
     assert (a_gathered == a_ref.T).all()
+
+    # the former name still works, with a deprecation warning
+    with pytest.warns(DeprecationWarning, match="allgatherv"):
+        np.testing.assert_array_equal(comm.gather(a), a_gathered)
 
 
 def _rank_array(xp, rank, dtype=np.complex128):
@@ -338,3 +342,134 @@ def test_sendrecv_around_a_ring():
         assert type(from_down) is type(local)
         np.testing.assert_array_equal(_on_host(from_down),
                                       _rank_array(np, down))
+
+
+def test_exchanges_on_the_bare_cpp_communicator():
+    # The array exchanges are the C++ communicator's own: no wrapper, and so
+    # no mpi4py communicator, needed.
+    from muGrid import _muGrid
+
+    comm = _make_comm()
+    cpp = (_muGrid.Communicator(comm.mpi_comm) if muGrid.has_mpi
+           else _muGrid.Communicator())
+    for xp in _array_modules():
+        x = xp.asarray([1.0, -2.0]) * (comm.rank + 1)
+        total = cpp.allreduce(x, "sum")
+        assert type(total) is type(x)
+        n = comm.size * (comm.size + 1) / 2
+        np.testing.assert_array_equal(_on_host(total), [n, -2 * n])
+        np.testing.assert_array_equal(
+            _on_host(cpp.allreduce(x, "max")), [comm.size, -2.0])
+        np.testing.assert_array_equal(
+            _on_host(cpp.allreduce(x, "min")), [1.0, -2.0 * comm.size])
+        scalar = cpp.allreduce(xp.asarray(3.0), "sum")
+        assert scalar.shape == ()
+        assert float(scalar) == 3.0 * comm.size
+        assert cpp.allgather(x).shape == (comm.size, 2)
+
+
+def test_exchanges_reject_unsupported_dtypes():
+    comm = _make_comm()
+    with pytest.raises(TypeError, match="dtype"):
+        comm.allreduce(np.zeros(2, dtype=np.int16))
+    with pytest.raises(ValueError, match="op"):
+        comm.allreduce(np.zeros(2), "prod")
+
+
+def test_isum():
+    comm = _make_comm()
+    n = comm.size * (comm.size + 1) / 2
+    for xp in _array_modules():
+        local = xp.asarray([1.0, 2.0, -1.0]) * (comm.rank + 1)
+        handle = comm.isum(local)
+        total = comm.isum_wait(handle)
+        assert type(total) is type(local)
+        np.testing.assert_array_equal(_on_host(total), [n, 2 * n, -n])
+        # waiting again returns the same result
+        np.testing.assert_array_equal(_on_host(handle.wait()), _on_host(total))
+    # a request dropped without waiting completes when it is collected
+    comm.isum(np.ones(2))
+    assert float(comm.isum_wait(comm.isum(2.0))) == 2.0 * comm.size
+
+
+@pytest.mark.parametrize("dtype", [np.float64, np.float32, np.complex128,
+                                   np.complex64, np.int32, np.int64,
+                                   np.uint32])
+@pytest.mark.parametrize("shape", [(3,), (2, 3), (2, 2, 2)])
+def test_array_reductions_keep_shape_and_dtype(dtype, shape):
+    comm = _make_comm()
+    for xp in _array_modules():
+        local = (xp.arange(np.prod(shape)).reshape(shape) + comm.rank
+                 ).astype(dtype)
+        reference = np.arange(np.prod(shape)).reshape(shape).astype(dtype)
+        total = comm.sum(local)
+        assert type(total) is type(local)
+        assert total.shape == shape and total.dtype == np.dtype(dtype)
+        np.testing.assert_array_equal(
+            _on_host(total),
+            reference * comm.size + sum(range(comm.size)))
+        if np.issubdtype(dtype, np.complexfloating):
+            continue
+        np.testing.assert_array_equal(_on_host(comm.max(local)),
+                                      reference + comm.size - 1)
+        np.testing.assert_array_equal(_on_host(comm.min(local)), reference)
+
+
+def test_allgatherv_concatenates_like_numpy():
+    comm = _make_comm()
+    for xp in _array_modules():
+        parts = [xp.arange(3 * (p + 1), dtype=np.float32).reshape(p + 1, 3) + p
+                 for p in range(comm.size)]
+        result = comm.allgatherv(parts[comm.rank])
+        assert type(result) is type(parts[0])
+        np.testing.assert_array_equal(
+            _on_host(result), np.concatenate([_on_host(p) for p in parts]))
+        # along another axis
+        result = comm.allgatherv(parts[comm.rank].T, axis=-1)
+        np.testing.assert_array_equal(
+            _on_host(result),
+            np.concatenate([_on_host(p).T for p in parts], axis=-1))
+
+
+@pytest.mark.parametrize("dtype", [np.uint8, np.bool_, np.int16, "S5",
+                                   [("a", np.int8), ("b", np.float64)]])
+def test_exchanges_move_any_fixed_size_dtype(dtype):
+    # Bytes of varying length per rank -- what muTimer needs to gather its
+    # serialised timers -- and other dtypes MPI has no arithmetic for
+    comm = _make_comm()
+    parts = [np.zeros(p + 2, dtype=dtype) for p in range(comm.size)]
+    for p, part in enumerate(parts):
+        part.view(np.uint8)[:] = np.arange(part.nbytes) % 2 + p
+    gathered = comm.allgatherv(parts[comm.rank])
+    assert gathered.dtype == np.dtype(dtype)
+    assert gathered.tobytes() == b"".join(p.tobytes() for p in parts)
+    same = np.zeros(3, dtype=dtype)
+    same.view(np.uint8)[:] = comm.rank
+    assert comm.allgather(same).shape == (comm.size, 3)
+    up, down = (comm.rank + 1) % comm.size, (comm.rank - 1) % comm.size
+    received = comm.sendrecv(same, dest=up, source=down)
+    assert received.view(np.uint8).tolist() == [down] * same.nbytes
+
+
+def test_allgatherv_round_trips_serialised_objects():
+    import json
+
+    comm = _make_comm()
+    local = {"rank": comm.rank, "timers": ["solve"] * (comm.rank + 1)}
+    payload = np.frombuffer(json.dumps(local).encode(), dtype=np.uint8)
+    lengths = comm.allgather(np.asarray([payload.size]))[:, 0]
+    data = comm.allgatherv(payload).tobytes()
+    offsets = np.concatenate([[0], np.cumsum(lengths)])
+    decoded = [json.loads(data[offsets[p]:offsets[p + 1]])
+               for p in range(comm.size)]
+    assert [d["rank"] for d in decoded] == list(range(comm.size))
+
+
+def test_allgatherv_rejects_mismatched_dtypes_and_objects():
+    comm = _make_comm()
+    with pytest.raises(TypeError, match="Python objects"):
+        comm.allgatherv(np.array([object()]))
+    if comm.size > 1:
+        dtype = np.float32 if comm.rank == 0 else np.float64
+        with pytest.raises(TypeError, match="one dtype"):
+            comm.allgatherv(np.ones(2, dtype=dtype))

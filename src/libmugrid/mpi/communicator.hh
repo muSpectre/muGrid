@@ -36,9 +36,11 @@
 #ifndef SRC_LIBMUGRID_COMMUNICATOR_HH_
 #define SRC_LIBMUGRID_COMMUNICATOR_HH_
 
+#include <array>
 #include <cassert>
 #include <limits>
 #include <type_traits>
+#include <vector>
 
 #ifdef WITH_MPI
 #include <mpi.h>
@@ -48,11 +50,51 @@
 
 #include "core/types.hh"
 #include "core/exception.hh"
+#include "core/type_descriptor.hh"
 
 namespace muGrid {
 
     template <typename T>
     using DynMatrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! Where the buffers handed to the buffer exchanges of Communicator
+    //! (allreduce, allgather, sendrecv, alltoallv) live
+    enum class BufferLocation { Host, Device };
+
+    //! Elementwise reduction of Communicator::allreduce
+    enum class ReduceOp { Sum, Max, Min };
+
+    /**
+     * A reduction started by Communicator::iallreduce. wait() completes it
+     * and leaves the result in the receive buffer; until then neither the
+     * send nor the receive buffer may be touched or freed. Move-only; a
+     * request destroyed before it was waited for is waited for then.
+     */
+    class AllreduceRequest {
+       public:
+        AllreduceRequest() = default;
+        AllreduceRequest(const AllreduceRequest &) = delete;
+        AllreduceRequest(AllreduceRequest && other) noexcept;
+        AllreduceRequest & operator=(const AllreduceRequest &) = delete;
+        AllreduceRequest & operator=(AllreduceRequest && other) noexcept;
+        ~AllreduceRequest();
+
+        //! Complete the reduction (a no-op once complete)
+        void wait();
+
+       protected:
+        friend class Communicator;
+#ifdef WITH_MPI
+        MPI_Request request{MPI_REQUEST_NULL};
+#endif
+        //! Host stand-ins (send, recv) for device buffers; owned by the
+        //! request, since MPI uses them until it completes
+        std::array<std::vector<char>, 2> host_staging{};
+        //! Device receive buffer the result is copied to on completion, or
+        //! null when MPI writes the receive buffer itself
+        void * device_recv{nullptr};
+        std::size_t recv_bytes{0};
+    };
 
 #ifdef WITH_MPI
 
@@ -269,11 +311,12 @@ namespace muGrid {
             return res;
         }
 
-        //! gather on EigenMatrix types
-        //! If the matrices are of different sizes they are collected along the
-        //! column index (second index). This is even possible for 0x0 arguments
-        //! on some cores. The following example shows how the gathered result
-        //! is collected for different sized matrices on the different cores:
+        //! All-gather of Eigen matrices of varying size (MPI_Allgatherv):
+        //! every rank receives all ranks' matrices concatenated along the
+        //! column index (second index), in rank order. For blocks of one
+        //! size on every rank, on host or device, see allgather. Ranks may
+        //! contribute 0x0 matrices. The following example shows how the
+        //! result is collected for matrices of different sizes:
         //! core   argument matrix   result matrix
         //!   0         3 x 1          3 x (24/3)
         //!   1         3 x 5          3 x (24/3)
@@ -285,7 +328,8 @@ namespace muGrid {
         //! index (first index) except for 0 if there is nothing to be gathered
         //! on the core; otherwise every rank raises a RuntimeError.
         template <typename T>
-        DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+        DynMatrix_t<T>
+        allgatherv(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             if (this->comm == MPI_COMM_NULL)
                 return arg;
 
@@ -324,8 +368,8 @@ namespace muGrid {
             }
             if (uneven) {
                 std::stringstream error{};
-                error << "gather: every rank must contribute the same number "
-                         "of rows (or none), but the largest is "
+                error << "allgatherv: every rank must contribute the same "
+                         "number of rows (or none), but the largest is "
                       << nb_rows_max << " and this rank has " << nb_rows_loc
                       << (uneven_loc ? "" : " (another rank differs)");
                 throw RuntimeError(error.str());
@@ -339,7 +383,7 @@ namespace muGrid {
             constexpr Index_t int_max{std::numeric_limits<int>::max()};
             if (static_cast<Index_t>(arg.size()) > int_max) {
                 std::stringstream error{};
-                error << "gather: the local buffer holds " << arg.size()
+                error << "allgatherv: the local buffer holds " << arg.size()
                       << " entries, which exceeds the MPI count limit of "
                       << int_max;
                 throw RuntimeError(error.str());
@@ -364,7 +408,7 @@ namespace muGrid {
             }
             if (nb_entries > int_max) {
                 std::stringstream error{};
-                error << "gather: the gathered result holds " << nb_entries
+                error << "allgatherv: the gathered result holds " << nb_entries
                       << " entries, which exceeds the MPI count/displacement "
                          "limit of "
                       << int_max;
@@ -378,7 +422,7 @@ namespace muGrid {
             // are global, so every rank takes this branch together.
             if ((nb_rows_max == 0) and (nb_entries != 0)) {
                 throw RuntimeError(
-                    "gather: the matrices have no rows but hold entries");
+                    "allgatherv: the matrices have no rows but hold entries");
             }
 
             // compute the offset at which the data from each processor is
@@ -407,6 +451,13 @@ namespace muGrid {
                 throw RuntimeError(error.str());
             }
             return res;
+        }
+
+        //! Former name of allgatherv; every rank receives the result
+        template <typename T>
+        [[deprecated("renamed allgatherv")]] DynMatrix_t<T>
+        gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+            return this->allgatherv<T>(arg);
         }
 
         //! broadcast of scalar types
@@ -445,6 +496,68 @@ namespace muGrid {
             }
         }
 
+        /**
+         * @name Buffer exchanges on host or device memory
+         *
+         * Contiguous buffers of `type`, counted in elements; send and
+         * receive buffers must not overlap. Device buffers go to MPI as they
+         * are when it is GPU-aware (mpi_is_gpu_aware()) or when the host can
+         * read them (host_can_read_device_pointer()), and are staged through
+         * host memory otherwise, so callers work with any MPI library
+         * without asking which one it is. Device buffers are read once the
+         * default stream has drained; work the caller queued on other
+         * streams must be complete. The receive buffer is ready on return.
+         * Collective where MPI's counterpart is.
+         */
+        //!@{
+        //! `recv` = `op` over all ranks of `send`, elementwise, on every rank
+        void allreduce(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, ReduceOp op,
+                       BufferLocation location) const;
+
+        //! Non-blocking allreduce, completed by the returned request's
+        //! wait(). For overlapping small reductions with computation: device
+        //! buffers are always staged through the host here, since even
+        //! GPU-aware MPI libraries support non-blocking collectives on device
+        //! memory less reliably than blocking ones.
+        AllreduceRequest iallreduce(const void * send, void * recv,
+                                    Index_t count, TypeDescriptor type,
+                                    ReduceOp op,
+                                    BufferLocation location) const;
+
+        //! `recv` (size() * `count` elements) = every rank's `send`, in
+        //! rank order, on every rank. Every rank sends `count` elements; for
+        //! varying sizes see allgatherv.
+        void allgather(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, BufferLocation location) const;
+
+        //! All-gather of blocks whose size differs between ranks, as
+        //! MPI_Allgatherv: rank p's `send_count` elements land at
+        //! `recv_displs[p]` of `recv` on every rank. `recv_counts[p]` must be
+        //! rank p's `send_count`; recv between the blocks is left alone.
+        void allgatherv(const void * send, Index_t send_count, void * recv,
+                        const std::vector<int> & recv_counts,
+                        const std::vector<int> & recv_displs,
+                        TypeDescriptor type, BufferLocation location) const;
+
+        //! Send `send` to rank `dest` and receive `recv` from rank `source`
+        void sendrecv(const void * send, Index_t send_count, int dest,
+                      void * recv, Index_t recv_count, int source,
+                      TypeDescriptor type, BufferLocation location,
+                      int tag = 0) const;
+
+        //! All-to-all with per-rank element counts and displacements, as
+        //! MPI_Alltoallv. Implemented with non-blocking point-to-point
+        //! messages, which GPU-aware MPI libraries support more reliably
+        //! than their collectives; this rank's own block is copied locally
+        //! and never enters MPI.
+        void alltoallv(const void * send, const std::vector<int> & send_counts,
+                       const std::vector<int> & send_displs, void * recv,
+                       const std::vector<int> & recv_counts,
+                       const std::vector<int> & recv_displs,
+                       TypeDescriptor type, BufferLocation location) const;
+        //!@}
+
         //! get the underlying MPI communicator
         MPI_Comm get_mpi_comm() const { return this->comm; }
 
@@ -453,6 +566,11 @@ namespace muGrid {
 
        protected:
         MPI_Comm comm;
+
+        //! Host buffers (send, recv) through which the buffer exchanges
+        //! stage device memory for an MPI that cannot read it; grown on
+        //! demand, per instance and not copied
+        mutable std::array<std::vector<char>, 2> host_staging{};
     };
 
 #else  // WITH_MPI
@@ -503,15 +621,17 @@ namespace muGrid {
             return arg;
         }
 
-        //! gather on scalar types
+        //! All-gather of matrices of varying size: with one rank, `arg`
         template <typename T>
-        T gather(const T & arg) const {
+        DynMatrix_t<T>
+        allgatherv(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             return arg;
         }
 
-        //! gather on EigenMatrix types
+        //! Former name of allgatherv
         template <typename T>
-        DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+        [[deprecated("renamed allgatherv")]] DynMatrix_t<T>
+        gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             return arg;
         }
 
@@ -526,6 +646,33 @@ namespace muGrid {
 
         //! return logical or
         bool any(const bool & arg) const { return arg; }
+
+        //! @name Buffer exchanges; with one rank, copies of `send` (see the
+        //! parallel implementation)
+        //!@{
+        void allreduce(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, ReduceOp op,
+                       BufferLocation location) const;
+        AllreduceRequest iallreduce(const void * send, void * recv,
+                                    Index_t count, TypeDescriptor type,
+                                    ReduceOp op,
+                                    BufferLocation location) const;
+        void allgather(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, BufferLocation location) const;
+        void allgatherv(const void * send, Index_t send_count, void * recv,
+                        const std::vector<int> & recv_counts,
+                        const std::vector<int> & recv_displs,
+                        TypeDescriptor type, BufferLocation location) const;
+        void sendrecv(const void * send, Index_t send_count, int dest,
+                      void * recv, Index_t recv_count, int source,
+                      TypeDescriptor type, BufferLocation location,
+                      int tag = 0) const;
+        void alltoallv(const void * send, const std::vector<int> & send_counts,
+                       const std::vector<int> & send_displs, void * recv,
+                       const std::vector<int> & recv_counts,
+                       const std::vector<int> & recv_displs,
+                       TypeDescriptor type, BufferLocation location) const;
+        //!@}
 
         //! find whether the underlying communicator is mpi
         static bool has_mpi() { return false; }
