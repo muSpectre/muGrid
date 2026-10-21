@@ -266,7 +266,8 @@ void add_communicator(py::module & mod) {
           },
           "a"_a,
           "Every rank's array, of one shape and dtype on all ranks, stacked "
-          "along a new leading axis in rank order, on every rank.")
+          "along a new leading axis in rank order, on every rank. For "
+          "arrays whose sizes differ between ranks, see allgatherv.")
       .def(
           "sendrecv",
           [](const muGrid::Communicator & comm, const py::object & a,
@@ -339,30 +340,30 @@ void add_communicator(py::module & mod) {
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Uint>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Index_t>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Complex>)
-      .def("gather",
+      .def("allgatherv",
            [](muGrid::Communicator & comm,
               const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
-             return comm.gather(arg);
+             return comm.allgatherv(arg);
            })
-      .def("gather",
+      .def("allgatherv",
            [](muGrid::Communicator & comm,
               const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
-             return comm.gather(arg);
+             return comm.allgatherv(arg);
            })
-      .def("gather",
+      .def("allgatherv",
            [](muGrid::Communicator & comm,
               const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
-             return comm.gather(arg);
+             return comm.allgatherv(arg);
            })
-      .def("gather",
+      .def("allgatherv",
            [](muGrid::Communicator & comm,
               const Eigen::Ref<muGrid::DynMatrix_t<Index_t>> & arg) {
-             return comm.gather(arg);
+             return comm.allgatherv(arg);
            })
-      .def("gather",
+      .def("allgatherv",
            [](muGrid::Communicator & comm,
               const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
-             return comm.gather(arg);
+             return comm.allgatherv(arg);
            })
       .def(
           "bcast",

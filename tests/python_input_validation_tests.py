@@ -97,20 +97,20 @@ def test_transpose_rejects_weights_of_the_wrong_length(make_op):
             op.transpose(quad, nodal, wrong)
 
 
-# --- M2: gather rejects uneven rows on every rank ---
+# --- M2: allgatherv rejects uneven rows on every rank ---
 
 
-def test_gather_rejects_uneven_rows_collectively(comm):
+def test_allgatherv_rejects_uneven_rows_collectively(comm):
     """Ranks with different row counts used to be accepted in release
     builds (the check was an assert) and the result was scrambled."""
     if comm.size == 1:
         pytest.skip("needs several ranks")
     rows = 2 if comm.rank == 0 else 3
     with pytest.raises(RuntimeError, match="same number of rows"):
-        comm.gather(np.ones((rows, 2), order="F"))
+        comm.allgatherv(np.ones((rows, 2), order="F"))
     # empty ranks are allowed
     rows = 0 if comm.rank == 0 else 3
-    result = comm.gather(np.ones((rows, 2), order="F"))
+    result = comm.allgatherv(np.ones((rows, 2), order="F"))
     assert result.shape == (3, 2 * (comm.size - 1))
 
 

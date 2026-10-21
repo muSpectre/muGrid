@@ -30,6 +30,8 @@ v1.5.2 (not yet released)
   a communicator created without mpi4py
 - API: `sum`, `max` and `min` of the Python communicator reduce host arrays of any shape and
   keep their shape and dtype; a 1-D array used to come back as an (n, 1) column
+- API: The communicator's `gather` is renamed `allgatherv`, after the MPI call it is: every
+  rank receives arrays whose sizes differ, concatenated; `gather` is deprecated
 - MAINT: Ghost exchange, FFT transposes and Python reductions share one decision on
   whether MPI takes device buffers, instead of each making its own
 

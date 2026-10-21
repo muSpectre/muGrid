@@ -311,11 +311,12 @@ namespace muGrid {
             return res;
         }
 
-        //! gather on EigenMatrix types
-        //! If the matrices are of different sizes they are collected along the
-        //! column index (second index). This is even possible for 0x0 arguments
-        //! on some cores. The following example shows how the gathered result
-        //! is collected for different sized matrices on the different cores:
+        //! All-gather of Eigen matrices of varying size (MPI_Allgatherv):
+        //! every rank receives all ranks' matrices concatenated along the
+        //! column index (second index), in rank order. For blocks of one
+        //! size on every rank, on host or device, see allgather. Ranks may
+        //! contribute 0x0 matrices. The following example shows how the
+        //! result is collected for matrices of different sizes:
         //! core   argument matrix   result matrix
         //!   0         3 x 1          3 x (24/3)
         //!   1         3 x 5          3 x (24/3)
@@ -327,7 +328,8 @@ namespace muGrid {
         //! index (first index) except for 0 if there is nothing to be gathered
         //! on the core; otherwise every rank raises a RuntimeError.
         template <typename T>
-        DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+        DynMatrix_t<T>
+        allgatherv(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             if (this->comm == MPI_COMM_NULL)
                 return arg;
 
@@ -366,8 +368,8 @@ namespace muGrid {
             }
             if (uneven) {
                 std::stringstream error{};
-                error << "gather: every rank must contribute the same number "
-                         "of rows (or none), but the largest is "
+                error << "allgatherv: every rank must contribute the same "
+                         "number of rows (or none), but the largest is "
                       << nb_rows_max << " and this rank has " << nb_rows_loc
                       << (uneven_loc ? "" : " (another rank differs)");
                 throw RuntimeError(error.str());
@@ -381,7 +383,7 @@ namespace muGrid {
             constexpr Index_t int_max{std::numeric_limits<int>::max()};
             if (static_cast<Index_t>(arg.size()) > int_max) {
                 std::stringstream error{};
-                error << "gather: the local buffer holds " << arg.size()
+                error << "allgatherv: the local buffer holds " << arg.size()
                       << " entries, which exceeds the MPI count limit of "
                       << int_max;
                 throw RuntimeError(error.str());
@@ -406,7 +408,7 @@ namespace muGrid {
             }
             if (nb_entries > int_max) {
                 std::stringstream error{};
-                error << "gather: the gathered result holds " << nb_entries
+                error << "allgatherv: the gathered result holds " << nb_entries
                       << " entries, which exceeds the MPI count/displacement "
                          "limit of "
                       << int_max;
@@ -420,7 +422,7 @@ namespace muGrid {
             // are global, so every rank takes this branch together.
             if ((nb_rows_max == 0) and (nb_entries != 0)) {
                 throw RuntimeError(
-                    "gather: the matrices have no rows but hold entries");
+                    "allgatherv: the matrices have no rows but hold entries");
             }
 
             // compute the offset at which the data from each processor is
@@ -449,6 +451,13 @@ namespace muGrid {
                 throw RuntimeError(error.str());
             }
             return res;
+        }
+
+        //! Former name of allgatherv; every rank receives the result
+        template <typename T>
+        [[deprecated("renamed allgatherv")]] DynMatrix_t<T>
+        gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+            return this->allgatherv<T>(arg);
         }
 
         //! broadcast of scalar types
@@ -517,7 +526,8 @@ namespace muGrid {
                                     BufferLocation location) const;
 
         //! `recv` (size() * `count` elements) = every rank's `send`, in
-        //! rank order, on every rank
+        //! rank order, on every rank. Every rank sends `count` elements; for
+        //! varying sizes see allgatherv.
         void allgather(const void * send, void * recv, Index_t count,
                        TypeDescriptor type, BufferLocation location) const;
 
@@ -602,15 +612,17 @@ namespace muGrid {
             return arg;
         }
 
-        //! gather on scalar types
+        //! All-gather of matrices of varying size: with one rank, `arg`
         template <typename T>
-        T gather(const T & arg) const {
+        DynMatrix_t<T>
+        allgatherv(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             return arg;
         }
 
-        //! gather on EigenMatrix types
+        //! Former name of allgatherv
         template <typename T>
-        DynMatrix_t<T> gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
+        [[deprecated("renamed allgatherv")]] DynMatrix_t<T>
+        gather(const Eigen::Ref<DynMatrix_t<T>> & arg) const {
             return arg;
         }
 

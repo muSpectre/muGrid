@@ -269,7 +269,7 @@ def test_reduce_gpu_matches_numpy():
         assert np.isclose(float(res), ref, rtol=1e-12)
 
 
-def test_gather():
+def test_allgatherv():
     try:
         from mpi4py import MPI
 
@@ -280,7 +280,7 @@ def test_gather():
     # gather arrays "a" with different lengths on the ranks
     a = np.arange(comm.rank * 2 + 4).reshape((-1, 2)).T
 
-    a_gathered = comm.gather(a)
+    a_gathered = comm.allgatherv(a)
 
     # construct reference
     for i in range(comm.size):
@@ -291,6 +291,10 @@ def test_gather():
             a_ref = np.concatenate((a_ref, a_tmp), axis=0)
 
     assert (a_gathered == a_ref.T).all()
+
+    # the former name still works, with a deprecation warning
+    with pytest.warns(DeprecationWarning, match="allgatherv"):
+        np.testing.assert_array_equal(comm.gather(a), a_gathered)
 
 
 def _rank_array(xp, rank, dtype=np.complex128):

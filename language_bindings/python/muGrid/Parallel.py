@@ -293,31 +293,51 @@ class CommunicatorWrapper:
 
         return self._cpp.cumulative_sum(arg)
 
-    def gather(self, arg):
+    def allgatherv(self, arg):
         """
-        Gather arrays from all processes.
+        Gather 2-D arrays whose number of columns differs between ranks.
+
+        Every rank receives all ranks' arrays concatenated along the second
+        axis (columns), in rank order: rank sizes ``(m, n_p)`` give
+        ``(m, sum_p n_p)``. Every rank must have the same number of rows, or
+        none; a 1-D array counts as one column, so reshape it to ``(1, -1)``
+        to concatenate values. For arrays of one shape on every rank, which
+        are stacked along a new leading axis and may live on the device, use
+        :meth:`allgather`.
 
         Parameters
         ----------
         arg : array
-            Local array to gather
+            Local array (host; a CuPy array is copied to the host)
 
         Returns
         -------
-        array
-            Gathered array containing data from all processes
+        numpy.ndarray
+            The concatenated array, on every rank
         """
-        # Delegated to the C++ implementation, which requires a host array;
-        # device arrays are copied to the host first.
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
+        if self._is_gpu(arg):
             import warnings
 
             warnings.warn(
-                "GPU gather not yet implemented, copying to CPU", RuntimeWarning
+                "allgatherv works on host arrays; copying the CuPy array to "
+                "the host",
+                RuntimeWarning,
             )
             arg = arg.get()
 
-        return self._cpp.gather(arg)
+        return self._cpp.allgatherv(arg)
+
+    def gather(self, arg):
+        """Former name of :meth:`allgatherv` (every rank receives the
+        result)."""
+        import warnings
+
+        warnings.warn(
+            "Communicator.gather is now allgatherv; gather will be removed",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.allgatherv(arg)
 
     def bcast(self, scalar_arg, root):
         """

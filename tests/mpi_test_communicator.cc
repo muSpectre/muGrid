@@ -113,7 +113,7 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
-  BOOST_AUTO_TEST_CASE(gather_test) {
+  BOOST_AUTO_TEST_CASE(allgatherv_test) {
     auto & comm{MPIContext::get_context().comm};
     auto rank{comm.rank()};
     const int columns_offset_from_rank{2};
@@ -132,7 +132,7 @@ namespace muGrid {
       send_mat.col(col) = send_mat.col(col).Ones(nb_rows, 1) * (rank + col);
     }
 
-    auto res{comm.template gather<Real>(send_mat)};
+    auto res{comm.template allgatherv<Real>(send_mat)};
     counter = 0;
     for (int lrank{0}; lrank < comm.size(); ++lrank) {
       for (int col{0}; col < lrank + columns_offset_from_rank; ++col) {
@@ -157,7 +157,7 @@ namespace muGrid {
           send_mat_lr.col(col).Ones(nb_rows, 1) * (rank + col);
     }
 
-    auto res_lr{comm.template gather<Real>(send_mat_lr)};
+    auto res_lr{comm.template allgatherv<Real>(send_mat_lr)};
     // check size of gathered matrix
     auto nb_cols_of_res{res_lr.cols()};
     BOOST_CHECK_EQUAL(nb_cols_of_res, comm.size() > 1
@@ -198,7 +198,7 @@ namespace muGrid {
           send_mat_em.col(col).Ones(nb_rows, 1) * (rank + col);
     }
 
-    auto res_em{comm.template gather<Real>(send_mat_em)};
+    auto res_em{comm.template allgatherv<Real>(send_mat_em)};
     // check size of gathered matrix
     auto nb_cols_of_res_em{res_em.cols()};
     auto nb_cols_of_res_em_expected{
@@ -227,7 +227,7 @@ namespace muGrid {
     // be an empty matrix ---
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> send_mat_empty(0, 0);
 
-    auto res_empty{comm.template gather<Real>(send_mat_empty)};
+    auto res_empty{comm.template allgatherv<Real>(send_mat_empty)};
     BOOST_CHECK_EQUAL(res_empty.rows(), 0);
     BOOST_CHECK_EQUAL(res_empty.cols(), 0);
 
@@ -243,7 +243,7 @@ namespace muGrid {
       send_col_vec(col) = rank + col;
     }
 
-    auto res_col_vec{comm.template gather<Real>(send_col_vec)};
+    auto res_col_vec{comm.template allgatherv<Real>(send_col_vec)};
 
     counter = 0;
     int offset{0};
