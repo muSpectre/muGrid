@@ -400,6 +400,8 @@ class DeviceFieldNetCDFTests(unittest.TestCase):
     def _round_trip(self, fname):
         import os
 
+        # Under mpirun every rank runs this serial test: one file per process
+        fname = f"{os.getpid()}_{fname}"
         nb_grid_pts = [4, 5]
         fc = muGrid.GlobalFieldCollection(nb_grid_pts, device=muGrid.Device.gpu())
         field = fc.real_field("rho")
