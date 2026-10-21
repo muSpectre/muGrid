@@ -145,15 +145,20 @@ class CommunicatorWrapper:
 
     def sum(self, arg):
         """
-        Sum reduction across all processes.
+        Sum reduction across all processes, elementwise for arrays.
 
-        For GPU arrays (CuPy), this method avoids unnecessary synchronization:
-        - Serial (size=1): Returns the input array directly (no sync)
-        - MPI parallel: Uses GPU-aware MPI for efficient reduction
+        Arrays -- NumPy or CuPy, of any shape and of dtype float32/64,
+        complex64/128, int32/64 or uint32 -- go through the C++
+        communicator's ``allreduce`` and come back with their shape, dtype
+        and kind; device arrays are handed to MPI directly or staged through
+        the host, as the communicator decides. In a serial run a CuPy array
+        is returned as it is, without waiting for the device. Host scalars
+        are reduced with the MPI datatype of their dtype (see
+        `_reduce_host_scalar`).
 
         Parameters
         ----------
-        arg : scalar, numpy array, or CuPy array
+        arg : scalar, array-like, or CuPy array
             Value to reduce
 
         Returns
@@ -161,15 +166,9 @@ class CommunicatorWrapper:
         Same type as input
             Global sum across all processes
         """
-        # Check if it's a GPU array
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
-            return self._sum_gpu(arg)
-
-        # CPU arrays: the C++ overloads for arrays match on dtype. CPU
-        # scalars: dispatch on dtype too (see _reduce_host_scalar).
-        if np.ndim(arg) == 0:
+        if not self._is_gpu(arg) and np.ndim(arg) == 0:
             return self._reduce_host_scalar(arg, "sum")
-        return self._cpp.sum(arg)
+        return self._allreduce_array(arg, "sum")
 
     def isum(self, arg):
         """Begin a non-blocking sum reduction across all processes.
@@ -203,56 +202,29 @@ class CommunicatorWrapper:
         an array of the argument's shape and kind."""
         return handle.wait()
 
-    def _sum_gpu(self, arg):
-        """Sum of a CuPy array across ranks, on the device."""
-        # Serial case: no reduction needed, return as-is
-        if self.size == 1:
+    def _allreduce_array(self, arg, op):
+        """Elementwise `op` over all ranks of a host or device array.
+
+        The C++ communicator's ``allreduce``: the result has the shape, dtype
+        and kind (NumPy or CuPy) of `arg`, which can be anything array-like.
+        A CuPy array in a serial run is returned as it is, so that a serial
+        solve never waits for the device."""
+        if self.size == 1 and self._is_gpu(arg):
             return arg
-        return self._cpp.allreduce(arg, "sum")
+        return self._cpp.allreduce(arg, op)
 
     def max(self, arg):
-        """
-        Max reduction across all processes.
-
-        For GPU arrays (CuPy), this method avoids unnecessary synchronization:
-        - Serial (size=1): Returns the input array directly (no sync)
-        - MPI parallel: Uses GPU-aware MPI for efficient reduction
-
-        Parameters
-        ----------
-        arg : scalar, numpy array, or CuPy array
-            Value to reduce
-
-        Returns
-        -------
-        Same type as input
-            Global maximum across all processes
-        """
-        # Check if it's a GPU array
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
-            return self._max_gpu(arg)
-
-        # CPU scalars: dispatch on dtype (see _reduce_host_scalar)
-        if np.ndim(arg) == 0:
+        """Max reduction across all processes, elementwise for arrays; see
+        :meth:`sum` (complex values have no maximum)."""
+        if not self._is_gpu(arg) and np.ndim(arg) == 0:
             return self._reduce_host_scalar(arg, "max")
-        return self._cpp.max(arg)
+        return self._allreduce_array(arg, "max")
 
     def min(self, arg):
-        """Min reduction across all processes: of a CPU scalar with the MPI
-        datatype taken from its dtype (see `_reduce_host_scalar`), and of a
-        CuPy array elementwise on the device."""
-        if self._is_gpu(arg):
-            return arg if self.size == 1 else self._cpp.allreduce(arg, "min")
-        if np.ndim(arg) == 0:
+        """Min reduction across all processes; see :meth:`sum`."""
+        if not self._is_gpu(arg) and np.ndim(arg) == 0:
             return self._reduce_host_scalar(arg, "min")
-        return self._cpp.min(arg)
-
-    def _max_gpu(self, arg):
-        """Maximum of a CuPy array across ranks, on the device."""
-        # Serial case: no reduction needed, return as-is
-        if self.size == 1:
-            return arg
-        return self._cpp.allreduce(arg, "max")
+        return self._allreduce_array(arg, "min")
 
     def all(self, arg):
         """

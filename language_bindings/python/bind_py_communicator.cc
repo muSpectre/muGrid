@@ -291,31 +291,6 @@ void add_communicator(py::module & mod) {
                      const int & arg) { return comm.sum(arg); })
       .def("sum", [](muGrid::Communicator & comm,
                      const Real & arg) { return comm.sum(arg); })
-      .def("sum",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
-             return comm.sum(arg);
-           })
-      .def("sum",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
-             return comm.sum(arg);
-           })
-      .def("sum",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
-             return comm.sum(arg);
-           })
-      .def("sum",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Index_t>> & arg) {
-             return comm.sum(arg);
-           })
-      .def("sum",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
-             return comm.sum(arg);
-           })
       .def("max", [](muGrid::Communicator & comm,
                      const int & arg) { return comm.max(arg); })
       .def("max", [](muGrid::Communicator & comm,

@@ -386,3 +386,26 @@ def test_isum():
     # a request dropped without waiting completes when it is collected
     comm.isum(np.ones(2))
     assert float(comm.isum_wait(comm.isum(2.0))) == 2.0 * comm.size
+
+
+@pytest.mark.parametrize("dtype", [np.float64, np.float32, np.complex128,
+                                   np.complex64, np.int32, np.int64,
+                                   np.uint32])
+@pytest.mark.parametrize("shape", [(3,), (2, 3), (2, 2, 2)])
+def test_array_reductions_keep_shape_and_dtype(dtype, shape):
+    comm = _make_comm()
+    for xp in _array_modules():
+        local = (xp.arange(np.prod(shape)).reshape(shape) + comm.rank
+                 ).astype(dtype)
+        reference = np.arange(np.prod(shape)).reshape(shape).astype(dtype)
+        total = comm.sum(local)
+        assert type(total) is type(local)
+        assert total.shape == shape and total.dtype == np.dtype(dtype)
+        np.testing.assert_array_equal(
+            _on_host(total),
+            reference * comm.size + sum(range(comm.size)))
+        if np.issubdtype(dtype, np.complexfloating):
+            continue
+        np.testing.assert_array_equal(_on_host(comm.max(local)),
+                                      reference + comm.size - 1)
+        np.testing.assert_array_equal(_on_host(comm.min(local)), reference)

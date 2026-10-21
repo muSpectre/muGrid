@@ -28,6 +28,8 @@ v1.5.2 (not yet released)
   ranks, in C++ and Python, staging device arrays through the host when MPI needs it
 - ENH: Non-blocking reductions, as used by pipelined CG, also work on CuPy arrays and on
   a communicator created without mpi4py
+- API: `sum`, `max` and `min` of the Python communicator reduce host arrays of any shape and
+  keep their shape and dtype; a 1-D array used to come back as an (n, 1) column
 - MAINT: Ghost exchange, FFT transposes and Python reductions share one decision on
   whether MPI takes device buffers, instead of each making its own
 
