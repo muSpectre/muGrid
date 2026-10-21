@@ -609,6 +609,73 @@ namespace muGrid {
         buffers.to_device(recv, 0, recv_bytes);
     }
 
+    void Communicator::bcast(void * buffer, Index_t count, TypeDescriptor type,
+                             int root, BufferLocation location) const {
+        const auto bytes{nb_bytes(count, type)};
+        if (this->comm == MPI_COMM_NULL || bytes == 0) {
+            return;
+        }
+        // In place: every rank's buffer is the receive buffer, and the
+        // root's is the send buffer as well. MPIBuffers copies the send
+        // side to the host when staging, which only the root needs, but a
+        // stale copy on the other ranks is overwritten by the broadcast.
+        MPIBuffers buffers{buffer, bytes, buffer, bytes, location,
+                           this->host_staging};
+        void * mpi_buffer{buffers.bounced ? buffers.recv : buffer};
+        if (buffers.bounced && this->rank() == root) {
+            std::memcpy(mpi_buffer, buffers.send, bytes);
+        }
+        check_mpi(MPI_Bcast(mpi_buffer, checked_mpi_int(count, "bcast count"),
+                            descriptor_to_mpi_type(type), root, this->comm),
+                  "MPI_Bcast", this->rank());
+        buffers.to_device(buffer, 0, bytes);
+    }
+
+    void Communicator::gatherv(const void * send, Index_t send_count,
+                               void * recv,
+                               const std::vector<int> & recv_counts,
+                               const std::vector<int> & recv_displs, int root,
+                               TypeDescriptor type,
+                               BufferLocation location) const {
+        const int nb_ranks{this->size()};
+        const int my_rank{this->rank()};
+        const bool is_root{my_rank == root};
+        const auto elem{type_descriptor_size(type)};
+        const auto send_bytes{nb_bytes(send_count, type)};
+        if (this->comm == MPI_COMM_NULL) {
+            allgatherv_extent(send_count, recv_counts, recv_displs, 1, 0);
+            copy_bytes(static_cast<char *>(recv) +
+                           static_cast<std::size_t>(recv_displs[0]) * elem,
+                       send, send_bytes, location);
+            return;
+        }
+        // Only the root reads the receive side; the others pass what they
+        // like, so give MPI nothing there
+        static const std::vector<int> none{};
+        const auto & counts{is_root ? recv_counts : none};
+        const auto & displs{is_root ? recv_displs : none};
+        const auto recv_bytes{
+            is_root ? allgatherv_extent(send_count, recv_counts, recv_displs,
+                                        nb_ranks, my_rank) *
+                          elem
+                    : 0};
+        MPIBuffers buffers{send, send_bytes, is_root ? recv : nullptr,
+                           recv_bytes, location, this->host_staging};
+        const auto mpi_type{descriptor_to_mpi_type(type)};
+        check_mpi(MPI_Gatherv(buffers.send,
+                              checked_mpi_int(send_count, "gatherv count"),
+                              mpi_type, buffers.recv, counts.data(),
+                              displs.data(), mpi_type, root, this->comm),
+                  "MPI_Gatherv", my_rank);
+        if (is_root) {
+            for (int r{0}; r < nb_ranks; ++r) {
+                buffers.to_device(
+                    recv, static_cast<std::size_t>(recv_displs[r]) * elem,
+                    static_cast<std::size_t>(recv_counts[r]) * elem);
+            }
+        }
+    }
+
     void Communicator::alltoallv(const void * send,
                                  const std::vector<int> & send_counts,
                                  const std::vector<int> & send_displs,
@@ -741,6 +808,22 @@ namespace muGrid {
                                "size");
         }
         copy_bytes(recv, send, nb_bytes(send_count, type), location);
+    }
+
+    void Communicator::bcast(void *, Index_t, TypeDescriptor, int,
+                             BufferLocation) const {}
+
+    void Communicator::gatherv(const void * send, Index_t send_count,
+                               void * recv,
+                               const std::vector<int> & recv_counts,
+                               const std::vector<int> & recv_displs, int,
+                               TypeDescriptor type,
+                               BufferLocation location) const {
+        allgatherv_extent(send_count, recv_counts, recv_displs, 1, 0);
+        copy_bytes(static_cast<char *>(recv) +
+                       static_cast<std::size_t>(recv_displs[0]) *
+                           type_descriptor_size(type),
+                   send, nb_bytes(send_count, type), location);
     }
 
     void Communicator::alltoallv(const void * send,

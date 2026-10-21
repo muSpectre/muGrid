@@ -593,6 +593,19 @@ namespace muGrid {
                       TypeDescriptor type, BufferLocation location,
                       int tag = 0) const;
 
+        //! Rank `root`'s `buffer` (`count` elements) into every rank's, in
+        //! place, as MPI_Bcast
+        void bcast(void * buffer, Index_t count, TypeDescriptor type, int root,
+                   BufferLocation location) const;
+
+        //! Gather to rank `root` only (MPI_Gatherv): as allgatherv, but
+        //! `recv`, `recv_counts` and `recv_displs` are read on `root` alone
+        //! and may be empty elsewhere
+        void gatherv(const void * send, Index_t send_count, void * recv,
+                     const std::vector<int> & recv_counts,
+                     const std::vector<int> & recv_displs, int root,
+                     TypeDescriptor type, BufferLocation location) const;
+
         //! All-to-all with per-rank element counts and displacements, as
         //! MPI_Alltoallv. Implemented with non-blocking point-to-point
         //! messages, which GPU-aware MPI libraries support more reliably
@@ -736,6 +749,12 @@ namespace muGrid {
                       void * recv, Index_t recv_count, int source,
                       TypeDescriptor type, BufferLocation location,
                       int tag = 0) const;
+        void bcast(void * buffer, Index_t count, TypeDescriptor type, int root,
+                   BufferLocation location) const;
+        void gatherv(const void * send, Index_t send_count, void * recv,
+                     const std::vector<int> & recv_counts,
+                     const std::vector<int> & recv_displs, int root,
+                     TypeDescriptor type, BufferLocation location) const;
         void alltoallv(const void * send, const std::vector<int> & send_counts,
                        const std::vector<int> & send_displs, void * recv,
                        const std::vector<int> & recv_counts,

@@ -206,14 +206,24 @@ namespace {
   }
 
   /**
-   * np.concatenate across ranks: every rank's array joined along `axis`, in
-   * rank order, on every rank. The extents along `axis` may differ; dtype
+   * The plan of a concatenation across ranks: every rank's array joined
+   * along `axis`, in rank order. The extents along `axis` may differ; dtype
    * and all other extents must agree. Ranks contributing no elements are
    * left out (their shape does not matter). Every rank sees every rank's
    * header, so a mismatch raises on all ranks alike.
    */
-  py::object allgatherv_array(const muGrid::Communicator & comm,
-                              const py::object & a, Index_t axis) {
+  struct ConcatenationPlan {
+    py::module_ xp;
+    ArrayBuffer send;       //!< the local array, gathered axis first
+    py::object dtype;
+    py::tuple result_shape;  //!< gathered axis first
+    std::vector<int> counts, displs;
+    Index_t result_axis;
+    BufferLocation location;
+  };
+
+  ConcatenationPlan plan_concatenation(const muGrid::Communicator & comm,
+                                       const py::object & a, Index_t axis) {
     const BufferLocation location{py::hasattr(a, "__cuda_array_interface__")
                                       ? BufferLocation::Device
                                       : BufferLocation::Host};
@@ -221,17 +231,17 @@ namespace {
     py::object array{xp.attr("asarray")(a)};
     const auto ndim{array.attr("ndim").cast<Index_t>()};
     if (ndim == 0 || ndim > max_dims) {
-      throw py::value_error("allgatherv: needs an array of 1 to " +
+      throw py::value_error("needs an array of 1 to " +
                             std::to_string(max_dims) + " dimensions");
     }
     if (axis < -ndim || axis >= ndim) {
-      throw py::value_error("allgatherv: axis " + std::to_string(axis) +
+      throw py::value_error("axis " + std::to_string(axis) +
                             " is out of range for an array of " +
                             std::to_string(ndim) + " dimensions");
     }
     const Index_t own_axis{axis < 0 ? axis + ndim : axis};
     py::object moved{xp.attr("moveaxis")(array, own_axis, 0)};
-    const auto send{buffer_of(moved, Use::Movement)};
+    auto send{buffer_of(moved, Use::Movement)};
     py::object dtype{array.attr("dtype")};
 
     std::vector<Index_t> header(header_size, 0);
@@ -252,8 +262,8 @@ namespace {
     int ref{-1};  // the first rank that contributes elements
     for (int r{0}; r < nb_ranks; ++r) {
       if (row(r)[1] != row(0)[1] || row(r)[2] != row(0)[2]) {
-        throw py::type_error("allgatherv: the arrays must have one dtype on "
-                             "all ranks, but ranks 0 and " +
+        throw py::type_error("the arrays must have one dtype on all ranks, "
+                             "but ranks 0 and " +
                              std::to_string(r) + " differ");
       }
       if (ref < 0 && row(r)[0] > 0) {
@@ -281,8 +291,8 @@ namespace {
       }
       if (!same) {
         throw py::value_error(
-            "allgatherv: arrays may differ only along the gathered axis, "
-            "but rank " + std::to_string(ref) + " has shape " +
+            "arrays may differ only along the gathered axis, but rank " +
+            std::to_string(ref) + " has shape " +
             shape_string(row(ref) + 4, row(ref)[3]) + " and rank " +
             std::to_string(r) + " " + shape_string(h + 4, h[3]) +
             " (gathered axis first)");
@@ -299,26 +309,108 @@ namespace {
     for (Index_t d{1}; d < result_ndim; ++d) {
       result_shape.append(rest[d - 1]);
     }
+    return ConcatenationPlan{xp,
+                             std::move(send),
+                             dtype,
+                             py::tuple(result_shape),
+                             std::move(counts),
+                             std::move(displs),
+                             axis < 0 ? axis + result_ndim : axis,
+                             location};
+  }
+
+  //! np.concatenate across ranks, on every rank
+  py::object allgatherv_array(const muGrid::Communicator & comm,
+                              const py::object & a, Index_t axis) {
+    auto plan{plan_concatenation(comm, a, axis)};
     py::object result{
-        xp.attr("empty")(py::tuple(result_shape), "dtype"_a = dtype)};
-    void * recv{data_of(interface_of(result, location))};
-    wait_for_writer(send);
+        plan.xp.attr("empty")(plan.result_shape, "dtype"_a = plan.dtype)};
+    void * recv{data_of(interface_of(result, plan.location))};
+    wait_for_writer(plan.send);
     {
       py::gil_scoped_release release{};
       std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
-      comm.allgatherv(send.data, send.count, recv, counts, displs, send.type,
-                      location);
+      comm.allgatherv(plan.send.data, plan.send.count, recv, plan.counts,
+                      plan.displs, plan.send.type, plan.location);
     }
-    const Index_t result_axis{axis < 0 ? axis + result_ndim : axis};
-    return xp.attr("moveaxis")(result, 0, result_axis);
+    return plan.xp.attr("moveaxis")(result, 0, plan.result_axis);
   }
 
-  muGrid::ReduceOp reduce_op(const std::string & op) {
-    if (op == "sum") return muGrid::ReduceOp::Sum;
-    if (op == "max") return muGrid::ReduceOp::Max;
-    if (op == "min") return muGrid::ReduceOp::Min;
-    throw py::value_error("allreduce: op must be 'sum', 'max' or 'min', not '" +
-                          op + "'");
+  //! np.concatenate across ranks, on the root; None elsewhere
+  py::object gatherv_array(const muGrid::Communicator & comm,
+                           const py::object & a, int root, Index_t axis) {
+    auto plan{plan_concatenation(comm, a, axis)};
+    const bool is_root{comm.rank() == root};
+    py::object result{py::none()};
+    void * recv{nullptr};
+    if (is_root) {
+      result = plan.xp.attr("empty")(plan.result_shape, "dtype"_a = plan.dtype);
+      recv = data_of(interface_of(result, plan.location));
+    }
+    wait_for_writer(plan.send);
+    {
+      py::gil_scoped_release release{};
+      std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+      comm.gatherv(plan.send.data, plan.send.count, recv, plan.counts,
+                   plan.displs, root, plan.send.type, plan.location);
+    }
+    return is_root ? plan.xp.attr("moveaxis")(result, 0, plan.result_axis)
+                   : result;
+  }
+
+  //! Rank root's array into every rank's, in place: all ranks pass an
+  //! array of one shape and dtype, which must be writable and contiguous
+  //! (a non-contiguous one would be broadcast into a copy and lost)
+  void bcast_array(const muGrid::Communicator & comm, const py::object & a,
+                   int root) {
+    const BufferLocation location{py::hasattr(a, "__cuda_array_interface__")
+                                      ? BufferLocation::Device
+                                      : BufferLocation::Host};
+    // NumPy's flags is a flagsobj, CuPy's lacks "writeable" (always true)
+    const py::object flags{a.attr("flags")};
+    if (!flags.attr("c_contiguous").cast<bool>() ||
+        !py::getattr(flags, "writeable", py::bool_(true)).cast<bool>()) {
+      throw py::value_error("bcast fills the array in place, so it must be "
+                            "C-contiguous and writeable");
+    }
+    const auto buffer{buffer_of(a, Use::Movement)};
+    wait_for_writer(buffer);
+    {
+      py::gil_scoped_release release{};
+      std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+      comm.bcast(buffer.data, buffer.count, buffer.type, root, location);
+    }
+  }
+
+  //! Whether `a` is a Python number (not a NumPy scalar: np.float64 is a
+  //! float subclass but carries an array interface, and comes back as a
+  //! 0-d array)
+  bool is_python_scalar(const py::object & a) {
+    return !py::hasattr(a, "__array_interface__") &&
+           (py::isinstance<py::bool_>(a) || py::isinstance<py::int_>(a) ||
+            py::isinstance<py::float_>(a) || PyComplex_Check(a.ptr()));
+  }
+
+  //! 'sum', 'max' or 'min', or mpi4py's MPI.SUM/MAX/MIN if mpi4py is
+  //! loaded (compared by identity; muGrid does not import it)
+  muGrid::ReduceOp reduce_op(const py::object & op) {
+    if (py::isinstance<py::str>(op)) {
+      const auto name{op.cast<std::string>()};
+      if (name == "sum") return muGrid::ReduceOp::Sum;
+      if (name == "max") return muGrid::ReduceOp::Max;
+      if (name == "min") return muGrid::ReduceOp::Min;
+    } else {
+      py::dict modules{py::module_::import("sys").attr("modules")};
+      if (modules.contains("mpi4py.MPI")) {
+        py::object MPI{modules["mpi4py.MPI"]};
+        if (op.is(MPI.attr("SUM"))) return muGrid::ReduceOp::Sum;
+        if (op.is(MPI.attr("MAX"))) return muGrid::ReduceOp::Max;
+        if (op.is(MPI.attr("MIN"))) return muGrid::ReduceOp::Min;
+      }
+    }
+    throw py::value_error("op must be 'sum', 'max' or 'min' (or mpi4py's "
+                          "MPI.SUM, MPI.MAX or MPI.MIN), not " +
+                          py::repr(op).cast<std::string>());
   }
 }  // namespace
 
@@ -439,7 +531,7 @@ void add_communicator(py::module & mod) {
       .def(
           "allreduce",
           [](const muGrid::Communicator & comm, const py::object & a,
-             const std::string & op) {
+             const py::object & op) {
             const auto send{buffer_of(a)};
             auto [result, recv]{empty_like(send, send.shape)};
             const auto reduction{reduce_op(op)};
@@ -450,15 +542,17 @@ void add_communicator(py::module & mod) {
               comm.allreduce(send.data, recv, send.count, send.type,
                              reduction, send.location);
             }
-            return result;
+            // A Python number comes back as one, as from mpi4py
+            return is_python_scalar(a) ? result.attr("item")() : result;
           },
           "a"_a, "op"_a = "sum",
-          "Elementwise reduction (op: 'sum', 'max' or 'min') of an array "
-          "over all ranks, returned on every rank.")
+          "Elementwise reduction of an array over all ranks, returned on "
+          "every rank; a Python number comes back as a Python number. op: "
+          "'sum', 'max' or 'min', or mpi4py's MPI.SUM/MAX/MIN.")
       .def(
           "iallreduce",
           [](const muGrid::Communicator & comm, const py::object & a,
-             const std::string & op) {
+             const py::object & op) {
             const auto send{buffer_of(a)};
             auto [result, recv]{empty_like(send, send.shape)};
             const auto reduction{reduce_op(op)};
@@ -571,6 +665,13 @@ void add_communicator(py::module & mod) {
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Uint>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Index_t>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Complex>)
+      .def("gatherv", &gatherv_array, "a"_a, "root"_a = 0, "axis"_a = 0,
+           "As allgatherv, but the result lands on rank `root` only; the "
+           "other ranks get None.")
+      .def("bcast", &bcast_array, "a"_a, "root"_a = 0,
+           "Rank root's array into every rank's, in place: every rank passes "
+           "a C-contiguous, writeable array of one shape and dtype, host or "
+           "device, and leaves with the root's values.")
       .def("allgatherv", &allgatherv_array, "a"_a, "axis"_a = 0,
            "np.concatenate across ranks: every rank's array joined along "
            "`axis`, in rank order, on every rank. The extent along `axis` "
@@ -579,32 +680,19 @@ void add_communicator(py::module & mod) {
            "arrays, of any fixed-size dtype. For arrays of one shape stacked "
            "along a new axis, see allgather.")
       .def(
-          "bcast",
+          "bcast_scalar",
           [](muGrid::Communicator & comm, Real & scalar_arg, const Int & root) {
             return comm.bcast<Real>(scalar_arg, root);
           },
           "scalar_arg"_a, "root"_a)
       .def(
-          "bcast",
+          "bcast_scalar",
           [](muGrid::Communicator & comm, Int & scalar_arg, const Int & root) {
             return comm.bcast<Int>(scalar_arg, root);
           },
           "scalar_arg"_a, "root"_a)
       .def(
-          "bcast",
-          [](muGrid::Communicator & comm, Uint & scalar_arg, const Int & root) {
-            return comm.bcast<Uint>(scalar_arg, root);
-          },
-          "scalar_arg"_a, "root"_a)
-      .def(
-          "bcast",
-          [](muGrid::Communicator & comm, Index_t & scalar_arg,
-             const Int & root) {
-            return comm.bcast<Index_t>(scalar_arg, root);
-          },
-          "scalar_arg"_a, "root"_a)
-      .def(
-          "bcast",
+          "bcast_scalar",
           [](muGrid::Communicator & comm, Complex & scalar_arg,
              const Int & root) {
             return comm.bcast<Complex>(scalar_arg, root);

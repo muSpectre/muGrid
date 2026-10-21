@@ -38,8 +38,12 @@ v1.6.0 (not yet released)
   a communicator created without mpi4py
 - API: `sum`, `max` and `min` of the Python communicator reduce host arrays of any shape and
   keep their shape and dtype; a 1-D array used to come back as an (n, 1) column
-- API: The communicator's `gather` becomes `allgatherv(a, axis=0)`, `np.concatenate` across
-  ranks for NumPy and CuPy arrays of any shape; `gather` is deprecated
+- API: The communicator's column-concatenating `gather` becomes `allgatherv(a, axis=0)`,
+  `np.concatenate` across ranks for NumPy and CuPy arrays of any shape
+- API: `bcast(obj, root=0)`, `gather(obj, root=0)` and `allgather(obj)` take any Python
+  object with mpi4py's lower-case semantics: objects pickled, arrays as buffers, a list
+  on the root from `gather`; `allreduce` also takes mpi4py's `MPI.SUM`/`MAX`/`MIN` and
+  returns a Python number for a Python number
 - ENH: Gathers and point-to-point exchanges move arrays of any fixed-size dtype, such as
   bytes, booleans or strings; reductions also take uint8
 - MAINT: Ghost exchange, FFT transposes and Python reductions share one decision on
