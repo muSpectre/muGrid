@@ -34,6 +34,7 @@
  */
 
 #include "mpi/communicator.hh"
+#include "mpi/mpi_environment.hh"
 #include "memory/device.hh"
 #include "memory/gpu_runtime.hh"
 
@@ -202,23 +203,165 @@ namespace muGrid {
     Communicator::Communicator(MPI_Comm comm) : comm{comm} {
         // Check if MPI has been initialized. If not, use MPI_COMM_NULL
         // to allow serial operation without MPI_Init
-        if (comm != MPI_COMM_NULL) {
-            int initialized = 0;
-            MPI_Initialized(&initialized);
-            if (!initialized) {
-                this->comm = MPI_COMM_NULL;
-            }
+        if (comm != MPI_COMM_NULL && !mpi_initialized()) {
+            this->comm = MPI_COMM_NULL;
+        }
+        // A single rank (no communicator, or MPI_COMM_SELF and the like) is
+        // rank 0 of 1 on its node without asking; size() is a local call
+        if (this->comm == MPI_COMM_NULL || this->size() == 1) {
+            this->node_rank_ = 0;
+            this->node_size_ = 1;
         }
     }
 
     Communicator::Communicator(const Communicator & other)
-        : comm(other.comm) {}
+        : comm(other.comm), owner{other.owner},
+          node_rank_{other.node_rank_}, node_size_{other.node_size_} {}
 
     Communicator::~Communicator() {}
 
     Communicator & Communicator::operator=(const Communicator & other) {
         this->comm = other.comm;
+        this->owner = other.owner;
+        this->node_rank_ = other.node_rank_;
+        this->node_size_ = other.node_size_;
         return *this;
+    }
+
+    Communicator Communicator::owning(MPI_Comm handle) {
+        Communicator result{handle};
+        if (handle != MPI_COMM_NULL) {
+            // The deleter runs with the last copy, which may be a global
+            // destroyed after MPI_Finalize; freeing then would abort.
+            result.owner = std::shared_ptr<void>(
+                nullptr, [handle](void *) {
+                    if (mpi_initialized() && !mpi_finalized()) {
+                        MPI_Comm h{handle};
+                        MPI_Comm_free(&h);
+                    }
+                });
+        }
+        return result;
+    }
+
+    Communicator Communicator::world() {
+        ensure_mpi_initialized();
+        Communicator result{MPI_COMM_WORLD};
+        result.discover_node();
+        return result;
+    }
+
+    Communicator Communicator::split(int color, int key) const {
+        if (this->comm == MPI_COMM_NULL) {
+            return *this;
+        }
+        MPI_Comm handle{MPI_COMM_NULL};
+        const int status{MPI_Comm_split(this->comm, color, key, &handle)};
+        if (status != MPI_SUCCESS) {
+            std::stringstream error{};
+            error << "MPI_Comm_split failed with " << status << " on rank "
+                  << this->rank();
+            throw RuntimeError(error.str());
+        }
+        Communicator result{owning(handle)};
+        result.discover_node();
+        return result;
+    }
+
+    Communicator Communicator::dup() const {
+        if (this->comm == MPI_COMM_NULL) {
+            return *this;
+        }
+        MPI_Comm handle{MPI_COMM_NULL};
+        const int status{MPI_Comm_dup(this->comm, &handle)};
+        if (status != MPI_SUCCESS) {
+            std::stringstream error{};
+            error << "MPI_Comm_dup failed with " << status << " on rank "
+                  << this->rank();
+            throw RuntimeError(error.str());
+        }
+        Communicator result{owning(handle)};
+        // The same ranks on the same nodes
+        result.node_rank_ = this->node_rank_;
+        result.node_size_ = this->node_size_;
+        if (result.node_rank_ < 0) {
+            result.discover_node();
+        }
+        return result;
+    }
+
+    std::string Communicator::compare(const Communicator & other) const {
+        const bool self_null{this->comm == MPI_COMM_NULL};
+        const bool other_null{other.comm == MPI_COMM_NULL};
+        if (self_null && other_null) {
+            return "identical";
+        }
+        if (self_null || other_null) {
+            // A serial communicator against an MPI one of size 1: the same
+            // single rank, but not one handle
+            return (this->size() == 1 && other.size() == 1) ? "congruent"
+                                                             : "unequal";
+        }
+        int result{MPI_UNEQUAL};
+        const int status{MPI_Comm_compare(this->comm, other.comm, &result)};
+        if (status != MPI_SUCCESS) {
+            std::stringstream error{};
+            error << "MPI_Comm_compare failed with " << status;
+            throw RuntimeError(error.str());
+        }
+        switch (result) {
+        case MPI_IDENT:
+            return "identical";
+        case MPI_CONGRUENT:
+            return "congruent";
+        case MPI_SIMILAR:
+            return "similar";
+        default:
+            return "unequal";
+        }
+    }
+
+    void Communicator::discover_node() {
+        if (this->comm == MPI_COMM_NULL) {
+            this->node_rank_ = 0;
+            this->node_size_ = 1;
+            return;
+        }
+        MPI_Comm node{MPI_COMM_NULL};
+        const int status{MPI_Comm_split_type(this->comm, MPI_COMM_TYPE_SHARED,
+                                             this->rank(), MPI_INFO_NULL,
+                                             &node)};
+        if (status != MPI_SUCCESS) {
+            std::stringstream error{};
+            error << "MPI_Comm_split_type failed with " << status
+                  << " on rank " << this->rank();
+            throw RuntimeError(error.str());
+        }
+        MPI_Comm_rank(node, &this->node_rank_);
+        MPI_Comm_size(node, &this->node_size_);
+        MPI_Comm_free(&node);
+    }
+
+    namespace {
+        int discovered(int value, const char * what) {
+            if (value < 0) {
+                std::stringstream error{};
+                error << what
+                      << " is not known for this communicator: it was "
+                         "wrapped from a handle. Call discover_node() (on "
+                         "every rank) first";
+                throw RuntimeError(error.str());
+            }
+            return value;
+        }
+    }  // namespace
+
+    int Communicator::node_rank() const {
+        return discovered(this->node_rank_, "node_rank");
+    }
+
+    int Communicator::node_size() const {
+        return discovered(this->node_size_, "node_size");
     }
 
     namespace {

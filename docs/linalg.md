@@ -145,11 +145,10 @@ la.scal(alpha, x)                # x_pc = alpha_p x_pc
 Under MPI, reduce scalar results over ranks:
 
 ```python
-from mpi4py import MPI
 import muGrid
 import muGrid.linalg as la
 
-comm = muGrid.Communicator(MPI.COMM_WORLD)
+comm = muGrid.Communicator.world()
 decomp = muGrid.CartesianDecomposition(comm, [128, 128],
                                        nb_ghosts_left=[1, 1],
                                        nb_ghosts_right=[1, 1])

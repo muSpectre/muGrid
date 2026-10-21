@@ -230,26 +230,34 @@ ranks, so the ghost width can be chosen from the stencil alone.
 muGrid.Communicator(communicator=None)
 ```
 
-Returns a communicator wrapper. Pass an mpi4py communicator (or a µGrid
-communicator); the default is a serial communicator containing only the current
-process, and constructing it under a multi-rank MPI launcher emits a
-`RuntimeWarning`. The wrapper provides `rank`, `size`, `barrier()` and the
-reductions `sum`, `max`, `min`, `all`, `any`, `cumulative_sum`, `gather` and
-`bcast`, which accept scalars and NumPy or CuPy arrays.
+The default is a serial communicator containing only the current process;
+constructing it under a multi-rank MPI launcher emits a `RuntimeWarning`.
+`Communicator.world()` is `MPI_COMM_WORLD` and starts MPI (with
+`MPI_THREAD_SERIALIZED`) if nothing has yet; opening a NetCDF file in a
+PnetCDF build does the same, since PnetCDF needs MPI running even for one
+rank. Nothing else does: importing µGrid does not start MPI, and mpi4py is
+not needed. µGrid finalises MPI at interpreter exit if it started it
+(`muGrid.finalize_mpi()` does so earlier; `MUGRID_MPI_FINALIZE=0` leaves it to
+the OS, for MPI stacks that misbehave once the GPU context is gone).
+
+A communicator provides `rank`, `size`, `barrier()`, the reductions `sum`,
+`max`, `min`, `all`, `any`, `cumulative_sum` and `bcast`, the array exchanges
+`allreduce`, `allgather`, `allgatherv` and `sendrecv` (NumPy or CuPy arrays),
+`split(color, key=0)`, `dup()`, `compare(other)`, and `node_rank`/`node_size`
+(its rank among the ranks on this node, for choosing one GPU per rank).
 
 ```python
 from muGrid import Communicator
-comm = Communicator()                 # serial
-
-from mpi4py import MPI
-comm = Communicator(MPI.COMM_WORLD)   # MPI-parallel
+comm = Communicator()          # serial
+comm = Communicator.world()    # MPI-parallel: mpirun -np 4 python script.py
 ```
 
-`muGrid.parprint(*args, comm=None, **kwargs)` prints on rank 0 only.
+An mpi4py communicator is accepted too (`Communicator(MPI.COMM_WORLD)`), and
+`comm.mpi4py_comm` hands a µGrid communicator to mpi4py when it is imported.
+µGrid checks that mpi4py is linked against the same MPI library and raises
+otherwise.
 
-In MPI builds, `import muGrid` imports mpi4py and thereby initialises MPI, so a
-script that imports µGrid runs as an MPI program even when it never
-communicates.
+`muGrid.parprint(*args, comm=None, **kwargs)` prints on rank 0 only.
 
 ## Operators
 

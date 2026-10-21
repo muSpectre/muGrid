@@ -40,6 +40,7 @@
 #include "field/field_map.hh"
 #include "grid/index_ops.hh"
 #include "mpi/communicator.hh"
+#include "mpi/mpi_environment.hh"
 #include "mpi/cartesian_decomposition.hh"
 
 namespace muGrid {
@@ -255,6 +256,52 @@ namespace muGrid {
       offset += counter;
       counter = 0;  // reset counter
     }
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(world_split_dup_compare_test) {
+    // MPIContext has initialised MPI itself; world() must find that and
+    // not claim it
+    auto world{Communicator::world()};
+    BOOST_CHECK(!mpi_initialized_by_mugrid());
+    auto & comm{MPIContext::get_context().comm};
+    BOOST_CHECK_EQUAL(world.size(), comm.size());
+    BOOST_CHECK_EQUAL(world.compare(comm), "identical");
+    BOOST_CHECK_EQUAL(world.node_size(), comm.size());
+
+    // The stub has one communicator only, so everything is identical
+    const std::string same_group{Communicator::has_mpi() ? "congruent"
+                                                          : "identical"};
+    auto dup{world.dup()};
+    BOOST_CHECK_EQUAL(world.compare(dup), same_group);
+    BOOST_CHECK_EQUAL(dup.node_rank(), world.node_rank());
+    {
+      auto copy{dup};  // shares the owned handle; freed with the last copy
+      BOOST_CHECK_EQUAL(copy.compare(dup), "identical");
+    }
+    BOOST_CHECK_EQUAL(dup.size(), world.size());
+
+    auto half{world.split(world.rank() % 2)};
+    BOOST_CHECK_EQUAL(half.size(),
+                      (world.size() + 1 - world.rank() % 2) / 2);
+    BOOST_CHECK_EQUAL(world.compare(half),
+                      world.size() == 1 ? same_group : "unequal");
+
+#ifdef WITH_MPI
+    Communicator serial{MPI_COMM_NULL};
+    BOOST_CHECK_EQUAL(serial.compare(Communicator{MPI_COMM_NULL}),
+                      "identical");
+    BOOST_CHECK_EQUAL(serial.node_size(), 1);
+    BOOST_CHECK_EQUAL(serial.split(0).size(), 1);
+
+    Communicator wrapped{world.get_mpi_comm()};
+    if (world.size() > 1) {
+      // A single rank knows it is rank 0 of 1 on its node without asking
+      BOOST_CHECK_THROW(wrapped.node_rank(), RuntimeError);
+    }
+    wrapped.discover_node();
+    BOOST_CHECK_EQUAL(wrapped.node_rank(), world.node_rank());
+#endif
   }
 
   // ----------------------------------------------------------------------

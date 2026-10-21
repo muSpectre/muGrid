@@ -37,6 +37,7 @@
 
 #include "mpi/communicator.hh"
 #include "mpi/gpu_aware_mpi.hh"
+#include "mpi/mpi_environment.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/complex.h>
@@ -44,6 +45,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -303,6 +305,7 @@ namespace {
     wait_for_writer(send);
     {
       py::gil_scoped_release release{};
+      std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
       comm.allgatherv(send.data, send.count, recv, counts, displs, send.type,
                       location);
     }
@@ -320,6 +323,36 @@ namespace {
 }  // namespace
 
 void add_communicator(py::module & mod) {
+  // Starting and stopping MPI (mpi/mpi_environment.hh). muGrid starts MPI
+  // only when Communicator.world() asks for it and stops it at interpreter
+  // exit only if it started it; see muGrid/__init__.py.
+  mod.def("mpi_initialized", &muGrid::mpi_initialized,
+          "Whether MPI has been initialised, by anyone.");
+  mod.def("mpi_finalized", &muGrid::mpi_finalized,
+          "Whether MPI has been finalised, by anyone.");
+  mod.def("mpi_initialized_by_mugrid", &muGrid::mpi_initialized_by_mugrid,
+          "Whether it was muGrid that initialised MPI.");
+  mod.def(
+      "finalize_mpi",
+      [](bool force) {
+        py::gil_scoped_release release{};
+        muGrid::finalize_mpi(force);
+      },
+      "force"_a = false,
+      "Finalise MPI if muGrid initialised it (with force, whoever did). "
+      "Owned communicators and open parallel files are left to the OS "
+      "afterwards. Registered at interpreter exit unless "
+      "MUGRID_MPI_FINALIZE=0.");
+  mod.def("mpi_thread_level", &muGrid::mpi_thread_level,
+          "The thread level MPI granted: 'single', 'funneled', 'serialized' "
+          "or 'multiple'; 'none' while MPI is not running.");
+  mod.def("mpi_library_version", &muGrid::mpi_library_version,
+          "The MPI library's own version string ('none' without MPI).");
+  mod.def("mpi_comm_world_handle", &muGrid::mpi_comm_world_handle,
+          "MPI_COMM_WORLD as an integer, as mpi4py's MPI._handleof gives it; "
+          "equal between muGrid and mpi4py only if they share one MPI "
+          "library.");
+
   py::class_<PyAllreduceRequest>(mod, "AllreduceRequest",
                                  "A reduction started by "
                                  "Communicator.iallreduce.")
@@ -328,6 +361,7 @@ void add_communicator(py::module & mod) {
           [](PyAllreduceRequest & self) {
             {
               py::gil_scoped_release release{};
+              std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
               self.request.wait();
             }
             return self.result;
@@ -350,6 +384,48 @@ void add_communicator(py::module & mod) {
 #endif
       .def_property_readonly_static(
           "has_mpi", [](py::object) { return muGrid::Communicator::has_mpi(); })
+      .def_static(
+          "world",
+          []() {
+            py::gil_scoped_release release{};
+            return muGrid::Communicator::world();
+          },
+          "MPI_COMM_WORLD, starting MPI first if nobody has. Collective.")
+      .def(
+          "split",
+          [](const muGrid::Communicator & comm, int color, int key) {
+            py::gil_scoped_release release{};
+            std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+            return comm.split(color, key);
+          },
+          "color"_a, "key"_a = 0,
+          "A communicator over the ranks passing the same color, ordered by "
+          "key; it owns its handle. Collective.")
+      .def(
+          "dup",
+          [](const muGrid::Communicator & comm) {
+            py::gil_scoped_release release{};
+            std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+            return comm.dup();
+          },
+          "A new handle to the same group. Collective.")
+      .def("compare", &muGrid::Communicator::compare, "other"_a,
+           "'identical', 'congruent' (same ranks, same order), 'similar' "
+           "(same ranks) or 'unequal'.")
+      .def(
+          "discover_node",
+          [](muGrid::Communicator & comm) {
+            py::gil_scoped_release release{};
+            std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+            comm.discover_node();
+          },
+          "Find out node_rank and node_size. Collective; world(), split() "
+          "and dup() have done it already.")
+      .def_property_readonly("node_rank", &muGrid::Communicator::node_rank,
+                             "Rank among the ranks on this node (for one "
+                             "GPU per rank).")
+      .def_property_readonly("node_size", &muGrid::Communicator::node_size,
+                             "Number of ranks on this node.")
       // Whether MPI may be handed device pointers (MUGRID_GPU_AWARE_MPI, else
       // the MPI library's own report through whichever GPU-support query it
       // provides). For information only: the exchanges below decide by
@@ -370,6 +446,7 @@ void add_communicator(py::module & mod) {
             wait_for_writer(send);
             {
               py::gil_scoped_release release{};
+              std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
               comm.allreduce(send.data, recv, send.count, send.type,
                              reduction, send.location);
             }
@@ -411,6 +488,7 @@ void add_communicator(py::module & mod) {
             wait_for_writer(send);
             {
               py::gil_scoped_release release{};
+              std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
               comm.allgather(send.data, recv, send.count, send.type,
                              send.location);
             }
@@ -429,6 +507,7 @@ void add_communicator(py::module & mod) {
             wait_for_writer(send);
             {
               py::gil_scoped_release release{};
+              std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
               comm.sendrecv(send.data, send.count, dest, recv, send.count,
                             source, send.type, send.location, tag);
             }

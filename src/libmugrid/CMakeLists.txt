@@ -40,6 +40,7 @@ set(MUGRID_SOURCES
     collection/field_collection_local.cc
     # mpi/
     mpi/communicator.cc
+    mpi/mpi_environment.cc
     mpi/cartesian_communicator.cc
     mpi/cartesian_decomposition.cc
     # operators/

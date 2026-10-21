@@ -45,31 +45,26 @@ except ImportError:
 
 has_mpi = _muGrid.Communicator.has_mpi
 
-# mpi4py is imported only by MPI-enabled builds. Importing it runs MPI_Init,
-# which is not free and pulls the MPI stack's transport and accelerator
-# plugins into the process; on some systems those interfere with the GPU
-# driver (e.g. under WSL2, Open MPI's UCX transport loads an OpenCL ICD that
-# leaves the CUDA driver unusable for the rest of the run). A serial build
-# never calls into MPI, so it must not pay that cost. Every use of ``MPI``
-# here and in Parallel.py sits behind a ``has_mpi`` check.
-if has_mpi:
-    try:
-        from mpi4py import MPI
-    except (ImportError, RuntimeError) as error:
-        # mpi4py fails three ways here. ModuleNotFoundError: not installed.
-        # ImportError: installed, but its extension cannot dlopen libmpi
-        # (ModuleNotFoundError is a subclass of ImportError, so catching
-        # ImportError covers both). RuntimeError: its ABI probe cannot find
-        # libmpi at all. All three mean
-        # a partial or absent MPI install and deserve the same explanation
-        # rather than a dlopen traceback from inside mpi4py, so the original is
-        # kept as the cause.
-        raise RuntimeError(
-            "MPI support is enabled for muGrid but mpi4py is not usable: "
-            f"{error}"
-        ) from error
-else:
-    MPI = None
+# muGrid does not import mpi4py, and importing muGrid does not start MPI:
+# MPI_Init is not free, pulls the MPI stack's transport and accelerator
+# plugins into the process (on some systems those interfere with the GPU
+# driver, e.g. under WSL2 Open MPI's UCX transport loads an OpenCL ICD that
+# leaves the CUDA driver unusable), and ties muGrid to the MPI library mpi4py
+# happens to be built against. MPI is started by the first
+# ``Communicator.world()`` and, if muGrid started it, stopped at exit here.
+# ``MUGRID_MPI_FINALIZE=0`` leaves it to the OS instead, for MPI stacks whose
+# finalisation misbehaves once the GPU context is gone.
+import atexit as _atexit  # noqa: E402
+import os as _os  # noqa: E402
+import warnings  # noqa: E402
+
+finalize_mpi = _muGrid.finalize_mpi
+mpi_initialized = _muGrid.mpi_initialized
+mpi_thread_level = _muGrid.mpi_thread_level
+mpi_library_version = _muGrid.mpi_library_version
+
+if _os.environ.get("MUGRID_MPI_FINALIZE", "1") not in ("0", "no", "false"):
+    _atexit.register(finalize_mpi)
 
 # Feature flags for compile-time configuration
 has_cuda = _muGrid.has_cuda
@@ -244,7 +239,7 @@ def version_string(communicator=None, device=None):
 
     Parameters
     ----------
-    communicator : Communicator or mpi4py communicator, optional
+    communicator : Communicator, _muGrid.Communicator or mpi4py communicator, optional
         Reports the MPI rank and communicator size. Defaults to a serial
         communicator (rank 0, size 1).
     device : Device, optional
@@ -257,11 +252,10 @@ def version_string(communicator=None, device=None):
 
     # MPI
     if has_mpi:
-        comm = communicator
-        if comm is None:
-            comm = _muGrid.Communicator()
-        elif MPI is not None and isinstance(comm, MPI.Comm):
-            comm = _muGrid.Communicator(comm)
+        with warnings.catch_warnings():
+            # Reporting is not computing: no launcher warning for the default
+            warnings.simplefilter("ignore", RuntimeWarning)
+            comm = Communicator(communicator)
         parts.append(f"MPI: ON, rank {comm.rank}/{comm.size}")
     else:
         parts.append("MPI: OFF")
@@ -304,6 +298,10 @@ __all__ = [
     "netcdf_backend",
     "netcdf_version",
     "version_string",
+    "finalize_mpi",
+    "mpi_initialized",
+    "mpi_thread_level",
+    "mpi_library_version",
     "host_arch",
     "device_arch",
     # Runtime checks

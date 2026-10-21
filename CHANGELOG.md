@@ -16,9 +16,17 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
-v1.5.2 (not yet released)
+v1.6.0 (not yet released)
 -------------------------
 
+- API: mpi4py is no longer required: importing muGrid does not import it or start MPI.
+  `Communicator.world()` (and opening a PnetCDF file) starts MPI, thread level serialized;
+  muGrid finalises MPI at exit only if it started it (`MUGRID_MPI_FINALIZE=0` opts out)
+- API: `muGrid.Communicator` is now a class (`CommunicatorWrapper` remains an alias) with
+  `split`, `dup`, `compare`, `node_rank` and `node_size`; `muGrid.MPI` is gone
+- ENH: An mpi4py communicator is still accepted; passing one from an mpi4py built against
+  another MPI library than muGrid's now raises instead of failing obscurely
+- BUG: `version_string` accepts an mpi4py communicator again
 - BUG: GPU-aware MPI is detected with any MPI library that can report it, including
   MPICH and its derivatives, not only Open MPI; others still stage through the host
 - BUG: On unified-memory APUs, plain device memory is staged through the host for a

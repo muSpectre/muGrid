@@ -34,19 +34,14 @@ covered by the terms of those libraries' licenses, the licensors of this
 Program grant you additional permission to convey the resulting work.
 """
 
-import unittest
-
-import muGrid
-
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
 import os
 import time
+import unittest
 
 import numpy as np
 import pytest
+
+import muGrid
 
 # Check if muGrid was built with NetCDF support
 HAS_MUGRID_NETCDF = hasattr(muGrid, 'OpenMode')
@@ -65,8 +60,8 @@ class FileIOTest(unittest.TestCase):
         self.file_f_name = "python_binding_io_field-tests.nc"
         self.file_sf_name = "python_binding_io_state-field-tests.nc"
         self.file_ga_name = "python_binding_io_global-attributes-tests.nc"
-        if MPI:
-            self.comm = MPI.COMM_WORLD
+        if muGrid.has_mpi:
+            self.comm = muGrid.Communicator.world()
         else:
             self.comm = muGrid.Communicator()
 

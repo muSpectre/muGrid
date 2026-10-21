@@ -31,7 +31,8 @@ test = [
     "pytest",
     "pytest-cov",
     "NuMPI[test]>=0.7.3",
-    "netCDF4"
+    "netCDF4",
+    "mpi4py"  # not needed at runtime; the interop tests need it
 ]
 
 [project.urls]

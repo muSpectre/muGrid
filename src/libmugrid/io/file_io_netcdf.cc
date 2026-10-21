@@ -43,6 +43,7 @@
 #include "io/type_descriptor_netcdf.hh"
 
 #include "io/file_io_netcdf.hh"
+#include "mpi/mpi_environment.hh"
 
 #include <algorithm>
 #include <cstdint>
@@ -196,6 +197,12 @@ namespace muGrid {
   /* ---------------------------------------------------------------------- */
   FileIONetCDF::~FileIONetCDF() {
     if (this->netcdf_id != -1) {
+      // A parallel file is closed through MPI; once MPI has been finalised
+      // (at interpreter exit, say, where objects outlive the atexit hooks)
+      // that would abort, so the handle is left to the OS instead.
+      if (mpi_finalized()) {
+        return;
+      }
       // close() can throw FileIOError on NetCDF failures; a throwing
       // destructor would call std::terminate during stack unwinding, so
       // swallow the exception here (the file is being torn down anyway).
@@ -438,6 +445,18 @@ namespace muGrid {
     int err{};
 #ifdef WITH_MPI
     MPI_Info info{MPI_INFO_NULL};
+    // PnetCDF needs MPI running even for a file of one rank, and a real
+    // communicator: a serial muGrid communicator (MPI not started, or
+    // Communicator() made before it was) is MPI_COMM_NULL, so start MPI --
+    // this is one of the two things in muGrid that do, with
+    // Communicator::world() -- and use MPI_COMM_SELF for the file. The
+    // member communicator stays as it is: its collectives are no-ops on
+    // MPI_COMM_NULL, which is what a serial file wants.
+    MPI_Comm io_comm{this->comm.get_mpi_comm()};
+    if (io_comm == MPI_COMM_NULL) {
+      ensure_mpi_initialized();
+      io_comm = MPI_COMM_SELF;
+    }
 #endif  // WITH_MPI
 
     if (this->open_mode == FileIOBase::OpenMode::Write ||
@@ -451,8 +470,8 @@ namespace muGrid {
         cmode |= NC_NOCLOBBER;
       }
 #ifdef WITH_MPI
-      err = ncmu_create(this->comm.get_mpi_comm(), (this->file_name).c_str(),
-                        cmode, info, &this->netcdf_id);
+      err = ncmu_create(io_comm, (this->file_name).c_str(), cmode, info,
+                        &this->netcdf_id);
 #else   // WITH_MPI
       err = ncmu_create((this->file_name).c_str(), cmode, &this->netcdf_id);
 #endif  // WITH_MPI
@@ -502,8 +521,8 @@ namespace muGrid {
         omode = NC_NOWRITE;
       }
 #ifdef WITH_MPI
-      err = ncmu_open(this->comm.get_mpi_comm(), (this->file_name).c_str(),
-                      omode, info, &this->netcdf_id);
+      err = ncmu_open(io_comm, (this->file_name).c_str(), omode, info,
+                      &this->netcdf_id);
 #else   // WITH_MPI
       err = ncmu_open((this->file_name).c_str(), omode, &this->netcdf_id);
 #endif  // WITH_MPI

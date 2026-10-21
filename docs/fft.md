@@ -347,10 +347,9 @@ grid.
 ### Basic parallel usage
 
 ```python
-from mpi4py import MPI
 import muGrid
 
-comm = muGrid.Communicator(MPI.COMM_WORLD)
+comm = muGrid.Communicator.world()
 engine = muGrid.FFTEngine([128, 128, 128], comm)
 
 print(f"Rank {comm.rank}: local {engine.nb_subdomain_grid_pts}, "
@@ -373,10 +372,9 @@ operators (see [Linear algebra](linalg.md#preconditioners)). Fourier-space
 fields have no ghosts.
 
 ```python
-from mpi4py import MPI
 import muGrid
 
-comm = muGrid.Communicator(MPI.COMM_WORLD)
+comm = muGrid.Communicator.world()
 laplace = muGrid.LaplaceOperator(3)
 
 engine = muGrid.FFTEngine([64, 64, 64], comm, ghosts=laplace)
