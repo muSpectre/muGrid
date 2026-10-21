@@ -257,6 +257,93 @@ namespace muGrid {
     }
   }
 
+  // ----------------------------------------------------------------------
+  // Buffer exchanges on host memory; the device paths share the code and
+  // are exercised by the GPU tests
+  BOOST_AUTO_TEST_CASE(buffer_allreduce_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<Real> send{Real(rank), Real(-rank), 1.};
+    std::vector<Real> recv(send.size());
+    comm.allreduce(send.data(), recv.data(), 3, TypeDescriptor::Real,
+                   ReduceOp::Sum, BufferLocation::Host);
+    BOOST_CHECK_EQUAL(recv[0], nb_ranks * (nb_ranks - 1) / 2);
+    BOOST_CHECK_EQUAL(recv[1], -nb_ranks * (nb_ranks - 1) / 2);
+    BOOST_CHECK_EQUAL(recv[2], nb_ranks);
+    comm.allreduce(send.data(), recv.data(), 3, TypeDescriptor::Real,
+                   ReduceOp::Max, BufferLocation::Host);
+    BOOST_CHECK_EQUAL(recv[0], nb_ranks - 1);
+    BOOST_CHECK_EQUAL(recv[1], 0);
+    comm.allreduce(send.data(), recv.data(), 3, TypeDescriptor::Real,
+                   ReduceOp::Min, BufferLocation::Host);
+    BOOST_CHECK_EQUAL(recv[0], 0);
+    BOOST_CHECK_EQUAL(recv[1], -(nb_ranks - 1));
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_allgather_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<Complex> send{Complex(rank, 1), Complex(0, rank)};
+    std::vector<Complex> recv(2 * nb_ranks);
+    comm.allgather(send.data(), recv.data(), 2, TypeDescriptor::Complex,
+                   BufferLocation::Host);
+    for (int p{0}; p < nb_ranks; ++p) {
+      BOOST_CHECK_EQUAL(recv[2 * p], Complex(p, 1));
+      BOOST_CHECK_EQUAL(recv[2 * p + 1], Complex(0, p));
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_sendrecv_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    const int up{(rank + 1) % nb_ranks};
+    const int down{(rank - 1 + nb_ranks) % nb_ranks};
+    std::vector<Int> send{rank, 10 * rank};
+    std::vector<Int> recv(2, -1);
+    comm.sendrecv(send.data(), 2, up, recv.data(), 2, down,
+                  TypeDescriptor::Int, BufferLocation::Host, 7);
+    BOOST_CHECK_EQUAL(recv[0], down);
+    BOOST_CHECK_EQUAL(recv[1], 10 * down);
+  }
+
+  // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_alltoallv_test) {
+    // Rank p sends p + q + 1 values to rank q, each p * 100 + q
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<int> send_counts(nb_ranks), send_displs(nb_ranks);
+    std::vector<int> recv_counts(nb_ranks), recv_displs(nb_ranks);
+    int send_total{0}, recv_total{0};
+    for (int q{0}; q < nb_ranks; ++q) {
+      send_counts[q] = rank + q + 1;
+      send_displs[q] = send_total;
+      send_total += send_counts[q];
+      recv_counts[q] = q + rank + 1;
+      recv_displs[q] = recv_total;
+      recv_total += recv_counts[q];
+    }
+    std::vector<Real32> send(send_total), recv(recv_total, -1);
+    for (int q{0}; q < nb_ranks; ++q) {
+      for (int i{0}; i < send_counts[q]; ++i) {
+        send[send_displs[q] + i] = Real32(rank * 100 + q);
+      }
+    }
+    comm.alltoallv(send.data(), send_counts, send_displs, recv.data(),
+                   recv_counts, recv_displs, TypeDescriptor::Real32,
+                   BufferLocation::Host);
+    for (int q{0}; q < nb_ranks; ++q) {
+      for (int i{0}; i < recv_counts[q]; ++i) {
+        BOOST_CHECK_EQUAL(recv[recv_displs[q] + i], Real32(q * 100 + rank));
+      }
+    }
+  }
+
   BOOST_AUTO_TEST_SUITE_END();
 
 }  // namespace muGrid

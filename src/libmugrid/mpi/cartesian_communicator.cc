@@ -17,7 +17,6 @@
 #include "memory/device.hh"
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
-#include "mpi/gpu_aware_mpi.hh"
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
 #include "mpi/ghost_accumulate_gpu.hh"
 #endif
@@ -366,8 +365,8 @@ namespace muGrid {
     void CartesianCommunicator::sendrecv_staged(
         Index_t block_stride, Index_t nb_send_blocks, Index_t send_block_len,
         Index_t nb_recv_blocks, Index_t recv_block_len, void * send_addr,
-        void * recv_addr, Index_t elem_size_in_bytes,
-        MPI_Datatype mpi_datatype, int dest_rank, int src_rank) const {
+        void * recv_addr, Index_t elem_size_in_bytes, TypeDescriptor type_desc,
+        int dest_rank, int src_rank) const {
         auto send_row_bytes{static_cast<std::size_t>(send_block_len) *
                             elem_size_in_bytes};
         auto recv_row_bytes{static_cast<std::size_t>(recv_block_len) *
@@ -388,54 +387,14 @@ namespace muGrid {
                                   nb_send_blocks, send_row_bytes, pitch_bytes,
                                   true);
         }
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        // Device-to-device 2D copies are asynchronous with respect to the
-        // host; MPI must not read the staging buffer before the gather has
-        // completed.
-        GPU_STREAM_SYNCHRONIZE_DEFAULT();
-#endif
-        // Without GPU-aware MPI, bounce the contiguous staging buffers
-        // through host memory (correct with any MPI library). Staging
-        // buffers the host can dereference (managed memory on a unified-
-        // memory device) go to any MPI directly and need no bounce.
-        const bool bounce{!mpi_is_gpu_aware() &&
-                          !(host_can_read_device_pointer(send_staging) &&
-                            host_can_read_device_pointer(recv_staging))};
-        char * send_buffer{send_staging};
-        char * recv_buffer{recv_staging};
-        if (bounce) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-            auto & host_send{this->host_staging[0]};
-            auto & host_recv{this->host_staging[1]};
-            if (host_send.size() < send_bytes) {
-                host_send.resize(send_bytes);
-            }
-            if (host_recv.size() < recv_bytes) {
-                host_recv.resize(recv_bytes);
-            }
-            if (send_bytes > 0) {
-                GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
-            }
-            send_buffer = host_send.data();
-            recv_buffer = host_recv.data();
-#endif
-        }
-        MPI_Status status;
         // Compute the flat message sizes in Index_t and narrow with a range
-        // check: an int * int product would overflow for halo faces of more
-        // than 2^31 elements.
-        const int send_count{checked_mpi_int(nb_send_blocks * send_block_len,
-                                             "staged send message size")};
-        const int recv_count{checked_mpi_int(nb_recv_blocks * recv_block_len,
-                                             "staged recv message size")};
-        MPI_Sendrecv(send_buffer, send_count, mpi_datatype, dest_rank, 0,
-                     recv_buffer, recv_count, mpi_datatype, src_rank, 0,
-                     this->comm, &status);
-        if (bounce && recv_bytes > 0) {
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-            GPU_MEMCPY_H2D(recv_staging, recv_buffer, recv_bytes);
-#endif
-        }
+        // check (inside sendrecv): an int * int product would overflow for
+        // halo faces of more than 2^31 elements. sendrecv waits for the
+        // gather and stages through the host if MPI cannot read the
+        // staging buffers.
+        this->sendrecv(send_staging, nb_send_blocks * send_block_len,
+                       dest_rank, recv_staging, nb_recv_blocks * recv_block_len,
+                       src_rank, type_desc, BufferLocation::Device);
         if (recv_bytes > 0) {
             // Scatter the contiguous receive buffer into the strided halo.
             // This runs on the default stream, so subsequent kernels and the
@@ -521,7 +480,7 @@ namespace muGrid {
             // buffers, communicate flat, unpack.
             this->sendrecv_staged(block_stride, nb_send_blocks, send_block_len,
                                   nb_recv_blocks, recv_block_len, send_addr,
-                                  recv_addr, elem_size_in_bytes, mpi_datatype,
+                                  recv_addr, elem_size_in_bytes, type_desc,
                                   this->right_ranks[direction],
                                   this->left_ranks[direction]);
             return;
@@ -575,7 +534,7 @@ namespace muGrid {
             // sendrecv_right).
             this->sendrecv_staged(block_stride, nb_send_blocks, send_block_len,
                                   nb_recv_blocks, recv_block_len, send_addr,
-                                  recv_addr, elem_size_in_bytes, mpi_datatype,
+                                  recv_addr, elem_size_in_bytes, type_desc,
                                   this->left_ranks[direction],
                                   this->right_ranks[direction]);
             return;
@@ -657,44 +616,23 @@ namespace muGrid {
                                       nb_send_blocks, send_row_bytes,
                                       pitch_bytes, true);
             }
-            GPU_STREAM_SYNCHRONIZE_DEFAULT();
-
-            // GPU-aware MPI receives straight into device staging and the
-            // accumulate kernel reads it there: no host transfer at all.
-            // Otherwise both sides bounce through host memory.
-            const bool gpu_aware{mpi_is_gpu_aware()};
-            char * send_buffer{send_staging};
-            char * recv_buffer_ptr{nullptr};
-            std::vector<char> host_recv{};
-            if (gpu_aware) {
-                recv_buffer_ptr =
-                    recv_bytes > 0 ? this->get_device_staging(1, recv_bytes)
-                                   : nullptr;
-            } else {
-                auto & host_send{this->host_staging[0]};
-                if (host_send.size() < send_bytes) {
-                    host_send.resize(send_bytes);
-                }
-                if (send_bytes > 0) {
-                    GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
-                }
-                send_buffer = host_send.data();
-                host_recv.resize(recv_bytes);
-                recv_buffer_ptr = host_recv.data();
-            }
-            MPI_Sendrecv(send_buffer, send_count, mpi_datatype,
-                         this->right_ranks[direction], 0, recv_buffer_ptr,
-                         recv_count, mpi_datatype,
-                         this->left_ranks[direction], 0, this->comm, &status);
-            // Scatter-accumulate the contiguous receive buffer into the
-            // strided destination; src is device memory (gpu-aware) or the
-            // host bounce buffer.
-            accumulate_blocks(dst_base, recv_buffer_ptr,
+            // Exchange flat (sendrecv waits for the pack, and stages
+            // through the host if MPI cannot read device memory), then
+            // scatter-accumulate the contiguous receive buffer, on the
+            // device either way, into the strided destination.
+            char * recv_staging{
+                recv_bytes > 0 ? this->get_device_staging(1, recv_bytes)
+                               : nullptr};
+            this->sendrecv(send_staging, send_count,
+                           this->right_ranks[direction], recv_staging,
+                           recv_count, this->left_ranks[direction], type_desc,
+                           BufferLocation::Device);
+            accumulate_blocks(dst_base, recv_staging,
                               static_cast<size_t>(nb_recv_blocks),
                               static_cast<size_t>(recv_block_len),
                               static_cast<size_t>(block_stride),
                               static_cast<size_t>(recv_block_len), type_desc,
-                              true, gpu_aware);
+                              true, true);
 #endif
         } else {
             // Host: derived-datatype send into a contiguous host receive
@@ -778,44 +716,23 @@ namespace muGrid {
                                       nb_send_blocks, send_row_bytes,
                                       pitch_bytes, true);
             }
-            GPU_STREAM_SYNCHRONIZE_DEFAULT();
-
-            // GPU-aware MPI receives straight into device staging and the
-            // accumulate kernel reads it there: no host transfer at all.
-            // Otherwise both sides bounce through host memory.
-            const bool gpu_aware{mpi_is_gpu_aware()};
-            char * send_buffer{send_staging};
-            char * recv_buffer_ptr{nullptr};
-            std::vector<char> host_recv{};
-            if (gpu_aware) {
-                recv_buffer_ptr =
-                    recv_bytes > 0 ? this->get_device_staging(1, recv_bytes)
-                                   : nullptr;
-            } else {
-                auto & host_send{this->host_staging[0]};
-                if (host_send.size() < send_bytes) {
-                    host_send.resize(send_bytes);
-                }
-                if (send_bytes > 0) {
-                    GPU_MEMCPY_D2H(host_send.data(), send_staging, send_bytes);
-                }
-                send_buffer = host_send.data();
-                host_recv.resize(recv_bytes);
-                recv_buffer_ptr = host_recv.data();
-            }
-            MPI_Sendrecv(send_buffer, send_count, mpi_datatype,
-                         this->left_ranks[direction], 0, recv_buffer_ptr,
-                         recv_count, mpi_datatype,
-                         this->right_ranks[direction], 0, this->comm, &status);
-            // Scatter-accumulate the contiguous receive buffer into the
-            // strided destination; src is device memory (gpu-aware) or the
-            // host bounce buffer.
-            accumulate_blocks(dst_base, recv_buffer_ptr,
+            // Exchange flat (sendrecv waits for the pack, and stages
+            // through the host if MPI cannot read device memory), then
+            // scatter-accumulate the contiguous receive buffer, on the
+            // device either way, into the strided destination.
+            char * recv_staging{
+                recv_bytes > 0 ? this->get_device_staging(1, recv_bytes)
+                               : nullptr};
+            this->sendrecv(send_staging, send_count,
+                           this->left_ranks[direction], recv_staging,
+                           recv_count, this->right_ranks[direction], type_desc,
+                           BufferLocation::Device);
+            accumulate_blocks(dst_base, recv_staging,
                               static_cast<size_t>(nb_recv_blocks),
                               static_cast<size_t>(recv_block_len),
                               static_cast<size_t>(block_stride),
                               static_cast<size_t>(recv_block_len), type_desc,
-                              true, gpu_aware);
+                              true, true);
 #endif
         } else {
             // Host: derived-datatype send into a contiguous host receive

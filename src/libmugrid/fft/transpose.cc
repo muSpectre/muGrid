@@ -40,7 +40,6 @@
 #include "memory/device_alloc.hh"
 #include "memory/gpu_runtime.hh"
 #include "memory/device.hh"
-#include "mpi/gpu_aware_mpi.hh"
 #include "mpi/mpi_counts.hh"
 
 #include <algorithm>
@@ -80,6 +79,8 @@ namespace muGrid {
           axis_out{axis_out}, nb_components{nb_components}, layout{layout},
           elem_size{single_precision ? sizeof(std::complex<float>)
                                      : sizeof(std::complex<double>)},
+          elem_type{single_precision ? TypeDescriptor::Complex32
+                                     : TypeDescriptor::Complex},
           on_device{on_device} {
         if (local_in.get_dim() != local_out.get_dim()) {
             throw RuntimeError(
@@ -563,30 +564,6 @@ namespace muGrid {
             recv_staging = hr.data();
         }
 
-        // Without GPU-aware MPI, the flat exchange below operates on host
-        // bounce buffers instead of the device staging (correct with any
-        // MPI library); the pack/unpack stays on the device either way. The
-        // host path never bounces (the staging is already host memory), and
-        // neither does device staging the host can dereference (managed
-        // memory on a unified-memory device), which any MPI can read.
-        const bool bounce{dev && !mpi_is_gpu_aware() &&
-                          !(host_can_read_device_pointer(send_staging) &&
-                            host_can_read_device_pointer(recv_staging))};
-        char * send_buffer{send_staging};
-        char * recv_buffer{recv_staging};
-        if (bounce) {
-            auto & host_send{this->host_staging[0]};
-            auto & host_recv{this->host_staging[1]};
-            if (host_send.size() < send_total * this->elem_size) {
-                host_send.resize(send_total * this->elem_size);
-            }
-            if (host_recv.size() < recv_total * this->elem_size) {
-                host_recv.resize(recv_total * this->elem_size);
-            }
-            send_buffer = host_send.data();
-            recv_buffer = host_recv.data();
-        }
-
         // Pack: gather each peer's block into the contiguous send buffer
         for (int r{0}; r < comm_size; ++r) {
             if (src_counts[r] == 0) {
@@ -620,99 +597,16 @@ namespace muGrid {
                 }
             }
         }
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        // Device-to-device 2D copies are asynchronous with respect to the
-        // host; MPI must not read the staging buffer before the gather is
-        // complete. (Host pack via memcpy is already synchronous.)
-        if (dev) {
-            GPU_STREAM_SYNCHRONIZE_DEFAULT();
-            if (bounce && send_total > 0) {
-                GPU_MEMCPY_D2H(send_buffer, send_staging,
-                               send_total * this->elem_size);
-            }
-        }
-#endif
-        // Non-blocking all-to-all instead of MPI_Alltoallv: collective
-        // components are not reliably GPU-aware, while point-to-point on
-        // contiguous device buffers is the well-trodden CUDA/ROCm-aware path.
-        // Posting every peer's receive and send up front and waiting once
-        // lets the per-peer transfers overlap, whereas a blocking pairwise
-        // ring (one Sendrecv per step) would serialise them. The self block
-        // never enters MPI: it is copied locally. Each peer reads and
-        // writes a disjoint slice of the contiguous staging buffers, so the
-        // outstanding requests do not alias.
-        {
-            MPI_Comm mpi_comm{this->comm.get_mpi_comm()};
-            int my_rank{this->comm.rank()};
+        // Exchange the blocks between the staging buffers. The
+        // communicator waits for the device pack, keeps the self block
+        // local, and stages through the host if MPI cannot read device
+        // memory.
+        this->comm.alltoallv(send_staging, send_counts_el, send_displs_el,
+                             recv_staging, recv_counts_el, recv_displs_el,
+                             this->elem_type,
+                             dev ? BufferLocation::Device
+                                 : BufferLocation::Host);
 
-            // The self block never enters MPI (and never leaves the device in
-            // the device case).
-            auto self_bytes{static_cast<std::size_t>(send_counts_el[my_rank]) *
-                            this->elem_size};
-            if (self_bytes > 0) {
-                copy2d(recv_staging +
-                           static_cast<std::size_t>(recv_displs_el[my_rank]) *
-                               this->elem_size,
-                       send_staging +
-                           static_cast<std::size_t>(send_displs_el[my_rank]) *
-                               this->elem_size,
-                       self_bytes, 1, self_bytes, self_bytes);
-            }
-
-            std::vector<MPI_Request> requests;
-            requests.reserve(2 * static_cast<std::size_t>(comm_size));
-            for (int peer{0}; peer < comm_size; ++peer) {
-                if (peer == my_rank) {
-                    continue;
-                }
-                if (recv_counts_el[peer] > 0) {
-                    requests.emplace_back();
-                    MPI_Irecv(recv_buffer +
-                                  static_cast<std::size_t>(
-                                      recv_displs_el[peer]) *
-                                      this->elem_size,
-                              recv_counts_el[peer], this->elem_mpi_type, peer,
-                              0, mpi_comm, &requests.back());
-                }
-                if (send_counts_el[peer] > 0) {
-                    requests.emplace_back();
-                    MPI_Isend(send_buffer +
-                                  static_cast<std::size_t>(
-                                      send_displs_el[peer]) *
-                                      this->elem_size,
-                              send_counts_el[peer], this->elem_mpi_type, peer,
-                              0, mpi_comm, &requests.back());
-                }
-            }
-            if (!requests.empty()) {
-                MPI_Waitall(static_cast<int>(requests.size()),
-                            requests.data(), MPI_STATUSES_IGNORE);
-            }
-        }
-
-#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
-        if (dev && bounce && recv_total > 0) {
-            // The self block (still on the device) occupies its slice of
-            // recv_staging; copying the bounced host data must not clobber
-            // it, so copy the two surrounding extents.
-            auto self_begin{static_cast<std::size_t>(
-                                recv_displs_el[this->comm.rank()]) *
-                            this->elem_size};
-            auto self_end{self_begin +
-                          static_cast<std::size_t>(
-                              recv_counts_el[this->comm.rank()]) *
-                              this->elem_size};
-            if (self_begin > 0) {
-                GPU_MEMCPY_H2D(recv_staging, recv_buffer, self_begin);
-            }
-            auto total_bytes{recv_total * this->elem_size};
-            if (self_end < total_bytes) {
-                GPU_MEMCPY_H2D(recv_staging + self_end,
-                               recv_buffer + self_end,
-                               total_bytes - self_end);
-            }
-        }
-#endif
         // Unpack: scatter each peer's block from the contiguous receive
         // buffer into the output field. Runs on the default stream, so
         // subsequent kernels are ordered after it.

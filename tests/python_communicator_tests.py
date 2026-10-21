@@ -338,3 +338,35 @@ def test_sendrecv_around_a_ring():
         assert type(from_down) is type(local)
         np.testing.assert_array_equal(_on_host(from_down),
                                       _rank_array(np, down))
+
+
+def test_exchanges_on_the_bare_cpp_communicator():
+    # The array exchanges are the C++ communicator's own: no wrapper, and so
+    # no mpi4py communicator, needed.
+    from muGrid import _muGrid
+
+    comm = _make_comm()
+    cpp = (_muGrid.Communicator(comm.mpi_comm) if muGrid.has_mpi
+           else _muGrid.Communicator())
+    for xp in _array_modules():
+        x = xp.asarray([1.0, -2.0]) * (comm.rank + 1)
+        total = cpp.allreduce(x, "sum")
+        assert type(total) is type(x)
+        n = comm.size * (comm.size + 1) / 2
+        np.testing.assert_array_equal(_on_host(total), [n, -2 * n])
+        np.testing.assert_array_equal(
+            _on_host(cpp.allreduce(x, "max")), [comm.size, -2.0])
+        np.testing.assert_array_equal(
+            _on_host(cpp.allreduce(x, "min")), [1.0, -2.0 * comm.size])
+        scalar = cpp.allreduce(xp.asarray(3.0), "sum")
+        assert scalar.shape == ()
+        assert float(scalar) == 3.0 * comm.size
+        assert cpp.allgather(x).shape == (comm.size, 2)
+
+
+def test_exchanges_reject_unsupported_dtypes():
+    comm = _make_comm()
+    with pytest.raises(TypeError, match="dtype"):
+        comm.allgather(np.zeros(2, dtype=np.int16))
+    with pytest.raises(ValueError, match="op"):
+        comm.allreduce(np.zeros(2), "prod")

@@ -36,9 +36,11 @@
 #ifndef SRC_LIBMUGRID_COMMUNICATOR_HH_
 #define SRC_LIBMUGRID_COMMUNICATOR_HH_
 
+#include <array>
 #include <cassert>
 #include <limits>
 #include <type_traits>
+#include <vector>
 
 #ifdef WITH_MPI
 #include <mpi.h>
@@ -48,11 +50,19 @@
 
 #include "core/types.hh"
 #include "core/exception.hh"
+#include "core/type_descriptor.hh"
 
 namespace muGrid {
 
     template <typename T>
     using DynMatrix_t = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+    //! Where the buffers handed to the buffer exchanges of Communicator
+    //! (allreduce, allgather, sendrecv, alltoallv) live
+    enum class BufferLocation { Host, Device };
+
+    //! Elementwise reduction of Communicator::allreduce
+    enum class ReduceOp { Sum, Max, Min };
 
 #ifdef WITH_MPI
 
@@ -445,6 +455,48 @@ namespace muGrid {
             }
         }
 
+        /**
+         * @name Buffer exchanges on host or device memory
+         *
+         * Contiguous buffers of `type`, counted in elements; send and
+         * receive buffers must not overlap. Device buffers go to MPI as they
+         * are when it is GPU-aware (mpi_is_gpu_aware()) or when the host can
+         * read them (host_can_read_device_pointer()), and are staged through
+         * host memory otherwise, so callers work with any MPI library
+         * without asking which one it is. Device buffers are read once the
+         * default stream has drained; work the caller queued on other
+         * streams must be complete. The receive buffer is ready on return.
+         * Collective where MPI's counterpart is.
+         */
+        //!@{
+        //! `recv` = `op` over all ranks of `send`, elementwise, on every rank
+        void allreduce(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, ReduceOp op,
+                       BufferLocation location) const;
+
+        //! `recv` (size() * `count` elements) = every rank's `send`, in
+        //! rank order, on every rank
+        void allgather(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, BufferLocation location) const;
+
+        //! Send `send` to rank `dest` and receive `recv` from rank `source`
+        void sendrecv(const void * send, Index_t send_count, int dest,
+                      void * recv, Index_t recv_count, int source,
+                      TypeDescriptor type, BufferLocation location,
+                      int tag = 0) const;
+
+        //! All-to-all with per-rank element counts and displacements, as
+        //! MPI_Alltoallv. Implemented with non-blocking point-to-point
+        //! messages, which GPU-aware MPI libraries support more reliably
+        //! than their collectives; this rank's own block is copied locally
+        //! and never enters MPI.
+        void alltoallv(const void * send, const std::vector<int> & send_counts,
+                       const std::vector<int> & send_displs, void * recv,
+                       const std::vector<int> & recv_counts,
+                       const std::vector<int> & recv_displs,
+                       TypeDescriptor type, BufferLocation location) const;
+        //!@}
+
         //! get the underlying MPI communicator
         MPI_Comm get_mpi_comm() const { return this->comm; }
 
@@ -453,6 +505,11 @@ namespace muGrid {
 
        protected:
         MPI_Comm comm;
+
+        //! Host buffers (send, recv) through which the buffer exchanges
+        //! stage device memory for an MPI that cannot read it; grown on
+        //! demand, per instance and not copied
+        mutable std::array<std::vector<char>, 2> host_staging{};
     };
 
 #else  // WITH_MPI
@@ -526,6 +583,25 @@ namespace muGrid {
 
         //! return logical or
         bool any(const bool & arg) const { return arg; }
+
+        //! @name Buffer exchanges; with one rank, copies of `send` (see the
+        //! parallel implementation)
+        //!@{
+        void allreduce(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, ReduceOp op,
+                       BufferLocation location) const;
+        void allgather(const void * send, void * recv, Index_t count,
+                       TypeDescriptor type, BufferLocation location) const;
+        void sendrecv(const void * send, Index_t send_count, int dest,
+                      void * recv, Index_t recv_count, int source,
+                      TypeDescriptor type, BufferLocation location,
+                      int tag = 0) const;
+        void alltoallv(const void * send, const std::vector<int> & send_counts,
+                       const std::vector<int> & send_displs, void * recv,
+                       const std::vector<int> & recv_counts,
+                       const std::vector<int> & recv_displs,
+                       TypeDescriptor type, BufferLocation location) const;
+        //!@}
 
         //! find whether the underlying communicator is mpi
         static bool has_mpi() { return false; }
