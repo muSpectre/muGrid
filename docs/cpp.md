@@ -187,7 +187,7 @@ in sync.
 - `muGrid::Communicator` — wrapper over an MPI communicator for collective and
   point-to-point operations; without `WITH_MPI` it compiles to a serial
   implementation with the same interface. Its buffer exchanges (`allreduce`,
-  `allgather`, `sendrecv`, `alltoallv`) take host or device buffers and decide
+  `iallreduce`, `allgather`, `allgatherv`, `sendrecv`, `alltoallv`) take host or device buffers and decide
   whether MPI gets device buffers directly or through the host (see
   [GPU-aware MPI](gpu.md)).
 

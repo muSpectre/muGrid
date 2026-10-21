@@ -293,51 +293,24 @@ class CommunicatorWrapper:
 
         return self._cpp.cumulative_sum(arg)
 
-    def allgatherv(self, arg):
-        """
-        Gather 2-D arrays whose number of columns differs between ranks.
-
-        Every rank receives all ranks' arrays concatenated along the second
-        axis (columns), in rank order: rank sizes ``(m, n_p)`` give
-        ``(m, sum_p n_p)``. Every rank must have the same number of rows, or
-        none; a 1-D array counts as one column, so reshape it to ``(1, -1)``
-        to concatenate values. For arrays of one shape on every rank, which
-        are stacked along a new leading axis and may live on the device, use
-        :meth:`allgather`.
-
-        Parameters
-        ----------
-        arg : array
-            Local array (host; a CuPy array is copied to the host)
-
-        Returns
-        -------
-        numpy.ndarray
-            The concatenated array, on every rank
-        """
-        if self._is_gpu(arg):
-            import warnings
-
-            warnings.warn(
-                "allgatherv works on host arrays; copying the CuPy array to "
-                "the host",
-                RuntimeWarning,
-            )
-            arg = arg.get()
-
-        return self._cpp.allgatherv(arg)
-
     def gather(self, arg):
-        """Former name of :meth:`allgatherv` (every rank receives the
-        result)."""
+        """Former name of ``allgatherv``, with its former semantics: 2-D
+        arrays concatenated along their columns (a 1-D array counts as one
+        column), on every rank. Use ``allgatherv(arg, axis=...)``."""
         import warnings
 
         warnings.warn(
-            "Communicator.gather is now allgatherv; gather will be removed",
+            "Communicator.gather is deprecated; use allgatherv(a, axis=...), "
+            "which concatenates along any axis",
             DeprecationWarning,
             stacklevel=2,
         )
-        return self.allgatherv(arg)
+        if self._is_gpu(arg):
+            arg = arg.get()
+        arg = np.asarray(arg)
+        if arg.ndim == 1:
+            arg = arg.reshape(-1, 1)
+        return self._cpp.allgatherv(arg, axis=1)
 
     def bcast(self, scalar_arg, root):
         """

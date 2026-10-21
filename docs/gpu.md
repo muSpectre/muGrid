@@ -342,7 +342,8 @@ reports the answer (ask after MPI is initialised, e.g. after importing
 `mpi4py.MPI`).
 
 All of this is decided in one place, the buffer exchanges of
-`muGrid::Communicator` (`allreduce`, `allgather`, `sendrecv`, `alltoallv`),
+`muGrid::Communicator` (`allreduce`, `allgather`, `allgatherv`, `sendrecv`,
+`alltoallv`),
 which the ghost exchange and the FFT transposes are built on. Given device
 buffers, they hand them to MPI directly when it is GPU-aware or when the host
 can read them (managed memory on a unified-memory device), and otherwise bounce
@@ -352,9 +353,10 @@ costs one device-to-host and one host-to-device copy per message. Strided data
 such as ghost layers is packed into contiguous device buffers first.
 
 Python sees the same exchanges on `muGrid.Communicator` (and on
-`_muGrid.Communicator` itself): `allreduce(a, op)`, `allgather(a)` and
-`sendrecv(a, dest, source, tag=0)` take NumPy and CuPy arrays alike and return
-a new array of the same kind, as do the reductions `sum`, `max`, `min` and
+`_muGrid.Communicator` itself): `allreduce(a, op)`, `allgather(a)` (one shape
+on every rank, stacked), `allgatherv(a, axis=0)` (extents along `axis` may
+differ, concatenated) and `sendrecv(a, dest, source, tag=0)` take NumPy and
+CuPy arrays alike and return a new array of the same kind, as do the reductions `sum`, `max`, `min` and
 `reduce_*`. `iallreduce(a, op)` (and the wrapper's `isum`) starts the
 reduction and returns a request whose `wait()` gives the result; it stages
 device arrays through the host even with GPU-aware MPI, since non-blocking

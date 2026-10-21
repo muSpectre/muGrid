@@ -531,6 +531,15 @@ namespace muGrid {
         void allgather(const void * send, void * recv, Index_t count,
                        TypeDescriptor type, BufferLocation location) const;
 
+        //! All-gather of blocks whose size differs between ranks, as
+        //! MPI_Allgatherv: rank p's `send_count` elements land at
+        //! `recv_displs[p]` of `recv` on every rank. `recv_counts[p]` must be
+        //! rank p's `send_count`; recv between the blocks is left alone.
+        void allgatherv(const void * send, Index_t send_count, void * recv,
+                        const std::vector<int> & recv_counts,
+                        const std::vector<int> & recv_displs,
+                        TypeDescriptor type, BufferLocation location) const;
+
         //! Send `send` to rank `dest` and receive `recv` from rank `source`
         void sendrecv(const void * send, Index_t send_count, int dest,
                       void * recv, Index_t recv_count, int source,
@@ -650,6 +659,10 @@ namespace muGrid {
                                     BufferLocation location) const;
         void allgather(const void * send, void * recv, Index_t count,
                        TypeDescriptor type, BufferLocation location) const;
+        void allgatherv(const void * send, Index_t send_count, void * recv,
+                        const std::vector<int> & recv_counts,
+                        const std::vector<int> & recv_displs,
+                        TypeDescriptor type, BufferLocation location) const;
         void sendrecv(const void * send, Index_t send_count, int dest,
                       void * recv, Index_t recv_count, int source,
                       TypeDescriptor type, BufferLocation location,

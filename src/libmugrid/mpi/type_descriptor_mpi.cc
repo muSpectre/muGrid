@@ -58,7 +58,8 @@ namespace muGrid {
     X(Real, MPI_DOUBLE)              \
     X(Complex, MPI_C_DOUBLE_COMPLEX) \
     X(Real32, MPI_FLOAT)             \
-    X(Complex32, MPI_C_FLOAT_COMPLEX)
+    X(Complex32, MPI_C_FLOAT_COMPLEX) \
+    X(Uint8, MPI_UINT8_T)
 
 MPI_Datatype descriptor_to_mpi_type(TypeDescriptor td) {
     switch (td) {

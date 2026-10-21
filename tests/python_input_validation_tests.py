@@ -97,21 +97,21 @@ def test_transpose_rejects_weights_of_the_wrong_length(make_op):
             op.transpose(quad, nodal, wrong)
 
 
-# --- M2: allgatherv rejects uneven rows on every rank ---
+# --- M2: allgatherv rejects mismatched shapes on every rank ---
 
 
-def test_allgatherv_rejects_uneven_rows_collectively(comm):
-    """Ranks with different row counts used to be accepted in release
-    builds (the check was an assert) and the result was scrambled."""
+def test_allgatherv_rejects_mismatched_shapes_collectively(comm):
+    """Arrays may differ only along the gathered axis, and every rank must
+    raise together (a rank-local error would leave the others blocked)."""
     if comm.size == 1:
         pytest.skip("needs several ranks")
-    rows = 2 if comm.rank == 0 else 3
-    with pytest.raises(RuntimeError, match="same number of rows"):
-        comm.allgatherv(np.ones((rows, 2), order="F"))
-    # empty ranks are allowed
-    rows = 0 if comm.rank == 0 else 3
-    result = comm.allgatherv(np.ones((rows, 2), order="F"))
-    assert result.shape == (3, 2 * (comm.size - 1))
+    cols = 2 if comm.rank == 0 else 3
+    with pytest.raises(ValueError, match="only along the gathered axis"):
+        comm.allgatherv(np.ones((2, cols)))
+    # ranks without elements are left out, whatever their shape
+    local = np.zeros(0) if comm.rank == 0 else np.ones((2, 3))
+    result = comm.allgatherv(local)
+    assert result.shape == (2 * (comm.size - 1), 3)
 
 
 # --- M3: integer min/max with an empty rank ---

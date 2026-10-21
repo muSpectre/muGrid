@@ -77,6 +77,37 @@ namespace muGrid {
             std::memcpy(dst, src, bytes);
         }
 
+        //! Validate the per-rank counts of an allgatherv and return the
+        //! extent of the receive buffer in elements
+        std::size_t allgatherv_extent(Index_t send_count,
+                                      const std::vector<int> & recv_counts,
+                                      const std::vector<int> & recv_displs,
+                                      int nb_ranks, int rank) {
+            const auto n{static_cast<std::size_t>(nb_ranks)};
+            if (recv_counts.size() != n || recv_displs.size() != n) {
+                throw RuntimeError("allgatherv: counts and displacements need "
+                                   "one entry per rank");
+            }
+            if (recv_counts[rank] != send_count) {
+                std::stringstream error{};
+                error << "allgatherv: rank " << rank << " sends " << send_count
+                      << " elements but recv_counts says "
+                      << recv_counts[rank];
+                throw RuntimeError(error.str());
+            }
+            std::size_t extent{0};
+            for (std::size_t r{0}; r < n; ++r) {
+                if (recv_counts[r] < 0 || recv_displs[r] < 0) {
+                    throw RuntimeError("allgatherv: negative count or "
+                                       "displacement");
+                }
+                extent = std::max(extent,
+                                  static_cast<std::size_t>(recv_displs[r]) +
+                                      static_cast<std::size_t>(recv_counts[r]));
+            }
+            return extent;
+        }
+
         //! This rank's own block of an all-to-all: element counts must agree
         void copy_own_block(const void * send,
                             const std::vector<int> & send_counts,
@@ -371,6 +402,42 @@ namespace muGrid {
         buffers.to_device(recv, 0, recv_bytes);
     }
 
+    void Communicator::allgatherv(const void * send, Index_t send_count,
+                                  void * recv,
+                                  const std::vector<int> & recv_counts,
+                                  const std::vector<int> & recv_displs,
+                                  TypeDescriptor type,
+                                  BufferLocation location) const {
+        const int nb_ranks{this->size()};
+        const int my_rank{this->rank()};
+        const auto extent{allgatherv_extent(send_count, recv_counts,
+                                            recv_displs, nb_ranks, my_rank)};
+        const auto elem{type_descriptor_size(type)};
+        const auto send_bytes{nb_bytes(send_count, type)};
+        if (this->comm == MPI_COMM_NULL) {
+            copy_bytes(static_cast<char *>(recv) +
+                           static_cast<std::size_t>(recv_displs[0]) * elem,
+                       send, send_bytes, location);
+            return;
+        }
+        const auto recv_bytes{extent * elem};
+        MPIBuffers buffers{send, send_bytes, recv, recv_bytes, location,
+                           this->host_staging};
+        const auto mpi_type{descriptor_to_mpi_type(type)};
+        check_mpi(MPI_Allgatherv(
+                      buffers.send,
+                      checked_mpi_int(send_count, "allgatherv count"),
+                      mpi_type, buffers.recv, recv_counts.data(),
+                      recv_displs.data(), mpi_type, this->comm),
+                  "MPI_Allgatherv", my_rank);
+        // Block by block, so that recv between the blocks is left alone
+        for (int r{0}; r < nb_ranks; ++r) {
+            buffers.to_device(recv,
+                              static_cast<std::size_t>(recv_displs[r]) * elem,
+                              static_cast<std::size_t>(recv_counts[r]) * elem);
+        }
+    }
+
     void Communicator::sendrecv(const void * send, Index_t send_count,
                                 int dest, void * recv, Index_t recv_count,
                                 int source, TypeDescriptor type,
@@ -506,6 +573,19 @@ namespace muGrid {
                                  Index_t count, TypeDescriptor type,
                                  BufferLocation location) const {
         copy_bytes(recv, send, nb_bytes(count, type), location);
+    }
+
+    void Communicator::allgatherv(const void * send, Index_t send_count,
+                                  void * recv,
+                                  const std::vector<int> & recv_counts,
+                                  const std::vector<int> & recv_displs,
+                                  TypeDescriptor type,
+                                  BufferLocation location) const {
+        allgatherv_extent(send_count, recv_counts, recv_displs, 1, 0);
+        copy_bytes(static_cast<char *>(recv) +
+                       static_cast<std::size_t>(recv_displs[0]) *
+                           type_descriptor_size(type),
+                   send, nb_bytes(send_count, type), location);
     }
 
     void Communicator::sendrecv(const void * send, Index_t send_count, int,

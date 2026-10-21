@@ -39,11 +39,15 @@
 #include "mpi/gpu_aware_mpi.hh"
 
 #include <pybind11/pybind11.h>
-#include <pybind11/eigen.h>
+#include <pybind11/complex.h>
 
 #include <cstdint>
+#include <limits>
 #include <memory>
+#include <optional>
+#include <sstream>
 #include <string>
+#include <vector>
 
 using pybind11::literals::operator""_a;
 using muGrid::Int;
@@ -68,17 +72,22 @@ namespace {
     py::object shape;
     py::object dtype;
     void * data;
-    Index_t count;
+    Index_t count;  //!< in elements of `type`
     TypeDescriptor type;
     BufferLocation location;
   };
+
+  //! What an exchange does with the values: reductions compute with them
+  //! and need an arithmetic MPI type; the other exchanges only move them,
+  //! which works for any fixed-size dtype, sent as its bytes.
+  enum class Use { Arithmetic, Movement };
 
   py::module_ array_module(BufferLocation location) {
     return py::module_::import(location == BufferLocation::Device ? "cupy"
                                                                   : "numpy");
   }
 
-  TypeDescriptor type_of(const std::string & typestr) {
+  std::optional<TypeDescriptor> arithmetic_type(const std::string & typestr) {
     // e.g. "<f8": byte order, kind, item size in bytes
     if (typestr.size() >= 3 && typestr[0] != '>') {
       const std::string kind_size{typestr.substr(1)};
@@ -88,13 +97,12 @@ namespace {
       if (kind_size == "c8") return TypeDescriptor::Complex32;
       if (kind_size == "i4") return TypeDescriptor::Int;
       if (kind_size == "u4") return TypeDescriptor::Uint;
+      if (kind_size == "u1") return TypeDescriptor::Uint8;
       if (kind_size == "i" + std::to_string(sizeof(Index_t))) {
         return TypeDescriptor::Index;
       }
     }
-    throw py::type_error("no MPI exchange for arrays of dtype " + typestr +
-                         "; use float32/64, complex64/128, int32/64 or "
-                         "uint32");
+    return std::nullopt;
   }
 
   py::dict interface_of(const py::object & array, BufferLocation location) {
@@ -108,7 +116,7 @@ namespace {
         interface["data"].cast<py::tuple>()[0].cast<std::uintptr_t>());
   }
 
-  ArrayBuffer buffer_of(const py::object & a) {
+  ArrayBuffer buffer_of(const py::object & a, Use use = Use::Arithmetic) {
     const BufferLocation location{py::hasattr(a, "__cuda_array_interface__")
                                       ? BufferLocation::Device
                                       : BufferLocation::Host};
@@ -120,12 +128,26 @@ namespace {
     for (auto extent : array.attr("shape").cast<py::tuple>()) {
       count *= extent.cast<Index_t>();
     }
-    return ArrayBuffer{contiguous,
-                       array.attr("shape"),
-                       array.attr("dtype"),
-                       data_of(interface),
-                       count,
-                       type_of(interface["typestr"].cast<std::string>()),
+    const auto typestr{interface["typestr"].cast<std::string>()};
+    auto type{arithmetic_type(typestr)};
+    if (!type) {
+      if (use == Use::Arithmetic) {
+        throw py::type_error("no MPI reduction for arrays of dtype " +
+                             typestr +
+                             "; use float32/64, complex64/128, int32/64, "
+                             "uint32 or uint8");
+      }
+      if (array.attr("dtype").attr("hasobject").cast<bool>()) {
+        throw py::type_error("arrays of Python objects cannot be sent over "
+                             "MPI; serialise them to a uint8 array first");
+      }
+      // Moved, not computed with: send the bytes
+      type = TypeDescriptor::Uint8;
+      count *= array.attr("dtype").attr("itemsize").cast<Index_t>();
+    }
+    return ArrayBuffer{contiguous,         array.attr("shape"),
+                       array.attr("dtype"), data_of(interface),
+                       count,              *type,
                        location};
   }
 
@@ -157,6 +179,136 @@ namespace {
     py::object result;
     muGrid::AllreduceRequest request;
   };
+
+  //! Per-rank header of allgatherv: element count, dtype number, item
+  //! size, ndim, then the shape (with the gathered axis first), padded
+  constexpr Index_t max_dims{64};
+  constexpr Index_t header_size{4 + max_dims};
+
+  std::string shape_string(const Index_t * dims, Index_t ndim) {
+    std::stringstream out{};
+    out << "(";
+    for (Index_t d{0}; d < ndim; ++d) {
+      out << (d ? ", " : "") << dims[d];
+    }
+    out << (ndim == 1 ? ",)" : ")");
+    return out.str();
+  }
+
+  int narrow_count(Index_t value) {
+    if (value > std::numeric_limits<int>::max()) {
+      throw py::value_error("allgatherv: the gathered array is too large "
+                            "for one MPI message");
+    }
+    return static_cast<int>(value);
+  }
+
+  /**
+   * np.concatenate across ranks: every rank's array joined along `axis`, in
+   * rank order, on every rank. The extents along `axis` may differ; dtype
+   * and all other extents must agree. Ranks contributing no elements are
+   * left out (their shape does not matter). Every rank sees every rank's
+   * header, so a mismatch raises on all ranks alike.
+   */
+  py::object allgatherv_array(const muGrid::Communicator & comm,
+                              const py::object & a, Index_t axis) {
+    const BufferLocation location{py::hasattr(a, "__cuda_array_interface__")
+                                      ? BufferLocation::Device
+                                      : BufferLocation::Host};
+    auto xp{array_module(location)};
+    py::object array{xp.attr("asarray")(a)};
+    const auto ndim{array.attr("ndim").cast<Index_t>()};
+    if (ndim == 0 || ndim > max_dims) {
+      throw py::value_error("allgatherv: needs an array of 1 to " +
+                            std::to_string(max_dims) + " dimensions");
+    }
+    if (axis < -ndim || axis >= ndim) {
+      throw py::value_error("allgatherv: axis " + std::to_string(axis) +
+                            " is out of range for an array of " +
+                            std::to_string(ndim) + " dimensions");
+    }
+    const Index_t own_axis{axis < 0 ? axis + ndim : axis};
+    py::object moved{xp.attr("moveaxis")(array, own_axis, 0)};
+    const auto send{buffer_of(moved, Use::Movement)};
+    py::object dtype{array.attr("dtype")};
+
+    std::vector<Index_t> header(header_size, 0);
+    header[0] = moved.attr("size").cast<Index_t>();
+    header[1] = dtype.attr("num").cast<Index_t>();
+    header[2] = dtype.attr("itemsize").cast<Index_t>();
+    header[3] = ndim;
+    const auto shape{moved.attr("shape").cast<py::tuple>()};
+    for (Index_t d{0}; d < ndim; ++d) {
+      header[4 + d] = shape[d].cast<Index_t>();
+    }
+    const int nb_ranks{comm.size()};
+    std::vector<Index_t> headers(header_size * nb_ranks);
+    comm.allgather(header.data(), headers.data(), header_size,
+                   TypeDescriptor::Index, BufferLocation::Host);
+    auto row{[&headers](int r) { return headers.data() + r * header_size; }};
+
+    int ref{-1};  // the first rank that contributes elements
+    for (int r{0}; r < nb_ranks; ++r) {
+      if (row(r)[1] != row(0)[1] || row(r)[2] != row(0)[2]) {
+        throw py::type_error("allgatherv: the arrays must have one dtype on "
+                             "all ranks, but ranks 0 and " +
+                             std::to_string(r) + " differ");
+      }
+      if (ref < 0 && row(r)[0] > 0) {
+        ref = r;
+      }
+    }
+    const Index_t result_ndim{ref < 0 ? ndim : row(ref)[3]};
+    const Index_t * rest{ref < 0 ? header.data() + 5 : row(ref) + 5};
+    Index_t length{0};
+    std::vector<int> counts(nb_ranks, 0), displs(nb_ranks, 0);
+    const Index_t scale{header[0] > 0 ? send.count / header[0]
+                                      : (send.type == TypeDescriptor::Uint8
+                                             ? header[2]
+                                             : 1)};
+    Index_t offset{0};
+    for (int r{0}; r < nb_ranks; ++r) {
+      const Index_t * h{row(r)};
+      if (h[0] == 0) {
+        displs[r] = narrow_count(offset);
+        continue;
+      }
+      bool same{h[3] == result_ndim};
+      for (Index_t d{1}; same && d < result_ndim; ++d) {
+        same = h[4 + d] == rest[d - 1];
+      }
+      if (!same) {
+        throw py::value_error(
+            "allgatherv: arrays may differ only along the gathered axis, "
+            "but rank " + std::to_string(ref) + " has shape " +
+            shape_string(row(ref) + 4, row(ref)[3]) + " and rank " +
+            std::to_string(r) + " " + shape_string(h + 4, h[3]) +
+            " (gathered axis first)");
+      }
+      length += h[4];
+      counts[r] = narrow_count(h[0] * scale);
+      displs[r] = narrow_count(offset);
+      offset += h[0] * scale;
+    }
+    narrow_count(offset);
+
+    py::list result_shape{};
+    result_shape.append(length);
+    for (Index_t d{1}; d < result_ndim; ++d) {
+      result_shape.append(rest[d - 1]);
+    }
+    py::object result{
+        xp.attr("empty")(py::tuple(result_shape), "dtype"_a = dtype)};
+    void * recv{data_of(interface_of(result, location))};
+    wait_for_writer(send);
+    {
+      py::gil_scoped_release release{};
+      comm.allgatherv(send.data, send.count, recv, counts, displs, send.type,
+                      location);
+    }
+    const Index_t result_axis{axis < 0 ? axis + result_ndim : axis};
+    return xp.attr("moveaxis")(result, 0, result_axis);
+  }
 
   muGrid::ReduceOp reduce_op(const std::string & op) {
     if (op == "sum") return muGrid::ReduceOp::Sum;
@@ -249,7 +401,7 @@ void add_communicator(py::module & mod) {
       .def(
           "allgather",
           [](const muGrid::Communicator & comm, const py::object & a) {
-            const auto send{buffer_of(a)};
+            const auto send{buffer_of(a, Use::Movement)};
             py::list shape{};
             shape.append(comm.size());
             for (auto extent : send.shape.cast<py::tuple>()) {
@@ -272,7 +424,7 @@ void add_communicator(py::module & mod) {
           "sendrecv",
           [](const muGrid::Communicator & comm, const py::object & a,
              int dest, int source, int tag) {
-            const auto send{buffer_of(a)};
+            const auto send{buffer_of(a, Use::Movement)};
             auto [result, recv]{empty_like(send, send.shape)};
             wait_for_writer(send);
             {
@@ -340,31 +492,13 @@ void add_communicator(py::module & mod) {
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Uint>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Index_t>)
       .def("cumulative_sum", &muGrid::Communicator::cumulative_sum<Complex>)
-      .def("allgatherv",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Real>> & arg) {
-             return comm.allgatherv(arg);
-           })
-      .def("allgatherv",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Int>> & arg) {
-             return comm.allgatherv(arg);
-           })
-      .def("allgatherv",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Uint>> & arg) {
-             return comm.allgatherv(arg);
-           })
-      .def("allgatherv",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Index_t>> & arg) {
-             return comm.allgatherv(arg);
-           })
-      .def("allgatherv",
-           [](muGrid::Communicator & comm,
-              const Eigen::Ref<muGrid::DynMatrix_t<Complex>> & arg) {
-             return comm.allgatherv(arg);
-           })
+      .def("allgatherv", &allgatherv_array, "a"_a, "axis"_a = 0,
+           "np.concatenate across ranks: every rank's array joined along "
+           "`axis`, in rank order, on every rank. The extent along `axis` "
+           "may differ between ranks; dtype and all other extents must "
+           "agree, and ranks with no elements are left out. Host or device "
+           "arrays, of any fixed-size dtype. For arrays of one shape stacked "
+           "along a new axis, see allgather.")
       .def(
           "bcast",
           [](muGrid::Communicator & comm, Real & scalar_arg, const Int & root) {

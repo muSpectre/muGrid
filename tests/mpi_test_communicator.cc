@@ -325,6 +325,32 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_allgatherv_test) {
+    // Rank p contributes p + 1 bytes of value p, with a one-byte gap after
+    // each block that must be left alone
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    std::vector<int> counts(nb_ranks), displs(nb_ranks);
+    int offset{0};
+    for (int p{0}; p < nb_ranks; ++p) {
+      counts[p] = p + 1;
+      displs[p] = offset;
+      offset += p + 2;
+    }
+    std::vector<std::uint8_t> send(rank + 1, std::uint8_t(rank));
+    std::vector<std::uint8_t> recv(offset, 255);
+    comm.allgatherv(send.data(), rank + 1, recv.data(), counts, displs,
+                    TypeDescriptor::Uint8, BufferLocation::Host);
+    for (int p{0}; p < nb_ranks; ++p) {
+      for (int i{0}; i < counts[p]; ++i) {
+        BOOST_CHECK_EQUAL(int(recv[displs[p] + i]), p);
+      }
+      BOOST_CHECK_EQUAL(int(recv[displs[p] + counts[p]]), 255);
+    }
+  }
+
+  // ----------------------------------------------------------------------
   BOOST_AUTO_TEST_CASE(buffer_sendrecv_test) {
     auto & comm{MPIContext::get_context().comm};
     const int nb_ranks{comm.size()};

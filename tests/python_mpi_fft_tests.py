@@ -795,8 +795,7 @@ class TestMPIFFTProcessGrid:
 
         if comm.rank == 0:
             # Check all coordinates are unique
-            # all_coords is concatenated to [comm.size * 2] array after allgatherv
-            # Reshape to [comm.size, 2]
+            # allgatherv concatenates the (1, 2) rows to (comm.size, 2)
             all_coords = all_coords.reshape(comm.size, 2)
             coord_tuples = [tuple(row) for row in all_coords]
             coord_set = set(coord_tuples)
