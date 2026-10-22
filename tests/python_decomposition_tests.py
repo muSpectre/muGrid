@@ -49,12 +49,7 @@ def get_nb_subdivisions(nb_processes: int):
 
 
 def make_subdivisions():
-    try:
-        from mpi4py import MPI
-
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
-        comm = muGrid.Communicator()
+    comm = muGrid.Communicator.world() if muGrid.has_mpi else muGrid.Communicator()
     nb_processes = comm.size
 
     # Create a Cartesian decomposition

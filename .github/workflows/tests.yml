@@ -26,6 +26,14 @@ jobs:
         exclude:
           - mpi: 'yes'
             compiler: 'clang'
+        include:
+          # MPI without mpi4py: muGrid starts MPI itself and nothing may
+          # import mpi4py. NuMPI then runs on its serial stub.
+          - mpi: 'yes'
+            compiler: 'gcc'
+            python-version: '3.14'
+            numpy-version: '>=2.1.0'
+            mpi4py-version: 'none'
 
     steps:
       - uses: actions/checkout@v6
@@ -58,11 +66,13 @@ jobs:
               libopenmpi-dev \
               libpnetcdf-dev \
               libnetcdf-dev
-            # Install mpi4py
-            echo "Installing mpi4py${{ matrix.mpi4py-version }}"
-            CC=mpicc python3 -m pip install -v \
-              --no-binary mpi4py \
-              "mpi4py${{ matrix.mpi4py-version }}"
+            if [ "${{ matrix.mpi4py-version }}" != "none" ]; then
+              # Install mpi4py
+              echo "Installing mpi4py${{ matrix.mpi4py-version }}"
+              CC=mpicc python3 -m pip install -v \
+                --no-binary mpi4py \
+                "mpi4py${{ matrix.mpi4py-version }}"
+            fi
           else
             sudo apt-get install -y \
               cmake \

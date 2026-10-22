@@ -89,23 +89,13 @@ def test_serial_communicator_under_mpi_launcher_warns(monkeypatch):
     not muGrid.has_mpi, reason="muGrid was compiled without MPI support"
 )
 def test_sum_comm_world():
-    try:
-        from mpi4py import MPI
-
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
-        comm = muGrid.Communicator()
+    comm = _make_comm()
     # 1 + 2 + 3 + ... + n = n*(n+1)/2
     assert comm.sum(comm.rank + 3) == comm.size * (comm.size + 1) / 2 + 2 * comm.size
 
 
 def test_cum_sum_comm_world():
-    try:
-        from mpi4py import MPI
-
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
-        comm = muGrid.Communicator()
+    comm = _make_comm()
     # 1 + 2 + 3 + ... + n = n*(n+1)/2
     assert (
         comm.cumulative_sum(comm.rank + 1)
@@ -127,12 +117,7 @@ def test_bcast_1():
 
 @pytest.mark.skipif(not muGrid.has_mpi, reason="muFFT was compiled without MPI support")
 def test_bcast_2():
-    try:
-        from mpi4py import MPI
-
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
-        comm = muGrid.Communicator()
+    comm = _make_comm()
     scalar_arg = comm.rank + 3
     res = comm.bcast(scalar_arg, 0)
     assert res == 3
@@ -143,12 +128,7 @@ def test_bcast_2():
 
 
 def _make_comm():
-    try:
-        from mpi4py import MPI
-
-        return muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
-        return muGrid.Communicator()
+    return muGrid.Communicator.world() if muGrid.has_mpi else muGrid.Communicator()
 
 
 def test_reduce_correctness_cpu():
@@ -270,12 +250,7 @@ def test_reduce_gpu_matches_numpy():
 
 
 def test_allgatherv():
-    try:
-        from mpi4py import MPI
-
-        comm = muGrid.Communicator(MPI.COMM_WORLD)
-    except ImportError:
-        comm = muGrid.Communicator()
+    comm = _make_comm()
 
     # gather arrays "a" with different lengths on the ranks
     a = np.arange(comm.rank * 2 + 4).reshape((-1, 2)).T

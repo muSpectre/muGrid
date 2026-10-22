@@ -39,6 +39,8 @@
 #include <array>
 #include <cassert>
 #include <limits>
+#include <memory>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -173,11 +175,56 @@ namespace muGrid {
     //! build can run serially without MPI_Init.
     class Communicator {
        public:
+        /**
+         * Wrap a handle the caller keeps responsible for: the communicator
+         * never frees it. Before MPI is initialised any handle is replaced
+         * by MPI_COMM_NULL, so that an MPI build runs serially without
+         * MPI_Init; see world() for starting MPI.
+         */
         explicit Communicator(MPI_Comm comm = MPI_COMM_SELF);
         Communicator(const Communicator & other);
         virtual ~Communicator();
 
         Communicator & operator=(const Communicator & other);
+
+        /**
+         * MPI_COMM_WORLD, starting MPI first if nobody has
+         * (ensure_mpi_initialized()). Collective, as is anything that
+         * creates a communicator: every rank must call it.
+         */
+        static Communicator world();
+
+        /**
+         * A communicator over the ranks that pass the same `color`, ordered
+         * by `key` (MPI_Comm_split); the result owns its handle and frees
+         * it with its last copy. Collective. A serial communicator splits
+         * into itself.
+         */
+        Communicator split(int color, int key = 0) const;
+
+        //! A new, owned handle to the same group (MPI_Comm_dup). Collective.
+        Communicator dup() const;
+
+        /**
+         * How this communicator relates to `other`, as MPI_Comm_compare
+         * names it: "identical" (one handle), "congruent" (same ranks in
+         * the same order), "similar" (same ranks, other order) or
+         * "unequal". Two serial communicators are identical.
+         */
+        std::string compare(const Communicator & other) const;
+
+        /**
+         * Rank and size among the ranks of this communicator that share
+         * this node's memory (MPI_Comm_split_type with
+         * MPI_COMM_TYPE_SHARED), for choosing one GPU per rank. Finding them
+         * out is collective, so it is done once, by world(), split() and
+         * dup(), or by discover_node() on a communicator wrapped from a
+         * handle; asking before that throws rather than risking a deadlock.
+         */
+        int node_rank() const;
+        int node_size() const;
+        //! Find out node_rank() and node_size(). Collective.
+        void discover_node();
 
         //! get rank of present process
         int rank() const {
@@ -565,7 +612,18 @@ namespace muGrid {
         static bool has_mpi() { return true; }
 
        protected:
+        //! A communicator that owns `handle`: created by `Communicator`
+        //! and freed with the last copy that refers to it (shared_ptr
+        //! does the counting), while MPI is still running
+        static Communicator owning(MPI_Comm handle);
+
         MPI_Comm comm;
+        //! Non-null when this communicator owns `comm`; shared between
+        //! copies, and its deleter frees the handle
+        std::shared_ptr<void> owner{};
+        //! Rank and size on this node, or -1 while not discovered
+        int node_rank_{-1};
+        int node_size_{-1};
 
         //! Host buffers (send, recv) through which the buffer exchanges
         //! stage device memory for an MPI that cannot read it; grown on
@@ -580,6 +638,17 @@ namespace muGrid {
        public:
         Communicator() {}
         ~Communicator() {}
+
+        //! The one rank there is (see the parallel implementation)
+        static Communicator world() { return Communicator{}; }
+        Communicator split(int, int = 0) const { return Communicator{}; }
+        Communicator dup() const { return Communicator{}; }
+        std::string compare(const Communicator &) const {
+            return "identical";
+        }
+        int node_rank() const { return 0; }
+        int node_size() const { return 1; }
+        void discover_node() {}
 
         //! get rank of present process
         int rank() const { return 0; }

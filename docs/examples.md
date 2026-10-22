@@ -16,8 +16,7 @@ python examples/poisson.py -n 64,64
 
 `poisson.py`, `homogenization.py` and the scripts that drive them also
 import `muTimer` (a dependency of the µGrid package) and `NuMPI` (part of the
-`test` extra); MPI runs need `mpi4py` and an
-MPI-enabled µGrid; GPU runs (`-d gpu`) need a CUDA or HIP build and CuPy. The
+`test` extra); MPI runs need an MPI-enabled µGrid; GPU runs (`-d gpu`) need a CUDA or HIP build and CuPy. The
 examples `components.py`, `fft_roundtrip.py`, `field_collection.py`,
 `fourier_derivative.py`, `gradient.py`, `homogenization.py`, `io.py`,
 `poisson.py` and `sub_points.py` are registered as CTest tests (`example_*`),

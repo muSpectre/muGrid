@@ -73,8 +73,8 @@ Optional:
 - [Boost.Test](https://www.boost.org/doc/libs/release/libs/test/) (C++ unit
   tests), [Unidata NetCDF](https://www.unidata.ucar.edu/software/netcdf/)
   (serial I/O), [PnetCDF](https://parallel-netcdf.github.io/) (parallel I/O),
-  [mpi4py](https://mpi4py.readthedocs.io/) (required at import time by an
-  MPI-enabled Python extension),
+  [mpi4py](https://mpi4py.readthedocs.io/) (not required: µGrid starts MPI
+  itself; only for exchanging communicators with mpi4py-based code),
   [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) (NVIDIA GPUs), and
   [ROCm/HIP](https://rocm.docs.amd.com/) with rocFFT (AMD GPUs).
 

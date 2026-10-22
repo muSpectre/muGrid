@@ -365,11 +365,9 @@ class LaminateHomogenization:
         self.maxiter = maxiter
 
         # Communicator
-        try:
-            from mpi4py import MPI
-
-            self.comm = muGrid.Communicator(MPI.COMM_WORLD)
-        except ImportError:
+        if muGrid.has_mpi:
+            self.comm = muGrid.Communicator.world()
+        else:
             self.comm = muGrid.Communicator()
 
         # Compute Lame parameters

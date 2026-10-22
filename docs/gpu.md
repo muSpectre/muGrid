@@ -338,8 +338,8 @@ them as `MPI GPU-support queries`), so no MPI implementation is singled out.
 Open MPI (and derivatives such as HPC-X) and MPICH (and its derivatives) each
 provide some of them. For MPI stacks that cannot be queried, the conservative
 answer is *not GPU-aware*. `muGrid._muGrid.Communicator.gpu_aware_mpi`
-reports the answer (ask after MPI is initialised, e.g. after importing
-`mpi4py.MPI`).
+reports the answer (ask after MPI is initialised, i.e. after
+`Communicator.world()`).
 
 All of this is decided in one place, the buffer exchanges of
 `muGrid::Communicator` (`allreduce`, `allgather`, `allgatherv`, `sendrecv`,

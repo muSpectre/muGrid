@@ -35,6 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import os
+import sys
 import warnings
 
 import numpy as np
@@ -47,15 +48,36 @@ try:
 except ImportError:
     import _muGrid
 
-# Imported only by MPI-enabled builds -- see the note in __init__.py. Every
-# use of ``MPI`` below is guarded by a ``has_mpi`` check.
-if _muGrid.Communicator.has_mpi:
-    try:
-        from mpi4py import MPI
-    except ImportError:
-        MPI = None
-else:
-    MPI = None
+
+def _loaded_mpi4py():
+    """The ``mpi4py.MPI`` module if the process has imported it, else None.
+
+    muGrid never imports mpi4py itself: importing it initialises MPI, which
+    muGrid does only when asked (:meth:`Communicator.world`), and loads a
+    second MPI library if mpi4py was built against another one than muGrid.
+    An mpi4py communicator can only have come from an already imported
+    mpi4py, so looking it up is enough.
+    """
+    return sys.modules.get("mpi4py.MPI")
+
+
+def _check_same_mpi_library(MPI):
+    """Raise unless mpi4py and muGrid are linked against one MPI library.
+
+    Handles are only meaningful within one library, so wrapping a
+    communicator from another would at best fail obscurely. Two libraries
+    never agree on the value of ``MPI_COMM_WORLD`` (a pointer in Open MPI, a
+    fixed integer in MPICH), which makes it a cheap and exact test; version
+    strings are only for the message."""
+    if MPI._handleof(MPI.COMM_WORLD) != _muGrid.mpi_comm_world_handle():
+        raise RuntimeError(
+            "mpi4py and muGrid are linked against different MPI libraries, "
+            "so their communicators cannot be exchanged. mpi4py: "
+            f"{MPI.Get_library_version().splitlines()[0]!r}; muGrid: "
+            f"{_muGrid.mpi_library_version().splitlines()[0]!r}. Use "
+            "muGrid.Communicator.world() instead of mpi4py, or install an "
+            "mpi4py built against muGrid's MPI."
+        )
 
 
 # CuPy is optional - only imported when GPU arrays are used
@@ -84,14 +106,20 @@ def _is_cupy_array(obj):
     return type(obj).__module__.startswith("cupy")
 
 
-class CommunicatorWrapper:
+class Communicator:
     """
     Python conveniences on top of the C++ communicator (`_muGrid.Communicator`).
 
+    ``Communicator()`` is a serial communicator (one rank; it never starts
+    MPI), also under an MPI launcher, where it warns; ``Communicator.world()``
+    is ``MPI_COMM_WORLD``, and the one thing that starts MPI. ``Communicator(x)``
+    wraps a bare ``_muGrid.Communicator`` or an mpi4py communicator, and
+    returns a ``Communicator`` unchanged.
+
     Array exchanges on NumPy and CuPy arrays (``allreduce``, ``allgather``,
-    ``sendrecv``) are the C++ communicator's own, which hands device buffers
-    to MPI directly when it is GPU-aware and stages them through the host
-    otherwise. On top of those this wrapper adds:
+    ``allgatherv``, ``sendrecv``) are the C++ communicator's own, which hands
+    device buffers to MPI directly when it is GPU-aware and stages them
+    through the host otherwise. On top of those this wrapper adds:
 
     - reductions that dispatch on the argument -- host scalars by dtype,
       CuPy arrays on the device, and serial runs without a copy;
@@ -99,35 +127,149 @@ class CommunicatorWrapper:
       ``reduction`` object;
     - ``isum``/``isum_wait``, a non-blocking sum on the C++ communicator's
       ``iallreduce``;
-    - the mpi4py communicator itself (``mpi4py_comm``), for tools that
-      gather Python objects.
+    - ``split``/``dup`` returning wrapped communicators, and the mpi4py
+      communicator (``mpi4py_comm``) when there is one.
 
     Everything else is delegated to the C++ communicator.
     """
 
-    def __init__(self, cpp_comm, mpi_comm=None):
+    def __new__(cls, communicator=None):
         """
-        Initialize the Communicator wrapper.
-
         Parameters
         ----------
-        cpp_comm : _muGrid.Communicator
-            The underlying C++ communicator object
-        mpi_comm : mpi4py.MPI.Comm, optional
-            The mpi4py communicator for GPU-aware operations
+        communicator : None, Communicator, _muGrid.Communicator or mpi4py.MPI.Comm
+            ``None`` (default) gives a serial communicator. A
+            ``Communicator`` is returned unchanged; a bare
+            ``_muGrid.Communicator`` is wrapped. An mpi4py communicator of
+            size 1 gives a serial communicator, and of larger size is wrapped
+            together with its mpi4py handle, after a check that mpi4py and
+            muGrid use one MPI library.
+
+        Raises
+        ------
+        RuntimeError
+            If a multi-rank mpi4py communicator is passed to a build without
+            MPI support or one linked against another MPI library, or if the
+            object is none of the above.
+
+        Warns
+        -----
+        RuntimeWarning
+            When a serial communicator is constructed (``communicator=None``)
+            while the environment indicates the process was started by a
+            multi-rank MPI launcher -- usually an accident that makes every
+            rank solve the full problem independently. Intentional serial use
+            under a launcher keeps working; suppress the warning with
+            :func:`warnings.catch_warnings` if it is deliberate.
         """
+        if communicator is None:
+            _warn_if_serial_under_launcher()
+            return cls._wrap(_muGrid.Communicator())
+        if isinstance(communicator, Communicator):
+            return communicator
+        if isinstance(communicator, _muGrid.Communicator):
+            return cls._wrap(communicator)
+        # Duck-type mpi4py's interface, so that a stub of it (NuMPI's, say)
+        # of size 1 works without mpi4py
+        if not hasattr(communicator, "Get_size"):
+            raise RuntimeError(
+                f"cannot make a muGrid Communicator from {communicator!r}: "
+                "pass a Communicator, a _muGrid.Communicator or an mpi4py "
+                "communicator, or call Communicator.world()"
+            )
+        if communicator.Get_size() == 1:
+            # Serial, but keep the object: tools asking for mpi4py_comm get
+            # what the caller had
+            return cls._wrap(_muGrid.Communicator(), mpi_comm=communicator)
+        if not _muGrid.Communicator.has_mpi:
+            raise RuntimeError("muGrid was compiled without MPI support.")
+        MPI = _loaded_mpi4py()
+        if MPI is None or not isinstance(communicator, MPI.Comm):
+            raise RuntimeError(
+                f"cannot make a muGrid Communicator from {communicator!r}: "
+                "only mpi4py communicators can be wrapped, or call "
+                "Communicator.world()"
+            )
+        _check_same_mpi_library(MPI)
+        cpp_comm = _muGrid.Communicator(MPI._handleof(communicator))
+        cpp_comm.discover_node()
+        return cls._wrap(cpp_comm, mpi_comm=communicator)
+
+    def __init__(self, communicator=None):
+        # Everything happens in __new__, which may return an existing
+        # instance; nothing to redo here.
+        pass
+
+    @classmethod
+    def _wrap(cls, cpp_comm, mpi_comm=None):
+        """A wrapper around `cpp_comm`, with `mpi_comm` the mpi4py
+        communicator it was made from, if any."""
+        self = object.__new__(cls)
         self._cpp = cpp_comm
         self._mpi_comm = mpi_comm
+        return self
+
+    @classmethod
+    def world(cls):
+        """``MPI_COMM_WORLD``, starting MPI if nobody has.
+
+        The only thing in muGrid that initialises MPI (with
+        ``MPI_THREAD_SERIALIZED``); importing muGrid does not. Collective:
+        every rank calls it. In a build without MPI it is the serial
+        communicator, unless the process runs under an MPI launcher, where
+        that would silently make every rank solve the whole problem -- then
+        it raises.
+        """
+        if not _muGrid.Communicator.has_mpi:
+            nb_ranks = _mpi_launcher_world_size()
+            if nb_ranks > 1:
+                raise RuntimeError(
+                    f"Communicator.world() under an MPI launcher with "
+                    f"{nb_ranks} ranks, but this build of muGrid has no MPI "
+                    "support; install or build muGrid with MPI"
+                )
+        return cls._wrap(_muGrid.Communicator.world())
 
     @property
     def mpi4py_comm(self):
-        """The underlying mpi4py communicator, or None if unavailable.
+        """The mpi4py communicator this was made from, or, if mpi4py is
+        imported, one made from the same handle; else None.
 
         Tools like muTimer use this to gather Python objects across ranks.
         Note that `mpi_comm` (delegated to the C++ communicator) returns the
         raw MPI handle instead.
         """
+        if self._mpi_comm is None and self.size > 1:
+            MPI = _loaded_mpi4py()
+            if MPI is not None and hasattr(MPI.Comm, "fromhandle"):
+                _check_same_mpi_library(MPI)
+                self._mpi_comm = MPI.Comm.fromhandle(self._cpp.mpi_comm)
         return self._mpi_comm
+
+    def split(self, color, key=0):
+        """A communicator over the ranks passing the same `color`, ordered
+        by `key` (``MPI_Comm_split``). Collective."""
+        return self._wrap(self._cpp.split(color, key))
+
+    def dup(self):
+        """A new handle to the same group (``MPI_Comm_dup``). Collective."""
+        return self._wrap(self._cpp.dup())
+
+    def compare(self, other):
+        """How this communicator relates to `other`: ``"identical"``,
+        ``"congruent"`` (same ranks, same order), ``"similar"`` (same ranks)
+        or ``"unequal"``."""
+        return self._cpp.compare(Communicator(other)._cpp)
+
+    @property
+    def node_rank(self):
+        """Rank among the ranks on this node, for one GPU per rank."""
+        return self._cpp.node_rank
+
+    @property
+    def node_size(self):
+        """Number of ranks on this node."""
+        return self._cpp.node_size
 
     @property
     def rank(self):
@@ -463,6 +605,9 @@ class CommunicatorWrapper:
     # Delegate other attributes to the C++ communicator
     def __getattr__(self, name):
         """Delegate attribute access to the underlying C++ communicator."""
+        if name.startswith("_"):
+            # Not yet wrapped, or a private name: never the C++ object's
+            raise AttributeError(name)
         return getattr(self._cpp, name)
 
 
@@ -515,93 +660,15 @@ def _warn_if_serial_under_launcher():
             f"This process runs under an MPI launcher with {nb_ranks} ranks, "
             "but a serial muGrid Communicator is being constructed: every "
             "rank will redundantly work on the full problem by itself. To "
-            "enable domain decomposition, pass mpi4py's MPI.COMM_WORLD to "
-            "muGrid.Communicator() (and to the FFT engine).",
+            "enable domain decomposition, use muGrid.Communicator.world() "
+            "(and pass it to the FFT engine).",
             RuntimeWarning,
             stacklevel=3,
         )
 
 
-def Communicator(communicator=None):
-    """
-    Factory function for the communicator class.
-
-    Parameters
-    ----------
-    communicator : mpi4py.MPI.Comm, _muGrid.Communicator, CommunicatorWrapper or None
-        ``None`` (default) gives a serial communicator. A
-        ``CommunicatorWrapper`` is returned unchanged; a bare
-        ``_muGrid.Communicator`` is wrapped (without an mpi4py handle, so
-        ``mpi4py_comm`` is None). Any object with ``Get_size`` (mpi4py interface) of
-        size 1 gives a serial communicator, and of larger size is wrapped
-        together with its mpi4py handle.
-
-    Returns
-    -------
-    CommunicatorWrapper
-        A wrapped communicator with GPU-aware reduction operations
-
-    Raises
-    ------
-    RuntimeError
-        If a multi-rank mpi4py communicator is passed to a build without MPI
-        support, if mpi4py cannot be imported in an MPI build, or if the
-        object has no ``Get_size`` method.
-
-    Warns
-    -----
-    RuntimeWarning
-        When a serial communicator is constructed (``communicator=None``)
-        while the environment indicates the process was started by a
-        multi-rank MPI launcher — usually an accident that makes every rank
-        solve the full problem independently. Intentional serial use under a
-        launcher keeps working; suppress the warning with
-        :func:`warnings.catch_warnings` if it is deliberate.
-    """
-    # If the communicator is None, we return a communicator that contains just
-    # the present process.
-    if communicator is None:
-        _warn_if_serial_under_launcher()
-        cpp_comm = _muGrid.Communicator()
-        return CommunicatorWrapper(cpp_comm, mpi_comm=None)
-
-    # If the communicator is already a CommunicatorWrapper, return it
-    if isinstance(communicator, CommunicatorWrapper):
-        return communicator
-
-    # If the communicator is already an instance of _muGrid.Communicator,
-    # wrap it
-    if isinstance(communicator, _muGrid.Communicator):
-        return CommunicatorWrapper(communicator, mpi_comm=None)
-
-    # Duck-type the communicator: anything conforming to the mpi4py
-    # interface, i.e. with a method 'Get_size', is accepted, so either mpi4py
-    # or a stub implementation of the same interface works.
-    if hasattr(communicator, "Get_size"):
-        # If the size of the communicator group is 1, just return a
-        # communicator that contains just the present process.
-        if communicator.Get_size() == 1:
-            cpp_comm = _muGrid.Communicator()
-            return CommunicatorWrapper(cpp_comm, mpi_comm=None)
-        # Otherwise, check if muGrid does actually have MPI support. If yes
-        # we assume that the communicator is an mpi4py communicator.
-        elif _muGrid.Communicator.has_mpi:
-            if not MPI:
-                raise RuntimeError(
-                    "muGrid was compiled with MPI support but "
-                    "mpi4py could not be loaded."
-                )
-            cpp_comm = _muGrid.Communicator(MPI._handleof(communicator))
-            # Store the mpi4py communicator for GPU-aware operations
-            return CommunicatorWrapper(cpp_comm, mpi_comm=communicator)
-        else:
-            raise RuntimeError("muGrid was compiled without MPI support.")
-    else:
-        raise RuntimeError(
-            "The communicator does not have a 'Get_size' "
-            "method. muGrid only supports communicators that "
-            "conform to the mpi4py interface."
-        )
+#: Former name of :class:`Communicator`
+CommunicatorWrapper = Communicator
 
 
 def parprint(*args, comm=None, **kwargs):
