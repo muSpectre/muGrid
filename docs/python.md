@@ -241,10 +241,19 @@ not needed. µGrid finalises MPI at interpreter exit if it started it
 the OS, for MPI stacks that misbehave once the GPU context is gone).
 
 A communicator provides `rank`, `size`, `barrier()`, the reductions `sum`,
-`max`, `min`, `all`, `any`, `cumulative_sum` and `bcast`, the array exchanges
+`max`, `min`, `all`, `any` and `cumulative_sum`, the array exchanges
 `allreduce`, `allgather`, `allgatherv` and `sendrecv` (NumPy or CuPy arrays),
 `split(color, key=0)`, `dup()`, `compare(other)`, and `node_rank`/`node_size`
 (its rank among the ranks on this node, for choosing one GPU per rank).
+
+`bcast(obj, root=0)`, `gather(obj, root=0)` and `allgather(obj)` follow
+mpi4py's lower-case collectives: any Python object travels pickled, `gather`
+returns a list on the root and `None` elsewhere, `allgather` a list on every
+rank. Arrays are the exception and go as buffers: `bcast` of a NumPy or CuPy
+array arrives as an array of the same kind, and `allgather` of an array (or a
+NumPy scalar) comes back stacked along a new leading axis. `allreduce(a, op)`
+takes `"sum"`, `"max"`, `"min"` or mpi4py's `MPI.SUM`/`MAX`/`MIN`, and returns a
+Python number for a Python number.
 
 ```python
 from muGrid import Communicator

@@ -398,6 +398,44 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_bcast_gatherv_test) {
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    const int root{nb_ranks - 1};
+    std::vector<Real> values{rank == root ? 1.5 : -1., rank == root ? 2.5 : -1.};
+    comm.bcast(values.data(), 2, TypeDescriptor::Real, root,
+               BufferLocation::Host);
+    BOOST_CHECK_EQUAL(values[0], 1.5);
+    BOOST_CHECK_EQUAL(values[1], 2.5);
+
+    // rank p contributes p + 1 bytes of value p; only the root receives
+    std::vector<int> counts, displs;
+    std::vector<std::uint8_t> recv;
+    if (rank == root) {
+      int offset{0};
+      for (int p{0}; p < nb_ranks; ++p) {
+        counts.push_back(p + 1);
+        displs.push_back(offset);
+        offset += p + 1;
+      }
+      recv.assign(offset, 255);
+    }
+    std::vector<std::uint8_t> send(rank + 1, std::uint8_t(rank));
+    comm.gatherv(send.data(), rank + 1, recv.data(), counts, displs, root,
+                 TypeDescriptor::Uint8, BufferLocation::Host);
+    if (rank == root) {
+      for (int p{0}; p < nb_ranks; ++p) {
+        for (int i{0}; i < counts[p]; ++i) {
+          BOOST_CHECK_EQUAL(int(recv[displs[p] + i]), p);
+        }
+      }
+    } else {
+      BOOST_CHECK(recv.empty());
+    }
+  }
+
+  // ----------------------------------------------------------------------
   BOOST_AUTO_TEST_CASE(buffer_sendrecv_test) {
     auto & comm{MPIContext::get_context().comm};
     const int nb_ranks{comm.size()};

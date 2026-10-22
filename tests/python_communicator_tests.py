@@ -111,7 +111,7 @@ def test_bcast_1():
     assert res == 3
 
     scalar_arg = comm.rank + 1
-    res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
+    res = comm.bcast(scalar_arg, root=comm.size - 1)
     assert res == comm.size
 
 
@@ -123,7 +123,7 @@ def test_bcast_2():
     assert res == 3
 
     scalar_arg = comm.rank + 1
-    res = comm.bcast(scalar_arg=scalar_arg, root=comm.size - 1)
+    res = comm.bcast(scalar_arg, root=comm.size - 1)
     assert res == comm.size
 
 
@@ -266,10 +266,6 @@ def test_allgatherv():
             a_ref = np.concatenate((a_ref, a_tmp), axis=0)
 
     assert (a_gathered == a_ref.T).all()
-
-    # the former name still works, with a deprecation warning
-    with pytest.warns(DeprecationWarning, match="allgatherv"):
-        np.testing.assert_array_equal(comm.gather(a), a_gathered)
 
 
 def _rank_array(xp, rank, dtype=np.complex128):
@@ -448,3 +444,76 @@ def test_allgatherv_rejects_mismatched_dtypes_and_objects():
         dtype = np.float32 if comm.rank == 0 else np.float64
         with pytest.raises(TypeError, match="one dtype"):
             comm.allgatherv(np.ones(2, dtype=dtype))
+
+
+# -- Python objects, as mpi4py's lower-case collectives --------------------- #
+
+
+def test_bcast_objects_and_arrays():
+    comm = _make_comm()
+    root = comm.size - 1
+    # objects, pickled; only the root's argument counts
+    assert comm.bcast({"n": 3, "name": "x"} if comm.rank == root else None,
+                      root=root) == {"n": 3, "name": "x"}
+    assert comm.bcast(None, root=root) is None
+    assert comm.bcast("abc" if comm.rank == root else 0, root=root) == "abc"
+    # numbers keep their type
+    for value in (3, 2.5, 1 + 2j, True, np.float32(1.5)):
+        got = comm.bcast(value if comm.rank == root else None, root=root)
+        assert got == value and type(got) is type(value)
+    # arrays go as buffers and arrive as arrays of the same kind
+    for xp in _array_modules():
+        sent = xp.arange(6, dtype=np.float32).reshape(2, 3)
+        got = comm.bcast(sent if comm.rank == root else None, root=root)
+        assert type(got) is type(sent)
+        np.testing.assert_array_equal(_on_host(got), _on_host(sent))
+    # default root is 0
+    assert comm.bcast([comm.rank]) == [0]
+
+
+def test_gather_is_a_list_on_the_root():
+    comm = _make_comm()
+    root = comm.size - 1
+    local = {"rank": comm.rank, "timers": ["solve"] * (comm.rank + 1)}
+    gathered = comm.gather(local, root=root)
+    if comm.rank == root:
+        assert [d["rank"] for d in gathered] == list(range(comm.size))
+        assert gathered[-1]["timers"] == ["solve"] * comm.size
+    else:
+        assert gathered is None
+    # what muTimer sends: a (dict, list) tuple per rank, to rank 0
+    timers = comm.gather(({"a": {"total": 1.0 * comm.rank}}, ["a"]), root=0)
+    if comm.rank == 0:
+        assert [t[0]["a"]["total"] for t in timers] == list(range(comm.size))
+    else:
+        assert timers is None
+
+
+def test_allgather_of_objects_is_a_list():
+    comm = _make_comm()
+    assert comm.allgather(f"rank {comm.rank}") == [
+        f"rank {p}" for p in range(comm.size)]
+    assert comm.allgather({"r": comm.rank}) == [{"r": p} for p in range(comm.size)]
+    # arrays and NumPy scalars still come back stacked
+    assert comm.allgather(np.float64(comm.rank)).shape == (comm.size,)
+    assert comm.allgather(np.ones(2)).shape == (comm.size, 2)
+    # a Python number is an object: a list, as from mpi4py
+    assert comm.allgather(comm.rank) == list(range(comm.size))
+
+
+def test_allreduce_scalars_and_mpi4py_ops():
+    comm = _make_comm()
+    n = comm.size
+    total = comm.allreduce(2.0)
+    assert total == 2.0 * n and type(total) is float
+    assert type(comm.allreduce(3, "max")) is int
+    assert comm.allreduce(np.float64(1.0)).shape == ()  # NumPy scalar: array
+    with pytest.raises(ValueError, match="op must be"):
+        comm.allreduce(1.0, "prod")
+    MPI = pytest.importorskip("mpi4py.MPI", exc_type=ImportError)
+    assert comm.allreduce(1.0, MPI.SUM) == n
+    assert comm.allreduce(comm.rank, op=MPI.MAX) == n - 1
+    np.testing.assert_array_equal(
+        comm.allreduce(np.arange(2.0), MPI.MIN), [0.0, 1.0])
+    with pytest.raises(ValueError, match="op must be"):
+        comm.allreduce(1.0, MPI.PROD)

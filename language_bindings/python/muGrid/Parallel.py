@@ -35,6 +35,7 @@ Program grant you additional permission to convey the resulting work.
 """
 
 import os
+import pickle
 import sys
 import warnings
 
@@ -127,6 +128,8 @@ class Communicator:
       ``reduction`` object;
     - ``isum``/``isum_wait``, a non-blocking sum on the C++ communicator's
       ``iallreduce``;
+    - ``bcast``, ``gather`` and ``allgather`` of Python objects, with
+      mpi4py's lower-case semantics (objects pickled, arrays as buffers);
     - ``split``/``dup`` returning wrapped communicators, and the mpi4py
       communicator (``mpi4py_comm``) when there is one.
 
@@ -435,48 +438,116 @@ class Communicator:
 
         return self._cpp.cumulative_sum(arg)
 
-    def gather(self, arg):
-        """Former name of ``allgatherv``, with its former semantics: 2-D
-        arrays concatenated along their columns (a 1-D array counts as one
-        column), on every rank. Use ``allgatherv(arg, axis=...)``."""
-        import warnings
+    # -- Python objects, as mpi4py's lower-case collectives ---------------- #
+    #
+    # The C++ communicator moves bytes and numbers; what an object is made of
+    # is Python's business, so objects travel pickled, as uint8 arrays. Arrays
+    # of numbers are the exception: they go as buffers, so that a CuPy array
+    # stays on its device and a large one is not copied through pickle.
 
-        warnings.warn(
-            "Communicator.gather is deprecated; use allgatherv(a, axis=...), "
-            "which concatenates along any axis",
-            DeprecationWarning,
-            stacklevel=2,
+    @staticmethod
+    def _is_array(obj):
+        """Whether `obj` goes as a buffer: anything with an array interface,
+        host or device, including NumPy scalars."""
+        return (
+            hasattr(obj, "__array_interface__")
+            or hasattr(obj, "__cuda_array_interface__")
         )
-        if self._is_gpu(arg):
-            arg = arg.get()
-        arg = np.asarray(arg)
-        if arg.ndim == 1:
-            arg = arg.reshape(-1, 1)
-        return self._cpp.allgatherv(arg, axis=1)
 
-    def bcast(self, scalar_arg, root):
-        """
-        Broadcast value from root to all processes.
+    def _bcast_bytes(self, data, root):
+        """Broadcast a bytes-like from `root` (ignored elsewhere)."""
+        length = np.zeros(1, dtype=np.int64)
+        if self.rank == root:
+            length[0] = len(data)
+        self._cpp.bcast(length, root)
+        buffer = np.empty(int(length[0]), dtype=np.uint8)
+        if self.rank == root:
+            buffer[...] = np.frombuffer(data, dtype=np.uint8)
+        self._cpp.bcast(buffer, root)
+        return buffer.tobytes()
+
+    def bcast(self, obj, root=0):
+        """Rank `root`'s `obj` on every rank, as mpi4py's ``bcast``.
+
+        An array (NumPy or CuPy) arrives as an array of the same kind on
+        every rank, through a buffer broadcast; any other object -- a number
+        keeping its type, a dict of settings, None -- is pickled. Only the
+        root's argument is read.
 
         Parameters
         ----------
-        scalar_arg : scalar
-            Value to broadcast (only used on root)
-        root : int
-            Rank of the broadcasting process
-
-        Returns
-        -------
-        scalar
-            Broadcasted value
+        obj : object
+            What to broadcast; whatever the other ranks pass is ignored.
+        root : int, optional
+            Rank whose `obj` is broadcast (default 0).
         """
-        # For GPU scalars, convert to CPU
-        if hasattr(scalar_arg, "__cuda_array_interface__") or _is_cupy_array(
-            scalar_arg
-        ):
-            scalar_arg = float(scalar_arg)
+        if self.size == 1:
+            return obj
+        is_root = self.rank == root
+        if is_root and self._is_array(obj) and np.ndim(obj) > 0:
+            on_device = self._is_gpu(obj)
+            xp = _get_cupy() if on_device else np
+            array = xp.ascontiguousarray(xp.asarray(obj))
+            header = ("array", array.shape, array.dtype.str, on_device)
+        elif is_root:
+            header = ("object", obj)
+        else:
+            header = None
+        header = pickle.loads(self._bcast_bytes(
+            pickle.dumps(header, protocol=pickle.HIGHEST_PROTOCOL)
+            if is_root else b"", root))
+        if header[0] == "object":
+            return header[1]
+        _, shape, dtype, on_device = header
+        xp = _get_cupy() if on_device else np
+        if not is_root:
+            array = xp.empty(shape, dtype=np.dtype(dtype))
+        self._cpp.bcast(array, root)
+        return array
 
-        return self._cpp.bcast(scalar_arg, root)
+    def gather(self, obj, root=0):
+        """Every rank's `obj`, as a list in rank order on rank `root` and
+        None on the other ranks, as mpi4py's ``gather``.
+
+        Objects are pickled (a CuPy array is thereby copied to the host);
+        for arrays of one shape on every rank that should stay on the device
+        and arrive stacked, see :meth:`allgather`.
+        """
+        payload = np.frombuffer(
+            pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL), dtype=np.uint8
+        )
+        if self.size == 1:
+            return [pickle.loads(payload.tobytes())]
+        lengths = self._cpp.allgather(np.asarray([payload.size]))[:, 0]
+        data = self._cpp.gatherv(payload, root)
+        if data is None:
+            return None
+        data = data.tobytes()
+        offsets = np.concatenate([[0], np.cumsum(lengths)])
+        return [pickle.loads(data[offsets[p]:offsets[p + 1]])
+                for p in range(self.size)]
+
+    def allgather(self, obj):
+        """Every rank's `obj`, on every rank.
+
+        An array (NumPy or CuPy, of one shape and dtype on every rank) or a
+        NumPy scalar comes back stacked along a new leading axis, shape
+        ``(size, *obj.shape)``, of the same kind; anything else -- a Python
+        number, a string, a dict -- comes back as a list in rank order, as
+        from mpi4py's ``allgather``.
+        """
+        if self._is_array(obj):
+            return self._cpp.allgather(obj)
+        payload = np.frombuffer(
+            pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL), dtype=np.uint8
+        )
+        if self.size == 1:
+            return [pickle.loads(payload.tobytes())]
+        lengths = self._cpp.allgather(np.asarray([payload.size]))[:, 0]
+        data = self._cpp.allgatherv(payload).tobytes()
+        offsets = np.concatenate([[0], np.cumsum(lengths)])
+        return [pickle.loads(data[offsets[p]:offsets[p + 1]])
+                for p in range(self.size)]
 
     # ------------------------------------------------------------------ #
     # Full-array global reductions (input array -> single global scalar)  #
