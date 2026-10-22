@@ -81,30 +81,22 @@ def _check_same_mpi_library(MPI):
         )
 
 
-# CuPy is optional - only imported when GPU arrays are used
-_cupy = None
+#: DLPack device types of host memory (plain, CUDA-pinned, ROCm-pinned);
+#: every other device type is GPU memory
+_DLPACK_HOST_DEVICES = (1, 3, 11)
 
 
-def _get_cupy():
-    """Lazy import of CuPy for GPU array support."""
-    global _cupy
-    if _cupy is None:
+def _is_device_array(obj):
+    """Whether `obj` is an array in GPU memory, of any library: its DLPack
+    device (or, for objects without DLPack, CUDA's array interface) says so.
+    muGrid never imports an array library to find out."""
+    device = getattr(obj, "__dlpack_device__", None)
+    if device is not None:
         try:
-            import cupy
-
-            _cupy = cupy
-        except ImportError:
-            raise ImportError(
-                "CuPy is required for GPU array operations. "
-                "Install it with: pip install cupy-cuda12x "
-                "(or appropriate CUDA or ROCm version)"
-            )
-    return _cupy
-
-
-def _is_cupy_array(obj):
-    """Check if an object is a CuPy array without importing CuPy."""
-    return type(obj).__module__.startswith("cupy")
+            return device()[0] not in _DLPACK_HOST_DEVICES
+        except Exception:  # e.g. a 0-d view some libraries refuse to export
+            pass
+    return hasattr(obj, "__cuda_array_interface__")
 
 
 class Communicator:
@@ -386,7 +378,7 @@ class Communicator:
             True if all processes have True, False otherwise
         """
         # For GPU scalars, need to sync to get the boolean value
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
+        if _is_device_array(arg):
             if self.size == 1:
                 # Still need to convert to Python bool for the return type
                 return bool(arg)
@@ -410,7 +402,7 @@ class Communicator:
             True if any process has True, False otherwise
         """
         # For GPU scalars, need to sync to get the boolean value
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
+        if _is_device_array(arg):
             if self.size == 1:
                 return bool(arg)
             arg = bool(arg)
@@ -433,7 +425,7 @@ class Communicator:
         """
         # For GPU scalars, convert to CPU (MPI_Scan doesn't have GPU-aware
         # variant in most implementations)
-        if hasattr(arg, "__cuda_array_interface__") or _is_cupy_array(arg):
+        if _is_device_array(arg):
             arg = float(arg)
 
         return self._cpp.cumulative_sum(arg)
@@ -447,10 +439,11 @@ class Communicator:
 
     @staticmethod
     def _is_array(obj):
-        """Whether `obj` goes as a buffer: anything with an array interface,
-        host or device, including NumPy scalars."""
+        """Whether `obj` goes as a buffer: anything with an array interface
+        or DLPack, host or device, including NumPy scalars."""
         return (
             hasattr(obj, "__array_interface__")
+            or hasattr(obj, "__dlpack__")
             or hasattr(obj, "__cuda_array_interface__")
         )
 
@@ -469,8 +462,10 @@ class Communicator:
     def bcast(self, obj, root=0):
         """Rank `root`'s `obj` on every rank, as mpi4py's ``bcast``.
 
-        An array (NumPy or CuPy) arrives as an array of the same kind on
-        every rank, through a buffer broadcast; any other object -- a number
+        An array (of any library speaking DLPack: NumPy, CuPy, PyTorch, ...)
+        arrives as an array of the same library on every rank -- a device
+        array on the receiving rank's current device -- through a buffer
+        broadcast; any other object -- a number
         keeping its type, a dict of settings, None -- is pickled. Only the
         root's argument is read.
 
@@ -484,11 +479,14 @@ class Communicator:
         if self.size == 1:
             return obj
         is_root = self.rank == root
-        if is_root and self._is_array(obj) and np.ndim(obj) > 0:
-            on_device = self._is_gpu(obj)
-            xp = _get_cupy() if on_device else np
-            array = xp.ascontiguousarray(xp.asarray(obj))
-            header = ("array", array.shape, array.dtype.str, on_device)
+        if is_root and isinstance(obj, np.ndarray) and obj.ndim > 0:
+            # NumPy describes any of its dtypes, also those DLPack cannot
+            array = np.ascontiguousarray(obj)
+            header = ("numpy", array.shape,
+                      np.lib.format.dtype_to_descr(array.dtype))
+        elif is_root and self._is_array(obj) and np.ndim(obj) > 0:
+            array = _muGrid._exchange_contiguous(obj)
+            header = ("array", _muGrid._exchange_describe(array))
         elif is_root:
             header = ("object", obj)
         else:
@@ -498,10 +496,13 @@ class Communicator:
             if is_root else b"", root))
         if header[0] == "object":
             return header[1]
-        _, shape, dtype, on_device = header
-        xp = _get_cupy() if on_device else np
-        if not is_root:
-            array = xp.empty(shape, dtype=np.dtype(dtype))
+        if not is_root and header[0] == "numpy":
+            array = np.empty(header[1],
+                             dtype=np.lib.format.descr_to_dtype(header[2]))
+        elif not is_root:
+            # Same shape, dtype, kind of memory and library as the root's,
+            # on this rank's current device
+            array = _muGrid._exchange_empty(*header[1])
         self._cpp.bcast(array, root)
         return array
 
@@ -560,8 +561,8 @@ class Communicator:
 
     @staticmethod
     def _is_gpu(a):
-        """True if `a` is a GPU (CuPy) array."""
-        return hasattr(a, "__cuda_array_interface__") or _is_cupy_array(a)
+        """True if `a` is an array in GPU memory (see `_is_device_array`)."""
+        return _is_device_array(a)
 
     @staticmethod
     def _as_array(a):
@@ -592,7 +593,7 @@ class Communicator:
             identity = {"sum": 0.0, "min": float("inf"),
                         "max": float("-inf")}[op]
         if self._is_gpu(a):
-            return _get_cupy().asarray(identity, dtype=dtype)
+            return _muGrid._exchange_full_like(a, identity)
         return np.asarray(identity, dtype=dtype)
 
     def _allreduce_scalar(self, local, op):

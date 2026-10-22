@@ -88,6 +88,24 @@ if(Boost_FOUND)
         ENVIRONMENT "MUGRID_FFT_NO_ND=1"
     )
 
+    # gpu_runtime.hh must refuse a per-thread default stream (#error): the
+    # communicator's device exchanges rely on stream 0 being the legacy one.
+    # The target is not part of the build; the test builds it and expects
+    # the #error.
+    if(MUGRID_ENABLE_CUDA OR MUGRID_ENABLE_HIP)
+        add_executable(gpu_runtime_needs_legacy_stream EXCLUDE_FROM_ALL
+            gpu_runtime_needs_legacy_stream.cc)
+        target_link_libraries(gpu_runtime_needs_legacy_stream PRIVATE muGrid)
+        target_compile_definitions(gpu_runtime_needs_legacy_stream PRIVATE
+            $<IF:$<BOOL:${MUGRID_ENABLE_CUDA}>,CUDA_API_PER_THREAD_DEFAULT_STREAM,HIP_API_PER_THREAD_DEFAULT_STREAM>)
+        add_test(NAME gpu_runtime_needs_legacy_stream
+            COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
+                --target gpu_runtime_needs_legacy_stream)
+        set_tests_properties(gpu_runtime_needs_legacy_stream PROPERTIES
+            PASS_REGULAR_EXPRESSION "requires the legacy default stream"
+            TIMEOUT 300)
+    endif()
+
     # MPI test sources
     set(MUGRID_MPI_TEST_SOURCES
         main_test_suite.cc

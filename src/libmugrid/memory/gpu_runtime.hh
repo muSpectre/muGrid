@@ -47,6 +47,18 @@
 #include "core/exception.hh"
 #include "core/types.hh"
 
+// muGrid issues its device work on stream 0 and relies on it being the
+// *legacy* default stream, which synchronises implicitly with every blocking
+// stream: the communicator's exchanges synchronise stream 0 before handing a
+// buffer to MPI, and ask array producers (through DLPack) to order their work
+// before it. Under a per-thread default stream that guarantee is gone.
+#if defined(CUDA_API_PER_THREAD_DEFAULT_STREAM) || \
+    defined(__CUDA_API_PER_THREAD_DEFAULT_STREAM) || \
+    defined(HIP_API_PER_THREAD_DEFAULT_STREAM)
+#error "muGrid requires the legacy default stream; do not build it with a " \
+       "per-thread default stream"
+#endif
+
 #if defined(MUGRID_ENABLE_CUDA)
 
 #include <cuda_runtime.h>
