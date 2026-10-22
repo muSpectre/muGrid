@@ -640,8 +640,10 @@ def test_cuda_array_interface_only_producer(stream):
     other = cupy.cuda.Stream(non_blocking=True)
     with other:
         x = cupy.arange(1000.0) + comm.rank  # written on another stream
-    a = _CudaArrayInterfaceOnly(
-        x, other.ptr if stream == "other" else stream)
+        # CuPy reports the *current* stream in its interface, so "keep"
+        # must read it while `other` is current, as a producer would
+        a = _CudaArrayInterfaceOnly(
+            x, other.ptr if stream == "other" else stream)
     s = comm._cpp.allreduce(a, "sum")
     cupy.testing.assert_array_equal(
         cupy.from_dlpack(s),
