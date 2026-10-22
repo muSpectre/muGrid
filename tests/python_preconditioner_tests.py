@@ -240,15 +240,20 @@ def test_block_fourier_shape_validation(comm):
         BlockFourierPreconditioner(engine, np.ones((2, 2, 3, 3)))
 
 
-def test_reference_stiffness_preconditioner_is_exact_inverse(comm):
+@pytest.mark.parametrize("nb_grid_pts", [(16, 16), (2, 16)])
+def test_reference_stiffness_preconditioner_is_exact_inverse(comm, nb_grid_pts):
     """The assembled preconditioner is the exact inverse of its operator.
 
     For a block-circulant operator A (here a componentwise minus-FD-Laplacian on
     an n-component field), `make_reference_stiffness_preconditioner` with the
     action of A builds M⁻¹ = A⁺. Applying it to ``b = A x`` for a zero-mean x
     must recover x (the rigid-body / zero-frequency mode is projected out).
+
+    The (2, 16) grid has only two planes along the distributed Fourier axis, so
+    on three or more ranks some rank's Fourier subdomain is empty; assembling
+    the symbol used to raise there, and the other ranks then waited forever.
     """
-    engine = make_engine(comm, (16, 16))
+    engine = make_engine(comm, nb_grid_pts)
     grid_spacing = 1 / 16
     n = 2
     laplace = muGrid.GenericLinearOperator(

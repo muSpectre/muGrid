@@ -1353,8 +1353,11 @@ def make_reference_stiffness_preconditioner(
             ch = column_hat.s
             ch = ch.get() if hasattr(ch, "get") else np.asarray(ch)
             # (n, [sub...], *fourier) -> (n, *fourier): collapse and drop the
-            # single nodal sub-point.
-            ch = ch.reshape((n, -1) + fourier_shape)[:, 0]
+            # single nodal sub-point. The sub-point count is spelled out
+            # rather than inferred (-1): a rank whose Fourier subdomain is
+            # empty holds a size-0 array, from which numpy cannot infer it.
+            nb_sub = int(np.prod(ch.shape[1:ch.ndim - len(fourier_shape)]))
+            ch = ch.reshape((n, nb_sub) + fourier_shape)[:, 0]
             K_hat[..., :, beta] = np.moveaxis(ch, 0, -1)
 
         # The impulse response is the operator's own output, so it carries
