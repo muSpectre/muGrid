@@ -118,3 +118,22 @@ def test_gpu_exchanges_across_ranks(comm):
     received = comm.sendrecv(x, dest=up, source=down)
     assert isinstance(received, cp.ndarray)
     np.testing.assert_array_equal(cp.asnumpy(received), np.arange(4) + down)
+
+
+@two_gpus
+def test_exchanges_run_on_the_array_device_and_restore_the_current_one(comm):
+    """The communicator's exchanges take the device from the array (its
+    DLPack device), not from whichever device is current: staging buffers
+    and results land on the array's GPU, and the current device is left
+    alone."""
+    cp.cuda.runtime.setDevice(0)
+    with cp.cuda.Device(1):
+        x = cp.arange(8.0) + comm.rank
+    s = comm._cpp.allreduce(x, "sum")
+    g = comm.allgather(x)
+    assert cp.cuda.runtime.getDevice() == 0
+    assert s.device.id == 1 and g.device.id == 1
+    with cp.cuda.Device(1):
+        cp.testing.assert_array_equal(
+            s, comm.size * cp.arange(8.0) + sum(range(comm.size)))
+        assert g.shape == (comm.size, 8)

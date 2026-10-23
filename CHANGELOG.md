@@ -40,6 +40,12 @@ v1.6.0 (not yet released)
   a communicator created without mpi4py
 - API: `sum`, `max` and `min` of the Python communicator reduce host arrays of any shape and
   keep their shape and dtype; a 1-D array used to come back as an (n, 1) column
+- ENH: The communicator exchanges arrays of any library that supports DLPack (NumPy, CuPy,
+  PyTorch, JAX, ...), on the array's own device, and returns them in that library
+- API: Arrays passed to the communicator must have their device work ordered before the
+  legacy default stream, which DLPack's stream argument asks producers to do
+- BUILD: Building with a per-thread default stream is refused, since the device exchanges
+  rely on the legacy default stream
 - API: The communicator's column-concatenating `gather` becomes `allgatherv(a, axis=0)`,
   `np.concatenate` across ranks for NumPy and CuPy arrays of any shape
 - API: `bcast(obj, root=0)`, `gather(obj, root=0)` and `allgather(obj)` take any Python

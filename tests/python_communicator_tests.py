@@ -517,3 +517,149 @@ def test_allreduce_scalars_and_mpi4py_ops():
         comm.allreduce(np.arange(2.0), MPI.MIN), [0.0, 1.0])
     with pytest.raises(ValueError, match="op must be"):
         comm.allreduce(1.0, MPI.PROD)
+
+
+# -- Arrays of any library: read through DLPack, results handed back --------- #
+#
+# The exchanges know no array library: they read arrays through DLPack (or,
+# without it, CUDA's array interface) and give results back through the
+# input's own library's from_dlpack -- or as muGrid's ExchangeBuffer when it
+# has none, as for the stand-in producers below.
+
+_DLPACK_CPU = 1
+
+
+class _DLPackOnly:
+    """An array that speaks DLPack and nothing else, recording the `stream`
+    each export was asked to order its work before."""
+
+    def __init__(self, array):
+        self._array = array
+        self.streams = []
+
+    def __dlpack__(self, stream=None, max_version=None, dl_device=None,
+                   copy=None):
+        self.streams.append(stream)
+        if max_version is None:
+            return self._array.__dlpack__(stream=stream)
+        try:
+            return self._array.__dlpack__(stream=stream,
+                                          max_version=max_version)
+        except TypeError:  # a producer predating DLPack 1.0
+            return self._array.__dlpack__(stream=stream)
+
+    def __dlpack_device__(self):
+        return self._array.__dlpack_device__()
+
+
+def test_dlpack_only_producer_on_the_host():
+    comm = _make_comm()
+    a = _DLPackOnly(np.arange(4.0) + comm.rank)
+    s = comm._cpp.allreduce(a, "sum")
+    # The producer's module has no from_dlpack: the result stays muGrid's
+    assert type(s).__name__ == "ExchangeBuffer"
+    assert s.__dlpack_device__() == (_DLPACK_CPU, 0)
+    np.testing.assert_array_equal(
+        np.from_dlpack(s), comm.size * np.arange(4.0) + sum(range(comm.size)))
+    assert a.streams == [None]  # host memory: no stream
+
+
+def test_exchanges_pack_any_strides():
+    comm = _make_comm()
+    base = np.arange(24.0).reshape(4, 6) + comm.rank
+    total = comm.size * np.arange(24.0).reshape(4, 6) + sum(range(comm.size))
+    for view, expected in [
+        (base[:, ::2], total[:, ::2]),       # strided
+        (base[::-1], total[::-1]),           # negative strides
+        (base.T, total.T),                   # transposed
+        (np.broadcast_to(base[0], (3, 6)),   # zero strides
+         np.broadcast_to(total[0], (3, 6))),
+    ]:
+        np.testing.assert_array_equal(comm._cpp.allreduce(view, "sum"),
+                                      expected)
+    # The gathered axis of a strided view, and the result's axis order
+    gathered = comm.allgatherv(base[:, ::2], axis=1)
+    np.testing.assert_array_equal(
+        gathered,
+        np.concatenate([(np.arange(24.0).reshape(4, 6) + p)[:, ::2]
+                        for p in range(comm.size)], axis=1))
+
+
+def test_bcast_needs_a_writeable_array():
+    comm = _make_comm()
+    a = np.zeros(3)
+    a.flags.writeable = False
+    with pytest.raises(ValueError, match="writeable"):
+        comm._cpp.bcast(a, 0)
+
+
+def _cupy_or_skip():
+    try:
+        import cupy
+
+        cupy.zeros(1)
+    except Exception:
+        pytest.skip("no CuPy with a usable GPU")
+    return cupy
+
+
+def test_dlpack_only_producer_on_the_device():
+    """A device producer is asked to order its work before the legacy
+    default stream: stream=1 on CUDA, None on ROCm."""
+    cupy = _cupy_or_skip()
+    comm = _make_comm()
+    a = _DLPackOnly(cupy.arange(4.0) + comm.rank)
+    s = comm._cpp.allreduce(a, "sum")
+    assert s.__dlpack_device__() == a.__dlpack_device__()
+    cupy.testing.assert_array_equal(
+        cupy.from_dlpack(s),
+        comm.size * cupy.arange(4.0) + sum(range(comm.size)))
+    assert a.streams == [1 if muGrid.has_cuda else None]
+
+
+class _CudaArrayInterfaceOnly:
+    """A device array known only through CUDA's array interface (v3), with
+    or without its `stream` key."""
+
+    def __init__(self, array, stream="keep"):
+        self._array = array
+        interface = dict(array.__cuda_array_interface__)
+        if stream is None:
+            interface.pop("stream", None)
+        elif stream != "keep":
+            interface["stream"] = stream
+        self.__cuda_array_interface__ = interface
+
+
+@pytest.mark.parametrize("stream", ["keep", None, "other"])
+def test_cuda_array_interface_only_producer(stream):
+    """Without DLPack, the interface's stream is synchronised (an unknown
+    one by draining the device)."""
+    cupy = _cupy_or_skip()
+    try:
+        cupy.zeros(1).__cuda_array_interface__
+    except AttributeError:  # CuPy on ROCm does not provide it
+        pytest.skip("this CuPy has no CUDA array interface")
+    comm = _make_comm()
+    other = cupy.cuda.Stream(non_blocking=True)
+    with other:
+        x = cupy.arange(1000.0) + comm.rank  # written on another stream
+        # CuPy reports the *current* stream in its interface, so "keep"
+        # must read it while `other` is current, as a producer would
+        a = _CudaArrayInterfaceOnly(
+            x, other.ptr if stream == "other" else stream)
+    s = comm._cpp.allreduce(a, "sum")
+    cupy.testing.assert_array_equal(
+        cupy.from_dlpack(s),
+        comm.size * cupy.arange(1000.0) + sum(range(comm.size)))
+
+
+def test_device_results_come_back_in_the_input_library():
+    cupy = _cupy_or_skip()
+    comm = _make_comm()
+    x = cupy.arange(6.0).reshape(2, 3) + comm.rank
+    s = comm._cpp.allreduce(x, "sum")
+    assert isinstance(s, cupy.ndarray)
+    assert s.device.id == x.device.id
+    g = comm.allgather(x)
+    assert isinstance(g, cupy.ndarray) and g.shape == (comm.size, 2, 3)

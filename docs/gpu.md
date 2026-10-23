@@ -190,6 +190,35 @@ data exchange between the C++ library and Python. This means:
 
 This is particularly important for performance when working with large arrays on GPUs.
 
+### Arrays of any library in the communicator
+
+The communicator's array exchanges -- `allreduce`, `allgather`, `allgatherv`,
+`gatherv`, `sendrecv`, `bcast` and the reductions built on them -- take arrays
+of any library that supports DLPack: NumPy, CuPy, PyTorch, JAX and others.
+µGrid imports no array library to do so. It reads the array through
+`__dlpack__`/`__dlpack_device__` (objects with only CUDA's
+`__cuda_array_interface__` are accepted too), works on the array's own GPU
+whichever device is current, and returns the result through the input's
+library's `from_dlpack`, so a CuPy array comes back as a CuPy array on the same
+GPU. For a library without `from_dlpack` the result is a
+`muGrid._muGrid.ExchangeBuffer`, which any DLPack consumer can take over.
+Arrays of any strides are accepted; non-contiguous ones are packed on their
+device.
+
+**Streams.** µGrid issues its device work on the *legacy* default stream
+(stream 0), which synchronises implicitly with every blocking stream, and
+synchronises that stream before MPI reads a device buffer. When it imports an
+array it passes DLPack's `stream` argument (1, the legacy default stream, on
+CUDA; `None`, the default stream, on ROCm), which asks the producer to order
+its pending work before that stream. Libraries that implement DLPack do this
+for you. For an object with only CUDA's array interface, the stream named in
+its `stream` key is synchronised, and without that key the whole device is.
+Kernels on *non-blocking* streams created outside such a library are not
+covered by the legacy stream's implicit synchronisation: synchronise them
+before an exchange. For the same reason µGrid refuses to be built with a
+per-thread default stream (`--default-stream per-thread`,
+`CUDA_API_PER_THREAD_DEFAULT_STREAM`, `HIP_API_PER_THREAD_DEFAULT_STREAM`).
+
 ## CartesianDecomposition with GPU
 
 When using domain decomposition with `CartesianDecomposition`, you can also
