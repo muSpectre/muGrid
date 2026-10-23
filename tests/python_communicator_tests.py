@@ -636,6 +636,10 @@ def test_cuda_array_interface_only_producer(stream):
     """Without DLPack, the interface's stream is synchronised (an unknown
     one by draining the device)."""
     cupy = _cupy_or_skip()
+    try:
+        cupy.zeros(1).__cuda_array_interface__
+    except AttributeError:  # CuPy on ROCm does not provide it
+        pytest.skip("this CuPy has no CUDA array interface")
     comm = _make_comm()
     other = cupy.cuda.Stream(non_blocking=True)
     with other:
