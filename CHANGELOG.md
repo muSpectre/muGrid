@@ -16,8 +16,8 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
-v1.6.0 (not yet released)
--------------------------
+v1.6.0 (27Oct26)
+----------------
 
 - API: mpi4py is no longer required: importing muGrid does not import it or start MPI.
   `Communicator.world()` (and opening a PnetCDF file) starts MPI, thread level serialized;
