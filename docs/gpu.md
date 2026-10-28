@@ -126,43 +126,41 @@ owner of every device byte (and records CuPy's allocations in the allocation
 profiler alongside Fields); `muGrid.clear_device_allocator()` restores the raw
 default.
 
-### Unified-memory APUs and the full HBM
+### Unified-memory APUs
 
 On a unified-memory accelerator — an APU such as the **AMD Instinct MI300A**,
-where the CPU and GPU share one physical HBM stack — the default device
-allocator only reaches the *coarse-grained device-local window*, which is a
-fraction of the physical memory. On MI300A that window is ~62.8 GiB of the
-128 GB package. The remaining memory is **not** physically partitioned away: it
-is visible to the CPU and reachable from the GPU through managed memory (the
-same physical HBM, at native bandwidth). A plain `hipMalloc` nonetheless runs
-out of memory once allocations exceed that window.
+where the CPU and GPU share one physical HBM stack — keep the default plain
+device allocator. Managed memory (`hipMallocManaged` / `cudaMallocManaged`)
+lives in the same physical HBM and kernels read it at full speed, but MPI
+moves managed buffers as it moves host memory, with the CPU. Measured on
+Hunter (HLRS; 4x MI300A per node, ROCm 7.0.2, Cray MPICH 9.1 with GPU support
+enabled), an all-to-all between the four GPUs of a node with 64 MiB per peer:
 
-*Managed* (unified) memory — `hipMallocManaged` / `cudaMallocManaged` — draws
-from the whole shared pool instead. Point CuPy's default pool at managed memory
-and then route µGrid through it, so **fields, solver scratch and the
-preconditioner all use the full HBM**:
+| buffer                       | ms per exchange |
+|------------------------------|-----------------|
+| plain (`hipMalloc`)          | 0.9             |
+| managed (`hipMallocManaged`) | 39              |
+| host (`malloc`)              | 35              |
+
+In a 256³ homogenization solve on four GPUs this made a CG iteration 1.8x to
+5.4x slower. Managed memory does not buy capacity there either: plain
+`hipMalloc` reached 120 GiB of the 128 GB package, with XNACK on or off.
+
+Managed memory can still be selected, for a system whose plain allocations
+stop short of what a run needs. Point CuPy's default pool at managed memory and
+route µGrid through it, so fields, solver scratch and the preconditioner all
+use it:
 
 ```python
 import cupy, muGrid
 
-# CuPy's default pool -> managed (unified) memory ...
 cupy.cuda.set_allocator(cupy.cuda.MemoryPool(cupy.cuda.malloc_managed).malloc)
-# ... and µGrid draws from that same pool.
 muGrid.use_cupy_allocator()
-
-# A large double-precision grid that overflows the coarse-grained window
-# allocates from the full unified HBM:
-fc = muGrid.GlobalFieldCollection([512, 512, 512], device="gpu")
 ```
 
-!!! note "When this matters"
-    Only when a workload's device footprint exceeds the coarse-grained window
-    — e.g. a 512³ double-precision FFT-preconditioned solve on MI300A needs
-    ~70 GiB > 62.8 GiB, so it OOMs with the default allocator but fits with
-    managed memory. Grids that fit the window need no change. On a true APU
-    managed pages live in the same physical HBM as the default pool, so there is
-    no PCIe migration; a modest first-touch / page-fault overhead is still
-    possible and worth benchmarking for latency-sensitive runs.
+On a discrete GPU, do not: managed pages migrate between host and device
+memory whenever the other side touches them, which makes a solver that
+streams every field through the GPU many times slower.
 
 !!! note "MPI and file I/O on an APU"
     Only managed allocations are host-readable on an APU; plain device
