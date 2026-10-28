@@ -16,6 +16,12 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.6.1 (not yet released)
+-------------------------
+
+- DOC: Plain device memory is recommended on unified-memory APUs too: MPI is ~40x
+  slower on managed buffers there, and plain allocations reach the full memory
+
 v1.6.0 (27Oct26)
 ----------------
 

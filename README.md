@@ -30,8 +30,7 @@ with support for MPI parallelization and GPU acceleration.
   transforms on the GPU
 - **GPU support**: Optional CUDA and HIP backends. Fields, operators, solvers
   and preconditioners all run on device, so a solve need not return to the
-  host; on unified-memory accelerators the allocator can be routed through
-  managed memory
+  host; the device allocator can be routed through CuPy's memory pool
 - **NetCDF I/O**: Serial and parallel file I/O for checkpointing and analysis
 
 µGrid is written in C++20 and has language bindings for
