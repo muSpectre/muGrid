@@ -328,20 +328,32 @@ def test_float32_solve_after_float64_on_the_same_collection(solver):
 
 @serial_only
 @pytest.mark.parametrize("solver", SOLVERS)
-def test_solver_leaves_no_work_fields_behind(solver):
-    """Work fields are removed when the solve ends, by return or by raising,
-    so repeated solves do not accumulate them in the collection."""
+def test_repeated_solves_reuse_their_work_fields(solver):
+    """Work fields stay in the collection and are reused by the next solve,
+    however the previous one ended (return or raise): repeated solves neither
+    accumulate fields nor allocate new ones."""
     from muGrid.Solvers import ConvergenceError
 
     comm = Communicator()
-    fc, b, x, hessp, _ = _ill_conditioned_diagonal_problem(np.float64, 1e3)
-    before = sorted(fc.field_names)
+    fc, b, x, hessp, true_relative_residual = \
+        _ill_conditioned_diagonal_problem(np.float64, 1e3)
     solver(comm, fc, b, x, hessp=hessp, rtol=1e-6, maxiter=5000)
-    assert sorted(fc.field_names) == before
+    after_first = sorted(fc.field_names)
+    work = [name for name in after_first if "-work0-" in name]
+    assert work
+    buffers = {name: np.asarray(fc.get_field(name)).__array_interface__[
+        "data"][0] for name in work}
     x.p[...] = 0
     with pytest.raises(ConvergenceError):
         solver(comm, fc, b, x, hessp=hessp, rtol=1e-12, maxiter=3)
-    assert sorted(fc.field_names) == before
+    assert sorted(fc.field_names) == after_first
+    x.p[...] = 0
+    solver(comm, fc, b, x, hessp=hessp, rtol=1e-6, maxiter=5000)
+    assert sorted(fc.field_names) == after_first
+    assert true_relative_residual() <= 1e-6
+    for name in work:
+        assert np.asarray(fc.get_field(name)).__array_interface__[
+            "data"][0] == buffers[name]
 
 
 def test_single_precision_field_refuses_a_mismatched_existing_one():
