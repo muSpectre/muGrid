@@ -19,6 +19,8 @@ Change log for µGrid
 v1.6.1 (not yet released)
 -------------------------
 
+- CI: macOS wheels are built on the macOS 15 runner image; GitHub is retiring macOS 14
+  (brownouts already cancel its jobs), the wheels still target macOS 14.0
 - DOC: Plain device memory is recommended on unified-memory APUs too: MPI is ~40x
   slower on managed buffers there, and plain allocations reach the full memory
 - PERF: Consecutive CG solves on one field collection reuse their work vectors instead
