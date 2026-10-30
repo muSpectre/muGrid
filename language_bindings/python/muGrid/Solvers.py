@@ -24,7 +24,6 @@ reaches the order of the tolerance.
   replacement.
 """
 
-import itertools
 import warnings
 
 import numpy as np
@@ -41,44 +40,53 @@ class ConvergenceError(RuntimeError):
     """
 
 
-#: Source of the per-call suffix of work-field names (see _WorkFields).
-_work_field_ids = itertools.count()
+#: Nesting depth of the solves running now (see _WorkFields).
+_work_field_depth = 0
 
 
 class _WorkFields:
-    """The work fields of one solver call, removed again when it ends.
+    """The work fields of one solver call, kept in the collection for the next.
 
-    Each field is named ``<solver>#<call>-<role>``, so no two calls share one:
-    a solve nested inside another's ``hessp``, ``prec`` or ``callback`` on the
-    same collection gets its own vectors instead of overwriting the caller's,
-    and a float32 solve after a float64 one is not handed the float64 fields.
-    The fields are popped from the collection on exit, however the solve ends
-    (return or exception), so repeated solves do not accumulate them. A
-    callback may keep a field it was given: popping only drops the
-    collection's reference.
+    A field is named after the solver, its role, dtype, component shape and
+    sub-point type, and the nesting depth of the call. Consecutive solves on
+    one collection therefore reuse the same fields instead of allocating and
+    freeing a set of full vectors per solve -- with muGrid's default device
+    allocator a malloc/free pair each, which at 512^3 on MI300A cost tens to
+    hundreds of milliseconds per solve. A solve nested inside another's
+    ``hessp``, ``prec`` or ``callback`` runs one level deeper and so gets
+    fields of its own instead of overwriting the caller's, and a float32
+    solve after a float64 one gets float32 fields.
+
+    The fields are zeroed when handed out and stay registered in the
+    collection after the solve; a callback that wants to keep one beyond the
+    solve must copy it.
     """
 
     def __init__(self, fc, solver):
         self._fc = fc
-        self._prefix = f"{solver}#{next(_work_field_ids)}-"
-        self._names = []
+        self._solver = solver
+        self._depth = None
 
     def __enter__(self):
+        global _work_field_depth
+        self._depth = _work_field_depth
+        _work_field_depth += 1
         return self
 
     def field(self, role, like, dtype):
-        """A zero-initialised field shaped like `like`, in `dtype`."""
-        name = self._prefix + role
-        field = self._fc.real_field(name, like.components_shape,
+        """A zeroed field shaped like `like`, in `dtype`."""
+        components = tuple(like.components_shape)
+        shape = "x".join(str(n) for n in components) or "scalar"
+        name = (f"{self._solver}-work{self._depth}-{role}-"
+                f"{np.dtype(dtype).name}-{shape}-{like.sub_division}")
+        field = self._fc.real_field(name, components,
                                     sub_pt=like.sub_division, dtype=dtype)
-        self._names.append(name)
+        field.set_zero()
         return field
 
     def __exit__(self, *exc):
-        collection = getattr(self._fc, "_get_field_collection", None)
-        collection = collection() if collection is not None else self._fc
-        for name in self._names:
-            collection.pop_field(name)
+        global _work_field_depth
+        _work_field_depth -= 1
         return False
 
 
@@ -107,7 +115,7 @@ def _warn_unreachable_rtol(dtype, rtol, solver):
 
 
 def _reject_indefinite_preconditioner(rz, rr, tol_sq, iteration,
-                                     solver="conjugate_gradients"):
+                                      solver="conjugate_gradients"):
     """Raise if ``r^T M r`` is not positive for a residual above the
     tolerance: the preconditioner M is then not positive definite, and the
     step lengths CG derives from it are meaningless."""
@@ -192,7 +200,7 @@ def conjugate_gradients(
     Each iteration costs one ``hessp``, one ``prec``, three global
     reductions (:math:`p^T A p`, :math:`r^T r` fused into the residual
     update, :math:`r^T z`) and four vector updates. Without a preconditioner
-    :math:`z` is aliased to :math:`r`, so four work fields are allocated with
+    :math:`z` is aliased to :math:`r`, so four work fields are used with
     and three without.
 
     When the recursive residual meets the tolerance, the true residual
@@ -205,6 +213,10 @@ def conjugate_gradients(
     The work fields take the dtype of `b`, so a float32 right-hand side gives
     a single-precision solve throughout; for float32, a `rtol` below
     :data:`FLOAT32_RTOL_FLOOR` triggers a :class:`RuntimeWarning`.
+
+    The work fields are registered in `fc` and stay there for the next
+    solve, which reuses them instead of allocating new ones; a `callback`
+    that wants to keep the vectors it is given must copy them.
 
     Parameters
     ----------

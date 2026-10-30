@@ -21,6 +21,8 @@ v1.6.1 (not yet released)
 
 - DOC: Plain device memory is recommended on unified-memory APUs too: MPI is ~40x
   slower on managed buffers there, and plain allocations reach the full memory
+- PERF: Consecutive CG solves on one field collection reuse their work vectors instead
+  of allocating and freeing them per solve; they now stay in the collection between solves
 - PERF: The hybrid preconditioner's interface exchange reuses its receive buffers and
   exchanges with both neighbours at once, instead of a fresh device buffer per message
 - ENH: `sendrecv` and `allgather` of the communicator receive into a given `out` array,
