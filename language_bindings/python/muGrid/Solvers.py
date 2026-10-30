@@ -224,8 +224,11 @@ def conjugate_gradients(
         Communicator for parallel processing.
     fc : muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or
          muGrid.CartesianDecomposition
-        Collection for creating temporary fields used by the CG algorithm.
-        They are named ``cg#<call>-<role>`` and removed again on return.
+        Collection holding the work fields of the CG algorithm. They are
+        named ``cg-work<depth>-<role>-...`` and stay registered in the
+        collection after the solve for the next one to reuse; pass
+        ``field_names`` to ``FileIONetCDF.register_field_collection`` to
+        leave them out of a file.
     b : muGrid.Field
         Right-hand side vector.
     x : muGrid.Field
@@ -641,7 +644,7 @@ def conjugate_gradients_pipelined(
     ----------
     comm, fc, b, x, hessp, prec, tol, maxiter, timer, rtol, atol
         As for :func:`conjugate_gradients`. Work fields are named
-        ``pcg#<call>-<role>``.
+        ``pcg-work<depth>-<role>-...`` and stay in the collection as well.
     callback : callable, optional
         Called as ``callback(iteration, state_dict)`` at the start of every
         iteration, after the reduction completes, with keys "x", "r", "p",
