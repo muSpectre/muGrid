@@ -21,6 +21,12 @@ v1.6.1 (not yet released)
 
 - DOC: Plain device memory is recommended on unified-memory APUs too: MPI is ~40x
   slower on managed buffers there, and plain allocations reach the full memory
+- PERF: The hybrid preconditioner's interface exchange reuses its receive buffers and
+  exchanges with both neighbours at once, instead of a fresh device buffer per message
+- ENH: `sendrecv` and `allgather` of the communicator receive into a given `out` array,
+  and `sendrecv_pair` exchanges with two ranks at once
+- ENH: The timing of the hybrid preconditioner splits its interface step into exchange,
+  products and zero-mode solve
 
 v1.6.0 (27Oct26)
 ----------------

@@ -593,6 +593,21 @@ namespace muGrid {
                       TypeDescriptor type, BufferLocation location,
                       int tag = 0) const;
 
+        /**
+         * Two sendrecvs at once, `count` elements each: `send_a` to `dest_a`
+         * while `recv_a` comes from `source_a` (tag `tag`), and `send_b` to
+         * `dest_b` while `recv_b` comes from `source_b` (tag `tag + 1`). The
+         * two directions of a neighbour exchange then share the links rather
+         * than taking turns. `send_a` and `send_b` may be the same buffer.
+         * Device buffers that have to be staged through the host are
+         * exchanged one direction after the other instead.
+         */
+        void sendrecv_pair(const void * send_a, int dest_a, void * recv_a,
+                           int source_a, const void * send_b, int dest_b,
+                           void * recv_b, int source_b, Index_t count,
+                           TypeDescriptor type, BufferLocation location,
+                           int tag = 0) const;
+
         //! Rank `root`'s `buffer` (`count` elements) into every rank's, in
         //! place, as MPI_Bcast
         void bcast(void * buffer, Index_t count, TypeDescriptor type, int root,
@@ -749,6 +764,11 @@ namespace muGrid {
                       void * recv, Index_t recv_count, int source,
                       TypeDescriptor type, BufferLocation location,
                       int tag = 0) const;
+        void sendrecv_pair(const void * send_a, int dest_a, void * recv_a,
+                           int source_a, const void * send_b, int dest_b,
+                           void * recv_b, int source_b, Index_t count,
+                           TypeDescriptor type, BufferLocation location,
+                           int tag = 0) const;
         void bcast(void * buffer, Index_t count, TypeDescriptor type, int root,
                    BufferLocation location) const;
         void gatherv(const void * send, Index_t send_count, void * recv,

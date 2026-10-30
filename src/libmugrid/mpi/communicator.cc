@@ -45,6 +45,7 @@
 #endif
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <sstream>
 #include <utility>
@@ -386,6 +387,24 @@ namespace muGrid {
             throw RuntimeError("allreduce: unknown reduction");
         }
 
+        //! Whether MPI is handed bounce copies of these buffers rather than
+        //! the buffers themselves (see MPIBuffers)
+        bool stages_through_host(BufferLocation location, const void * send,
+                                 const void * recv) {
+            if (location != BufferLocation::Device) {
+                return false;
+            }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+            return !(mpi_is_gpu_aware() ||
+                     (host_can_read_device_pointer(send) &&
+                      host_can_read_device_pointer(recv)));
+#else
+            (void)send;
+            (void)recv;
+            return true;
+#endif
+        }
+
         /**
          * The buffers MPI actually reads and writes for one exchange.
          *
@@ -413,9 +432,8 @@ namespace muGrid {
                 }
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
                 GPU_STREAM_SYNCHRONIZE_DEFAULT();
-                if (mpi_is_gpu_aware() ||
-                    (host_can_read_device_pointer(send_buffer) &&
-                     host_can_read_device_pointer(recv_buffer))) {
+                if (!stages_through_host(location, send_buffer,
+                                         recv_buffer)) {
                     return;
                 }
                 auto & host_send{host_staging[0]};
@@ -607,6 +625,52 @@ namespace muGrid {
                                MPI_STATUS_IGNORE),
                   "MPI_Sendrecv", this->rank());
         buffers.to_device(recv, 0, recv_bytes);
+    }
+
+    void Communicator::sendrecv_pair(const void * send_a, int dest_a,
+                                     void * recv_a, int source_a,
+                                     const void * send_b, int dest_b,
+                                     void * recv_b, int source_b,
+                                     Index_t count, TypeDescriptor type,
+                                     BufferLocation location, int tag) const {
+        if (this->comm == MPI_COMM_NULL ||
+            stages_through_host(location, send_a, recv_a) ||
+            stages_through_host(location, send_b, recv_b)) {
+            // Serial, or bounced through the host, where both directions
+            // would share the one pair of staging buffers: one after the
+            // other
+            this->sendrecv(send_a, count, dest_a, recv_a, count, source_a,
+                           type, location, tag);
+            this->sendrecv(send_b, count, dest_b, recv_b, count, source_b,
+                           type, location, tag + 1);
+            return;
+        }
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        if (location == BufferLocation::Device) {
+            // MPI does not order itself after the kernels that wrote the
+            // send buffers, nor before those still reading the receive ones
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
+        }
+#endif
+        const auto mpi_type{descriptor_to_mpi_type(type)};
+        const int n{checked_mpi_int(count, "sendrecv_pair count")};
+        const int my_rank{this->rank()};
+        std::array<MPI_Request, 4> requests{};
+        check_mpi(MPI_Irecv(recv_a, n, mpi_type, source_a, tag, this->comm,
+                            &requests[0]),
+                  "MPI_Irecv", my_rank);
+        check_mpi(MPI_Irecv(recv_b, n, mpi_type, source_b, tag + 1,
+                            this->comm, &requests[1]),
+                  "MPI_Irecv", my_rank);
+        check_mpi(MPI_Isend(const_cast<void *>(send_a), n, mpi_type, dest_a,
+                            tag, this->comm, &requests[2]),
+                  "MPI_Isend", my_rank);
+        check_mpi(MPI_Isend(const_cast<void *>(send_b), n, mpi_type, dest_b,
+                            tag + 1, this->comm, &requests[3]),
+                  "MPI_Isend", my_rank);
+        check_mpi(MPI_Waitall(static_cast<int>(requests.size()),
+                              requests.data(), MPI_STATUSES_IGNORE),
+                  "MPI_Waitall", my_rank);
     }
 
     void Communicator::bcast(void * buffer, Index_t count, TypeDescriptor type,
@@ -808,6 +872,16 @@ namespace muGrid {
                                "size");
         }
         copy_bytes(recv, send, nb_bytes(send_count, type), location);
+    }
+
+    void Communicator::sendrecv_pair(const void * send_a, int,
+                                     void * recv_a, int,
+                                     const void * send_b, int,
+                                     void * recv_b, int, Index_t count,
+                                     TypeDescriptor type,
+                                     BufferLocation location, int) const {
+        copy_bytes(recv_a, send_a, nb_bytes(count, type), location);
+        copy_bytes(recv_b, send_b, nb_bytes(count, type), location);
     }
 
     void Communicator::bcast(void *, Index_t, TypeDescriptor, int,

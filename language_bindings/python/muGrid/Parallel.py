@@ -528,17 +528,21 @@ class Communicator:
         return [pickle.loads(data[offsets[p]:offsets[p + 1]])
                 for p in range(self.size)]
 
-    def allgather(self, obj):
+    def allgather(self, obj, out=None):
         """Every rank's `obj`, on every rank.
 
         An array (NumPy or CuPy, of one shape and dtype on every rank) or a
         NumPy scalar comes back stacked along a new leading axis, shape
         ``(size, *obj.shape)``, of the same kind; anything else -- a Python
         number, a string, a dict -- comes back as a list in rank order, as
-        from mpi4py's ``allgather``.
+        from mpi4py's ``allgather``. For an array, `out` (of that stacked
+        shape and of `obj`'s dtype and device) receives the result in place
+        and is returned.
         """
         if self._is_array(obj):
-            return self._cpp.allgather(obj)
+            return self._cpp.allgather(obj, out=out)
+        if out is not None:
+            raise TypeError("allgather: out is only for arrays")
         payload = np.frombuffer(
             pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL), dtype=np.uint8
         )
