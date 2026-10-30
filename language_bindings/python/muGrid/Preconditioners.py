@@ -2415,7 +2415,9 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         Default Q1.
     timer : muTimer.Timer, optional
         When given, :meth:`apply` records ``"fft"``, ``"tridiag"``,
-        ``"interface"`` and ``"ifft"``.
+        ``"interface"`` and ``"ifft"``. Nested under ``"interface"`` are
+        ``"exchange"`` (or ``"allgather"`` off the PCR path), ``"matmul"``
+        and ``"zero_mode"``.
     dtype : data-type, optional
         Real precision of the solve, ``np.float64`` (default) or
         ``np.float32``; the per-mode blocks and factors are complex128 or
@@ -2956,13 +2958,19 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
 
         matmul = xp.matmul
         for level, (A, C, D_inv) in enumerate(self._pcr_levels):
-            from_low, from_high = self._exchange(x, 1 << level)
-            x = matmul(D_inv, x - matmul(A, from_low) - matmul(C, from_high))
+            with self._timed("exchange"):
+                from_low, from_high = self._exchange(x, 1 << level)
+            with self._timed("matmul"):
+                x = matmul(D_inv,
+                           x - matmul(A, from_low) - matmul(C, from_high))
 
         # The neighbours' products, computed here and sent to them (see
         # _build_corrections); what arrives is this slab's two corrections.
-        return self._exchange(matmul(self._pcr_to_right, x), 1,
-                              to_low=matmul(self._pcr_to_left, x))
+        with self._timed("matmul"):
+            to_right = matmul(self._pcr_to_right, x)
+            to_left = matmul(self._pcr_to_left, x)
+        with self._timed("exchange"):
+            return self._exchange(to_right, 1, to_low=to_left)
 
     def _build_zero_mode(self):
         """The all-zero mode, which the tridiagonal path cannot solve.
@@ -3114,15 +3122,19 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
                 if self.nb_ranks == 1:
                     rhs = ends.reshape(self._mode_shape + (2 * dim, 1))
                 else:
-                    gathered = self._comm.allgather(xp.ascontiguousarray(ends))
+                    with self._timed("allgather"):
+                        gathered = self._comm.allgather(
+                            xp.ascontiguousarray(ends))
                     rhs = xp.moveaxis(gathered, 0, -3).reshape(
                         self._mode_shape + (2 * dim * self.nb_ranks, 1))
-                first = xp.matmul(self._corr_first, rhs)
-                last = xp.matmul(self._corr_last, rhs)
+                with self._timed("matmul"):
+                    first = xp.matmul(self._corr_first, rhs)
+                    last = xp.matmul(self._corr_last, rhs)
             # From the *uncorrected* right-hand side: the all-zero mode is
             # solved globally rather than through the interface system, so the
             # end corrections below would double-count it.
-            zero_solution = self._solve_zero_mode(v)
+            with self._timed("zero_mode"):
+                zero_solution = self._solve_zero_mode(v)
 
         with self._timed("tridiag"):
             # z_local = T^-1 (rhs - A2 left e_0 - A0 right e_last): the
