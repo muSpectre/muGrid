@@ -321,6 +321,42 @@ namespace {
     }
   }
 
+  /**
+   * `out`, imported as the buffer an exchange of `like` receives into: it
+   * must have `shape`, `like`'s dtype and device, and be C-contiguous and
+   * writeable. Reusing one buffer across exchanges spares the allocation of
+   * a fresh one each time and, with a GPU-aware MPI, the registration of
+   * fresh device memory with MPI.
+   */
+  //! Whether `array` has `shape` and `like`'s dtype and device
+  bool matches(const ImportedArray & array, const ImportedArray & like,
+               const std::vector<Index_t> & shape) {
+    const auto & a{array.dtype};
+    const auto & b{like.dtype};
+    return array.shape == shape && a.code == b.code && a.bits == b.bits &&
+           a.lanes == b.lanes && array.itemsize == like.itemsize &&
+           array.location == like.location &&
+           (array.location != BufferLocation::Device ||
+            array.device_id == like.device_id);
+  }
+
+  ImportedArray receive_buffer(const py::object & out,
+                               const ImportedArray & like,
+                               const std::vector<Index_t> & shape,
+                               const char * what) {
+    auto array{muGrid::python::import_array(out)};
+    if (!matches(array, like, shape)) {
+      throw py::value_error(std::string{what} +
+                            ": out must have the shape, dtype and device of "
+                            "the result");
+    }
+    if (!array.c_contiguous() || array.read_only) {
+      throw py::value_error(std::string{what} +
+                            ": out must be C-contiguous and writeable");
+    }
+    return array;
+  }
+
   //! 'sum', 'max' or 'min', or mpi4py's MPI.SUM/MAX/MIN if mpi4py is
   //! loaded (compared by identity; muGrid does not import it)
   muGrid::ReduceOp reduce_op(const py::object & op) {
@@ -609,13 +645,25 @@ void add_communicator(py::module & mod) {
           "Work that does not need the result can run in between.")
       .def(
           "allgather",
-          [](const muGrid::Communicator & comm, const py::object & a) {
+          [](const muGrid::Communicator & comm, const py::object & a,
+             const py::object & out) -> py::object {
             auto array{muGrid::python::import_array(a)};
             muGrid::python::DeviceGuard guard{array};
             const SendBuffer send{std::move(array), Use::Movement};
             std::vector<Index_t> shape{comm.size()};
             shape.insert(shape.end(), send.array.shape.begin(),
                          send.array.shape.end());
+            if (!out.is_none()) {
+              const auto recv{
+                  receive_buffer(out, send.array, shape, "allgather")};
+              {
+                py::gil_scoped_release release{};
+                std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+                comm.allgather(send.data, recv.data, send.count, send.type,
+                               send.array.location);
+              }
+              return out;
+            }
             auto result{muGrid::python::allocate_like(send.array, shape)};
             {
               py::gil_scoped_release release{};
@@ -625,17 +673,33 @@ void add_communicator(py::module & mod) {
             }
             return muGrid::python::hand_back(send.array, std::move(result));
           },
-          "a"_a,
+          "a"_a, "out"_a = py::none(),
           "Every rank's array, of one shape and dtype on all ranks, stacked "
           "along a new leading axis in rank order, on every rank. For "
-          "arrays whose sizes differ between ranks, see allgatherv.")
+          "arrays whose sizes differ between ranks, see allgatherv. With "
+          "`out`, an array of that stacked shape and of `a`'s dtype and "
+          "device, the result is written there and `out` returned: reusing "
+          "it spares a fresh allocation per call.")
       .def(
           "sendrecv",
           [](const muGrid::Communicator & comm, const py::object & a,
-             int dest, int source, int tag) {
+             int dest, int source, int tag,
+             const py::object & out) -> py::object {
             auto array{muGrid::python::import_array(a)};
             muGrid::python::DeviceGuard guard{array};
             const SendBuffer send{std::move(array), Use::Movement};
+            if (!out.is_none()) {
+              const auto recv{receive_buffer(out, send.array,
+                                             send.array.shape, "sendrecv")};
+              {
+                py::gil_scoped_release release{};
+                std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+                comm.sendrecv(send.data, send.count, dest, recv.data,
+                              send.count, source, send.type,
+                              send.array.location, tag);
+              }
+              return out;
+            }
             auto result{muGrid::python::allocate_like(send.array)};
             {
               py::gil_scoped_release release{};
@@ -646,9 +710,78 @@ void add_communicator(py::module & mod) {
             }
             return muGrid::python::hand_back(send.array, std::move(result));
           },
-          "a"_a, "dest"_a, "source"_a, "tag"_a = 0,
+          "a"_a, "dest"_a, "source"_a, "tag"_a = 0, "out"_a = py::none(),
           "Send an array to rank `dest` and return the one rank `source` "
-          "sends, which must have the same shape and dtype.")
+          "sends, which must have the same shape and dtype. With `out`, an "
+          "array of that shape, dtype and device, the message is received "
+          "there and `out` returned: reusing it spares a fresh allocation "
+          "per call.")
+      .def(
+          "sendrecv_pair",
+          [](const muGrid::Communicator & comm, const py::object & a,
+             int dest_a, int source_a, const py::object & b, int dest_b,
+             int source_b, int tag, const py::object & out_a,
+             const py::object & out_b) {
+            auto array_a{muGrid::python::import_array(a)};
+            auto array_b{muGrid::python::import_array(b)};
+            muGrid::python::DeviceGuard guard{array_a};
+            const SendBuffer send_a{std::move(array_a), Use::Movement};
+            const SendBuffer send_b{std::move(array_b), Use::Movement};
+            const auto & like{send_a.array};
+            if (!matches(send_b.array, like, like.shape)) {
+              throw py::value_error("sendrecv_pair: a and b must have one "
+                                    "shape, dtype and device");
+            }
+            // The receive buffers: the caller's, or fresh ones
+            py::object result_a{out_a};
+            py::object result_b{out_b};
+            void * recv_a{nullptr};
+            void * recv_b{nullptr};
+            std::shared_ptr<ExchangeBuffer> fresh_a{};
+            std::shared_ptr<ExchangeBuffer> fresh_b{};
+            std::optional<ImportedArray> given_a{};
+            std::optional<ImportedArray> given_b{};
+            if (out_a.is_none()) {
+              fresh_a = muGrid::python::allocate_like(like);
+              recv_a = fresh_a->data;
+            } else {
+              given_a = receive_buffer(out_a, like, like.shape,
+                                       "sendrecv_pair");
+              recv_a = given_a->data;
+            }
+            if (out_b.is_none()) {
+              fresh_b = muGrid::python::allocate_like(like);
+              recv_b = fresh_b->data;
+            } else {
+              given_b = receive_buffer(out_b, like, like.shape,
+                                       "sendrecv_pair");
+              recv_b = given_b->data;
+            }
+            {
+              py::gil_scoped_release release{};
+              std::lock_guard<std::mutex> lock{muGrid::mpi_call_mutex()};
+              comm.sendrecv_pair(send_a.data, dest_a, recv_a, source_a,
+                                 send_b.data, dest_b, recv_b, source_b,
+                                 send_a.count, send_a.type, like.location,
+                                 tag);
+            }
+            if (fresh_a) {
+              result_a = muGrid::python::hand_back(like, std::move(fresh_a));
+            }
+            if (fresh_b) {
+              result_b = muGrid::python::hand_back(like, std::move(fresh_b));
+            }
+            return py::make_tuple(result_a, result_b);
+          },
+          "a"_a, "dest_a"_a, "source_a"_a, "b"_a, "dest_b"_a, "source_b"_a,
+          "tag"_a = 0, "out_a"_a = py::none(), "out_b"_a = py::none(),
+          "Two sendrecvs at once: `a` to rank `dest_a` while the result's "
+          "first array comes from `source_a` (tag `tag`), and `b` to "
+          "`dest_b` while the second comes from `source_b` (tag `tag + 1`). "
+          "`a` and `b` must have one shape, dtype and device, and may be the "
+          "same array. The two directions of a neighbour exchange then "
+          "share the links instead of taking turns. `out_a` and `out_b`, as "
+          "`out` of sendrecv, receive in place.")
       .def_property_readonly("rank", &muGrid::Communicator::rank)
       .def_property_readonly("size", &muGrid::Communicator::size)
       .def("barrier", &muGrid::Communicator::barrier)

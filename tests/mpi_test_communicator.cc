@@ -451,6 +451,26 @@ namespace muGrid {
   }
 
   // ----------------------------------------------------------------------
+  BOOST_AUTO_TEST_CASE(buffer_sendrecv_pair_test) {
+    // Both neighbours at once: up the ring and down it
+    auto & comm{MPIContext::get_context().comm};
+    const int nb_ranks{comm.size()};
+    const int rank{comm.rank()};
+    const int up{(rank + 1) % nb_ranks};
+    const int down{(rank - 1 + nb_ranks) % nb_ranks};
+    std::vector<Int> to_up{rank, 10 * rank};
+    std::vector<Int> to_down{-rank, -10 * rank};
+    std::vector<Int> from_down(2, -1), from_up(2, -1);
+    comm.sendrecv_pair(to_up.data(), up, from_down.data(), down,
+                       to_down.data(), down, from_up.data(), up, 2,
+                       TypeDescriptor::Int, BufferLocation::Host, 3);
+    BOOST_CHECK_EQUAL(from_down[0], down);
+    BOOST_CHECK_EQUAL(from_down[1], 10 * down);
+    BOOST_CHECK_EQUAL(from_up[0], -up);
+    BOOST_CHECK_EQUAL(from_up[1], -10 * up);
+  }
+
+  // ----------------------------------------------------------------------
   BOOST_AUTO_TEST_CASE(buffer_alltoallv_test) {
     // Rank p sends p + q + 1 values to rank q, each p * 100 + q
     auto & comm{MPIContext::get_context().comm};

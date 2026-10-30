@@ -315,6 +315,71 @@ def test_sendrecv_around_a_ring():
                                       _rank_array(np, down))
 
 
+def test_receive_into_out():
+    # `out` receives in place and is what comes back; reused across calls,
+    # it is overwritten each time.
+    comm = _make_comm()
+    up, down = (comm.rank + 1) % comm.size, (comm.rank - 1) % comm.size
+    for xp in _array_modules():
+        local = _rank_array(xp, comm.rank)
+        out = xp.empty(local.shape, dtype=local.dtype)
+        for shift in range(2):
+            sent = local + shift
+            received = comm.sendrecv(sent, dest=up, source=down, tag=4,
+                                     out=out)
+            assert received is out
+            np.testing.assert_array_equal(_on_host(out),
+                                          _rank_array(np, down) + shift)
+        stacked = xp.empty((comm.size,) + local.shape, dtype=local.dtype)
+        assert comm.allgather(local, out=stacked) is stacked
+        for p in range(comm.size):
+            np.testing.assert_array_equal(_on_host(stacked[p]),
+                                          _rank_array(np, p))
+
+
+def test_sendrecv_pair_around_a_ring():
+    # Both neighbours at once, as the hybrid preconditioner's interface
+    # exchange does, with one send array for both directions or two.
+    comm = _make_comm()
+    up, down = (comm.rank + 1) % comm.size, (comm.rank - 1) % comm.size
+    for xp in _array_modules():
+        local = _rank_array(xp, comm.rank)
+        from_down, from_up = comm.sendrecv_pair(local, up, down,
+                                                local, down, up, tag=5)
+        assert type(from_down) is type(local)
+        np.testing.assert_array_equal(_on_host(from_down),
+                                      _rank_array(np, down))
+        np.testing.assert_array_equal(_on_host(from_up), _rank_array(np, up))
+
+        to_up, to_down = local, -local
+        out_a = xp.empty(local.shape, dtype=local.dtype)
+        out_b = xp.empty(local.shape, dtype=local.dtype)
+        result = comm.sendrecv_pair(to_up, up, down, to_down, down, up,
+                                    tag=7, out_a=out_a, out_b=out_b)
+        assert result[0] is out_a and result[1] is out_b
+        np.testing.assert_array_equal(_on_host(out_a), _rank_array(np, down))
+        np.testing.assert_array_equal(_on_host(out_b), -_rank_array(np, up))
+
+
+def test_out_must_match_the_result():
+    comm = _make_comm()
+    local = np.arange(6.0).reshape(2, 3)
+    with pytest.raises(ValueError, match="shape, dtype and device"):
+        comm.sendrecv(local, dest=comm.rank, source=comm.rank,
+                      out=np.empty((3, 2)))
+    with pytest.raises(ValueError, match="shape, dtype and device"):
+        comm.sendrecv(local, dest=comm.rank, source=comm.rank,
+                      out=np.empty((2, 3), dtype=np.float32))
+    with pytest.raises(ValueError, match="C-contiguous and writeable"):
+        comm.sendrecv(local, dest=comm.rank, source=comm.rank,
+                      out=np.empty((2, 6))[:, ::2])
+    with pytest.raises(ValueError, match="shape, dtype and device"):
+        comm.allgather(local, out=np.empty((comm.size + 1, 2, 3)))
+    with pytest.raises(ValueError, match="one shape, dtype and device"):
+        comm.sendrecv_pair(local, comm.rank, comm.rank,
+                           local[:1], comm.rank, comm.rank)
+
+
 def test_exchanges_on_the_bare_cpp_communicator():
     # The array exchanges are the C++ communicator's own: no wrapper, and so
     # no mpi4py communicator, needed.

@@ -2468,6 +2468,9 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         # device arrays, whether MPI gets them directly or through the host.
         comm = Communicator(communicator)
         self._comm = comm
+        # Receive buffers of the interface exchanges, kept across applies
+        # (see _exchange)
+        self._receive_buffers = {}
         self._timer = timer
         self._name = name
 
@@ -2939,11 +2942,27 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         P = self.nb_ranks
         lo = (self.rank - distance) % P
         hi = (self.rank + distance) % P
-        # Receive from the low side while sending to the high side, then the
-        # reverse; two Sendrecvs rather than four blocking calls.
-        from_low = self._comm.sendrecv(to_high, dest=hi, source=lo, tag=0)
-        from_high = self._comm.sendrecv(to_low, dest=lo, source=hi, tag=1)
-        return from_low, from_high
+        # Both directions at once, into buffers kept across applies: a fresh
+        # device buffer per message costs an allocation and, with a
+        # GPU-aware MPI, registering new memory with MPI -- on MI300A that
+        # was five times the transfer itself. The results are overwritten by
+        # the next exchange of this shape, which is only ever made after
+        # they have been used.
+        return self._comm.sendrecv_pair(
+            to_high, hi, lo, to_low, lo, hi,
+            out_a=self._receive_buffer(to_high, "from_low"),
+            out_b=self._receive_buffer(to_high, "from_high"))
+
+    def _receive_buffer(self, like, name, shape=None):
+        """A buffer of ``like``'s dtype and ``shape`` (default: its own) on
+        this preconditioner's device, the same one on every call."""
+        shape = tuple(like.shape if shape is None else shape)
+        key = (name, shape, np.dtype(like.dtype).str)
+        buffer = self._receive_buffers.get(key)
+        if buffer is None:
+            buffer = self._xp.empty(shape, dtype=like.dtype)
+            self._receive_buffers[key] = buffer
+        return buffer
 
     def _solve_reduced_pcr(self, ends):
         """The interface solve by parallel cyclic reduction.
@@ -3039,7 +3058,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         """
         local = self._xp.ascontiguousarray(
             v[(slice(None),) + self._zero_index][..., 0])
-        full = self._comm.allgather(local).reshape(-1)
+        full = self._comm.allgather(
+            local, out=self._receive_buffer(
+                local, "zero_mode", (self.nb_ranks,) + local.shape)
+        ).reshape(-1)
         return (self._zero_op @ full).reshape(self.nz_local, self.dim)
 
     # -- collectives -------------------------------------------------------- #
@@ -3123,8 +3145,11 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
                     rhs = ends.reshape(self._mode_shape + (2 * dim, 1))
                 else:
                     with self._timed("allgather"):
+                        ends = xp.ascontiguousarray(ends)
                         gathered = self._comm.allgather(
-                            xp.ascontiguousarray(ends))
+                            ends, out=self._receive_buffer(
+                                ends, "ends",
+                                (self.nb_ranks,) + ends.shape))
                     rhs = xp.moveaxis(gathered, 0, -3).reshape(
                         self._mode_shape + (2 * dim * self.nb_ranks, 1))
                 with self._timed("matmul"):
