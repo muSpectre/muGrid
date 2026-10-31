@@ -629,7 +629,7 @@ $\|\mathbf{r}\|_2 \le \max(\mathrm{rtol}\,\|\mathbf{b}\|_2, \mathrm{atol})$.
 | Parameter | Description |
 |-----------|-------------|
 | `comm` | `Communicator` used for the global reductions. |
-| `fc` | Collection (`GlobalFieldCollection`, `LocalFieldCollection` or `CartesianDecomposition`) on which temporary work fields are created and removed again. |
+| `fc` | Collection (`GlobalFieldCollection`, `LocalFieldCollection` or `CartesianDecomposition`) holding the solver's work fields. They stay registered after the solve, so the next solve on the same collection reuses them instead of allocating anew; their names start with `cg-work`. |
 | `b` | Right-hand side field. Its dtype sets the working precision. |
 | `x` | Initial guess; overwritten with the solution. |
 | `hessp` | Callable `hessp(x, Ax)` writing $\mathbf{A}\mathbf{x}$ into `Ax`. |
@@ -648,6 +648,10 @@ attainable accuracy of the working precision), if the operator or
 preconditioner is found not to be positive definite, or if a residual becomes
 NaN or infinite. With a `float32` right-hand side, an `rtol` below
 `muGrid.Solvers.FLOAT32_RTOL_FLOOR` (`1e-6`) triggers a `RuntimeWarning`.
+
+Since the work fields remain in `fc`, a `register_field_collection` of that
+collection without `field_names` would write them to the file as well; name
+the fields you want written.
 
 ### conjugate_gradients_pipelined
 
