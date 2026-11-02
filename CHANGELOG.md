@@ -16,8 +16,8 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
-v1.6.1 (not yet released)
--------------------------
+v1.6.1 (02Nov26)
+----------------
 
 - CI: macOS wheels are built on the macOS 15 runner image; GitHub is retiring macOS 14
   (brownouts already cancel its jobs), the wheels still target macOS 14.0
