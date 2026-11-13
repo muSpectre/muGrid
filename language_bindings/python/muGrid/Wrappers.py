@@ -880,6 +880,30 @@ class CartesianDecomposition(FieldCollectionMixin):
         """
         self._cpp.communicate_ghosts(_unwrap(field))
 
+    def begin_communicate_ghosts(self, field: Field) -> None:
+        """
+        Start :meth:`communicate_ghosts` without waiting for the last axis.
+
+        The ghosts along every axis but the last are filled on return; the
+        exchange along the last axis -- the one a slab decomposition
+        distributes -- is left in flight, so work that reads none of its
+        ghosts can overlap it. :meth:`end_communicate_ghosts` completes it;
+        until then the field must not be written. Where there is nothing to
+        overlap this is :meth:`communicate_ghosts` and the end is a no-op
+        (see :attr:`overlaps_ghost_communication`).
+        """
+        self._cpp.begin_communicate_ghosts(_unwrap(field))
+
+    def end_communicate_ghosts(self, field: Field) -> None:
+        """Complete :meth:`begin_communicate_ghosts` for `field`."""
+        self._cpp.end_communicate_ghosts(_unwrap(field))
+
+    @property
+    def overlaps_ghost_communication(self) -> bool:
+        """Whether :meth:`begin_communicate_ghosts` leaves the last axis's
+        exchange in flight (False: it does the whole exchange itself)."""
+        return self._cpp.overlaps_ghost_communication
+
     def reduce_ghosts(self, field: Field) -> None:
         """
         Accumulate ghost buffer contributions back to the interior domain.
@@ -1122,6 +1146,30 @@ class FFTEngine:
             (e.g. a Fourier-space field, which has no ghost regions).
         """
         self._cpp.communicate_ghosts(_unwrap(field))
+
+    def begin_communicate_ghosts(self, field: Field) -> None:
+        """
+        Start :meth:`communicate_ghosts` without waiting for the last axis.
+
+        The ghosts along every axis but the last are filled on return; the
+        exchange along the last axis -- the one a slab decomposition
+        distributes -- is left in flight, so work that reads none of its
+        ghosts can overlap it. :meth:`end_communicate_ghosts` completes it;
+        until then the field must not be written. Where there is nothing to
+        overlap this is :meth:`communicate_ghosts` and the end is a no-op
+        (see :attr:`overlaps_ghost_communication`).
+        """
+        self._cpp.begin_communicate_ghosts(_unwrap(field))
+
+    def end_communicate_ghosts(self, field: Field) -> None:
+        """Complete :meth:`begin_communicate_ghosts` for `field`."""
+        self._cpp.end_communicate_ghosts(_unwrap(field))
+
+    @property
+    def overlaps_ghost_communication(self) -> bool:
+        """Whether :meth:`begin_communicate_ghosts` leaves the last axis's
+        exchange in flight (False: it does the whole exchange itself)."""
+        return self._cpp.overlaps_ghost_communication
 
     def reduce_ghosts(self, field: Field) -> None:
         """
@@ -1813,6 +1861,40 @@ class IsotropicStiffnessOperator:
             _unwrap(mu_field),
             alpha,
             _unwrap(force),
+        )
+
+    def apply_planes(
+        self,
+        displacement: Field,
+        lambda_field: Field,
+        mu_field: Field,
+        force: Field,
+        plane_begin: int,
+        plane_end: int = -1,
+    ) -> None:
+        """:meth:`apply` for the nodes in planes ``[plane_begin, plane_end)``
+        of the last axis only, counted within the computable region
+        (``plane_end=-1``: to its end); other nodes of `force` are left
+        untouched.
+
+        The stencil reads displacement planes ``plane_begin - 1`` to
+        ``plane_end``, so a range that keeps off the first and the last
+        computable plane reads none of the last axis's ghosts. That is what
+        lets it run while those ghosts are still being exchanged::
+
+            decomposition.begin_communicate_ghosts(u)
+            op.apply_planes(u, lam, mu, f, 1, n - 1)   # interior planes
+            decomposition.end_communicate_ghosts(u)
+            op.apply_planes(u, lam, mu, f, 0, 1)       # the two planes that
+            op.apply_planes(u, lam, mu, f, n - 1, n)   # read the ghosts
+        """
+        self._cpp.apply_planes(
+            _unwrap(displacement),
+            _unwrap(lambda_field),
+            _unwrap(mu_field),
+            _unwrap(force),
+            plane_begin,
+            plane_end,
         )
 
     def __getattr__(self, name: str) -> Any:

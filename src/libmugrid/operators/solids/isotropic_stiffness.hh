@@ -70,6 +70,7 @@
 #include "collection/field_collection_global.hh"
 
 #include <array>
+#include <utility>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -319,6 +320,28 @@ namespace muGrid {
             return info;
         }
 
+        /**
+         * The planes [begin, end) of the `nb` computable ones along the last
+         * axis, as (first, count); `end < 0` stands for `nb`. Throws unless
+         * 0 <= begin <= end <= nb. See IsotropicStiffnessOperator::
+         * apply_planes.
+         */
+        inline std::pair<Index_t, Index_t> plane_range(Index_t nb,
+                                                       Index_t begin,
+                                                       Index_t end) {
+            if (end < 0) {
+                end = nb;
+            }
+            if (begin < 0 || begin > end || end > nb) {
+                throw RuntimeError(
+                    "IsotropicStiffnessOperator: plane range [" +
+                    std::to_string(begin) + ", " + std::to_string(end) +
+                    ") is not within the " + std::to_string(nb) +
+                    " computable planes of the last axis");
+            }
+            return {begin, end - begin};
+        }
+
     }  // namespace internal
 
     /**
@@ -421,6 +444,33 @@ namespace muGrid {
                              TypedFieldBase<Real32> & force) const override {
             this->apply_impl<Real32>(displacement, lambda, mu, alpha, force,
                                      true);
+        }
+
+        /**
+         * apply() for the nodes in planes [plane_begin, plane_end) of the
+         * last axis only, counted within the computable region (-1: to its
+         * end); every other node of `force` is left untouched. Its stencil
+         * reads displacement planes plane_begin - 1 .. plane_end, so a range
+         * that keeps off the first and the last computable plane reads none
+         * of the last axis's ghosts -- which is what lets the stencil
+         * overlap their exchange (see
+         * CartesianDecomposition::begin_communicate_ghosts).
+         */
+        void apply_planes(const TypedFieldBase<Real> & displacement,
+                          const TypedFieldBase<Real> & lambda,
+                          const TypedFieldBase<Real> & mu,
+                          TypedFieldBase<Real> & force, Index_t plane_begin,
+                          Index_t plane_end) const {
+            this->apply_impl<Real>(displacement, lambda, mu, 1.0, force, false,
+                                   plane_begin, plane_end);
+        }
+        void apply_planes(const TypedFieldBase<Real32> & displacement,
+                          const TypedFieldBase<Real32> & lambda,
+                          const TypedFieldBase<Real32> & mu,
+                          TypedFieldBase<Real32> & force, Index_t plane_begin,
+                          Index_t plane_end) const {
+            this->apply_impl<Real32>(displacement, lambda, mu, 1.0f, force,
+                                     false, plane_begin, plane_end);
         }
 
         // ---- Uniform-coefficient host interface ----
@@ -609,6 +659,21 @@ namespace muGrid {
                              DField<Real32> & force) const {
             this->apply_impl<Real32>(displacement, lambda, mu, alpha, force,
                                      true);
+        }
+        //! Device overloads of apply_planes (see the host ones)
+        void apply_planes(const DField<Real> & displacement,
+                          const DField<Real> & lambda, const DField<Real> & mu,
+                          DField<Real> & force, Index_t plane_begin,
+                          Index_t plane_end) const {
+            this->apply_impl<Real>(displacement, lambda, mu, 1.0, force, false,
+                                   plane_begin, plane_end);
+        }
+        void apply_planes(const DField<Real32> & displacement,
+                          const DField<Real32> & lambda,
+                          const DField<Real32> & mu, DField<Real32> & force,
+                          Index_t plane_begin, Index_t plane_end) const {
+            this->apply_impl<Real32>(displacement, lambda, mu, 1.0f, force,
+                                     false, plane_begin, plane_end);
         }
 
         // ---- Uniform-coefficient device interface ----
@@ -872,7 +937,9 @@ namespace muGrid {
         void apply_impl(const TypedFieldBase<T> & displacement,
                         const TypedFieldBase<T> & lambda,
                         const TypedFieldBase<T> & mu, T alpha,
-                        TypedFieldBase<T> & force, bool increment) const;
+                        TypedFieldBase<T> & force, bool increment,
+                        Index_t plane_begin = 0,
+                        Index_t plane_end = -1) const;
 
         //! Host apply for uniform Lamé scalars (dimension-specific; explicit
         //! specialization in isotropic_stiffness_{2,3}d.cc).
@@ -929,7 +996,8 @@ namespace muGrid {
             const TypedFieldBase<T, DefaultDeviceSpace> & lambda,
             const TypedFieldBase<T, DefaultDeviceSpace> & mu, T alpha,
             TypedFieldBase<T, DefaultDeviceSpace> & force,
-            bool increment) const;
+            bool increment, Index_t plane_begin = 0,
+            Index_t plane_end = -1) const;
 
         //! Device apply for uniform Lamé scalars (explicit specialization in
         //! isotropic_stiffness_gpu.cc).
@@ -995,7 +1063,8 @@ namespace muGrid {
     template <>                                                                \
     template <typename T>                                                      \
     void IsotropicStiffnessOperator<D>::apply_impl(                            \
-        const TFB &, const TFB &, const TFB &, T, TFB &, bool) const;          \
+        const TFB &, const TFB &, const TFB &, T, TFB &, bool, Index_t,        \
+        Index_t) const;                                                        \
     template <>                                                                \
     template <typename T>                                                      \
     void IsotropicStiffnessOperator<D>::apply_uniform_impl(                    \

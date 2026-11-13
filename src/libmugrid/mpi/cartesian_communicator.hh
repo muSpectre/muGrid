@@ -402,6 +402,18 @@ namespace muGrid {
             Index_t elem_size_in_bytes, TypeDescriptor type_desc,
             bool is_device_memory = false) const;
 
+#ifdef WITH_MPI
+        //! Rank of the left (lower-coordinate) neighbour along `direction`
+        int get_left_rank(int direction) const {
+            return this->left_ranks[direction];
+        }
+
+        //! Rank of the right (higher-coordinate) neighbour along `direction`
+        int get_right_rank(int direction) const {
+            return this->right_ranks[direction];
+        }
+#endif
+
        protected:
         //! The parent communicator from which this Cartesian communicator
         //! was derived.

@@ -201,6 +201,28 @@ void add_cartesian_decomposition(py::module & mod) {
             py::overload_cast<>(&CartesianDecomposition::get_collection,
                                 py::const_),
             "Get the underlying GlobalFieldCollection.")
+        .def("begin_communicate_ghosts",
+             &CartesianDecomposition::begin_communicate_ghosts, "field"_a,
+             R"pbdoc(
+             Start ``communicate_ghosts(field)`` without waiting for the last
+             axis.
+
+             The ghosts along every axis but the last are filled on return; the
+             exchange along the last axis -- the one a slab decomposition
+             distributes -- is left in flight, so work that reads none of its
+             ghosts can overlap it. ``end_communicate_ghosts(field)`` completes
+             it. Where there is nothing to overlap this is
+             ``communicate_ghosts`` and the end is a no-op (see
+             ``overlaps_ghost_communication``). Collective.
+             )pbdoc")
+        .def("end_communicate_ghosts",
+             &CartesianDecomposition::end_communicate_ghosts, "field"_a,
+             "Complete begin_communicate_ghosts(field). Collective.")
+        .def_property_readonly(
+            "overlaps_ghost_communication",
+            &CartesianDecomposition::overlaps_ghost_communication,
+            "Whether begin_communicate_ghosts leaves the last axis's exchange "
+            "in flight (False: it does the whole exchange itself).")
         .def_property_readonly("nb_subdivisions",
                                [](const CartesianDecomposition & self) {
                                    return muGrid::to_tuple(self.get_nb_subdivisions());

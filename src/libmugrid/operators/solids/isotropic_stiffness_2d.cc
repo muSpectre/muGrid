@@ -166,7 +166,8 @@ namespace muGrid {
     void IsotropicStiffnessOperator<2>::apply_impl(
         const TypedFieldBase<T> & displacement,
         const TypedFieldBase<T> & lambda, const TypedFieldBase<T> & mu,
-        T alpha, TypedFieldBase<T> & force, bool increment) const {
+        T alpha, TypedFieldBase<T> & force, bool increment,
+        Index_t plane_begin, Index_t plane_end) const {
 
         // Validate field collections and ghosts; the dimension-generic checks
         // live in internal::validate_stiffness_fields (isotropic_stiffness.hh).
@@ -219,6 +220,16 @@ namespace muGrid {
         Index_t mat_offset = mat_offset_x * mat_stride_x +
                              mat_offset_y * mat_stride_y;
 
+        // Only the planes [plane_begin, plane_end) of the last axis (see
+        // apply_planes): start that many planes in, compute fewer.
+        const auto planes = internal::plane_range(nny, plane_begin, plane_end);
+        if (planes.second == 0) {
+            return;
+        }
+        disp_offset += planes.first * disp_stride_y;
+        force_offset += planes.first * force_stride_y;
+        mat_offset += planes.first * mat_stride_y;
+
         const T * disp_data = displacement.data() + disp_offset;
         const T * lambda_data = lambda.data() + mat_offset;
         const T * mu_data = mu.data() + mat_offset;
@@ -233,8 +244,8 @@ namespace muGrid {
 
         isotropic_stiffness_kernels::isotropic_stiffness_2d_host<T>(
             disp_data, lambda_data, mu_data, force_data, nnx,
-            nny,         // Number of interior nodes
-            nelx, nely,  // Number of elements
+            planes.second,         // Number of interior nodes
+            nelx, planes.second,   // Number of elements
             disp_stride_x, disp_stride_y, disp_stride_d, mat_stride_x,
             mat_stride_y, force_stride_x, force_stride_y, force_stride_d,
             G_ptr, V_ptr, alpha, increment);
@@ -952,7 +963,8 @@ namespace muGrid {
 #define MUGRID_INSTANTIATE_STIFFNESS_2D(T)                                     \
     template void IsotropicStiffnessOperator<2>::apply_impl<T>(                \
         const TypedFieldBase<T> &, const TypedFieldBase<T> &,                  \
-        const TypedFieldBase<T> &, T, TypedFieldBase<T> &, bool) const;        \
+        const TypedFieldBase<T> &, T, TypedFieldBase<T> &, bool, Index_t,      \
+        Index_t) const;                                                        \
     template void IsotropicStiffnessOperator<2>::apply_uniform_impl<T>(        \
         const TypedFieldBase<T> &, T, T, T, TypedFieldBase<T> &, bool) const;  \
     template void IsotropicStiffnessOperator<2>::apply_macro_rhs_impl<T>(      \
