@@ -296,6 +296,70 @@ __global__ void axpy_norm_sq_kernel(T alpha, const T* x, T* y,
     }
 }
 
+/**
+ * Fused AXPY over the full buffer with the squared norm of the *interior*
+ * only, in one pass: y = alpha * x + y everywhere (ghosts included, as for
+ * plain axpy), and the per-block partial sums of |y|^2 over the non-ghost
+ * entries. The unfused alternative -- axpy, then an interior reduction --
+ * reads y a second time, four passes over memory where this makes three.
+ *
+ * The buffer is walked as `nb_rows` contiguous rows of `row_len` elements,
+ * one row per x-line: for structure-of-arrays fields a row is one component
+ * of one (y, z) line (row_len = NX), for array-of-structures fields all
+ * components of it, interleaved (row_len = NX * nb_dofs). Row `r` covers
+ * (y, z) line `r % nb_lines` -- iy = line % NY, iz = line / NY -- and is
+ * interior in y and z if those are; its interior elements are
+ * [x_begin, x_end) within the row. Each group of ROW_THREADS threads takes a
+ * whole row and strides along it, so accesses stay coalesced and the
+ * interior test costs one division per row, not per element. A group rather
+ * than the whole block per row: an x-line is often shorter than a block (130
+ * elements at 128^3), and a block on one row would leave half its threads
+ * idle.
+ */
+constexpr int AXPY_NORM_ROW_THREADS = 32;
+
+template <typename T>
+__global__ void axpy_interior_norm_sq_kernel(
+    T alpha, const T* x, T* y, Real* partial_sums, Index_t nb_rows,
+    Index_t row_len, Index_t nb_lines, Index_t ny, Index_t y0, Index_t y1,
+    Index_t z0, Index_t z1, Index_t x_begin, Index_t x_end) {
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+    const Index_t tid = threadIdx.x;
+    const Index_t lane = tid % AXPY_NORM_ROW_THREADS;
+    const Index_t rows_per_block = blockDim.x / AXPY_NORM_ROW_THREADS;
+
+    Real sum = 0.0;
+    for (Index_t row = blockIdx.x * rows_per_block +
+                       tid / AXPY_NORM_ROW_THREADS;
+         row < nb_rows; row += gridDim.x * rows_per_block) {
+        const Index_t line = row % nb_lines;
+        const Index_t iy = line % ny;
+        const Index_t iz = line / ny;
+        const bool interior_line = iy >= y0 && iy < y1 && iz >= z0 && iz < z1;
+        const Index_t base = row * row_len;
+        for (Index_t i = lane; i < row_len; i += AXPY_NORM_ROW_THREADS) {
+            const Index_t e = base + i;
+            T new_y = y[e] + alpha * x[e];
+            y[e] = new_y;
+            if (interior_line && i >= x_begin && i < x_end) {
+                // Widen before squaring -- see axpy_norm_sq_kernel.
+                sum += sq_norm(widen(new_y));
+            }
+        }
+    }
+    shared_data[tid] = sum;
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared_data[tid] += shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        partial_sums[blockIdx.x] = shared_data[0];
+    }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Reduction kernels                                                       */
 /* ---------------------------------------------------------------------- */
@@ -1066,6 +1130,71 @@ void copy_device(const TypedField<T, DeviceSpace>& src,
                       device_ptr(src), device_ptr(dst), n);
 }
 
+//! Result of the last fused interior AXPY-norm (see
+//! axpy_interior_norm_sq), read back from the reduction scratch.
+Real reduction_result_scalar() {
+    Real result;
+    GPU_MEMCPY_D2H(&result, reduction_scratch(0, 1), sizeof(Real));
+    return result;
+}
+
+/**
+ * Launch axpy_interior_norm_sq_kernel if `field`'s layout is the canonical
+ * one it walks -- column-major pixels without padding, components either
+ * fastest (AoS) or slowest (SoA) with a uniform stride -- and return true;
+ * leave everything untouched and return false otherwise, for the caller to
+ * fall back to the two-kernel path. The squared norm is left in
+ * reduction_scratch(0)[0].
+ */
+template <typename DS, typename T>
+bool axpy_interior_norm_sq(DS alpha, const DS* x, DS* y,
+                           const TypedField<T, DeviceSpace>& field,
+                           const GlobalFieldCollection& coll, Index_t n) {
+    const InteriorBox box = interior_box(field, coll);
+    const auto spatial_dim = coll.get_spatial_dim();
+    const auto& full = coll.get_nb_subdomain_grid_pts_with_ghosts();
+    Index_t extent[3]{1, 1, 1};
+    Index_t nb_pixels{1};
+    for (Dim_t d = 0; d < spatial_dim; ++d) {
+        extent[d] = full[d];
+        nb_pixels *= full[d];
+    }
+    const Index_t nb_dofs = box.nb_components_per_pixel;
+    if (nb_dofs <= 0 || n != nb_pixels * nb_dofs) {
+        return false;
+    }
+    const bool soa = nb_dofs > 1 && box.stride_c == nb_pixels;
+    const bool aos = box.stride_c == 1;
+    if (!soa && !aos) {
+        return false;
+    }
+    // Pixel strides must be the unpadded column-major ones.
+    Index_t expected = aos ? nb_dofs : 1;
+    for (Dim_t d = 0; d < spatial_dim; ++d) {
+        if (box.stride[d] != expected) {
+            return false;
+        }
+        expected *= extent[d];
+    }
+    const Index_t per_x = aos ? nb_dofs : 1;  // elements per x in a row
+    const Index_t row_len = extent[0] * per_x;
+    const Index_t nb_lines = extent[1] * extent[2];
+    const Index_t nb_rows = soa ? nb_lines * nb_dofs : nb_lines;
+
+    const int num_blocks = gpu_kernels::reduction_blocks(n);
+    Real* d_partial = reduction_scratch(0, num_blocks);
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_interior_norm_sq_kernel<DS>,
+                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE, alpha, x, y,
+                      d_partial, nb_rows, row_len, nb_lines, extent[1],
+                      box.start[1], box.start[1] + box.extent[1],
+                      box.start[2], box.start[2] + box.extent[2],
+                      box.start[0] * per_x,
+                      (box.start[0] + box.extent[0]) * per_x);
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_reduce_kernel<Real>,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial, num_blocks);
+    return true;
+}
+
 template <typename T>
 reduction_result_t<T> axpy_norm_sq_device(T alpha,
                                           const TypedField<T, DeviceSpace>& x,
@@ -1098,6 +1227,12 @@ reduction_result_t<T> axpy_norm_sq_device(T alpha,
     if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
         const auto& global_coll = static_cast<const GlobalFieldCollection&>(coll);
         if (has_ghosts(global_coll)) {
+            // One pass where the canonical layout allows it (see
+            // axpy_interior_norm_sq_kernel); otherwise update, then reduce.
+            if (axpy_interior_norm_sq(to_device(alpha), device_ptr(x),
+                                      device_ptr(y), y, global_coll, n)) {
+                return norm_to_public<T>(reduction_result_scalar());
+            }
             const int num_blocks = (n + gpu_kernels::BLOCK_SIZE - 1) /
                                    gpu_kernels::BLOCK_SIZE;
             GPU_LAUNCH_KERNEL(gpu_kernels::axpy_kernel<DS>,
