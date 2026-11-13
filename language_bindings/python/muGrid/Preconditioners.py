@@ -2944,6 +2944,10 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     #: as zero in the parallel cyclic reduction (see _truncate_pcr).
     PCR_TRUNCATION = 1.0
 
+    #: A PCR level runs on all modes unless it keeps fewer than this
+    #: fraction of them (see _truncate_pcr).
+    PCR_COMPACT_BELOW = 0.9
+
     def _truncate_pcr(self, coupled):
         """Keep each PCR level only for the modes it still couples.
 
@@ -2973,6 +2977,7 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         """
         xp = self._xp
         nb_modes = int(np.prod(self._mode_shape))
+        zero = int(np.ravel_multi_index(self._zero_index, self._mode_shape))
         # Nested: a level keeps a mode if it or any later level couples it.
         for k in range(len(coupled) - 2, -1, -1):
             coupled[k] = coupled[k] | coupled[k + 1]
@@ -2981,8 +2986,18 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         levels = []
         for keep, level in zip(coupled, self._pcr_levels):
             flat = [b.reshape((nb_modes,) + b.shape[-2:]) for b in level]
-            index = xp.flatnonzero(keep.reshape(-1))
-            if int(index.size) == nb_modes:
+            keep = keep.reshape(-1).copy()
+            # The all-zero mode's coefficients are zero by design (its solve
+            # is replaced, see _solve_zero_mode), so it never looks coupled;
+            # keep it wherever anything is kept, or no level would ever keep
+            # every mode and level 0 would pay a gather for nothing.
+            if bool(keep.any()):
+                keep[zero] = True
+            index = xp.flatnonzero(keep)
+            # Keeping a decoupled mode is exact, only wasted work; compacting
+            # costs a gather and a scatter of the level's vector. Below this
+            # fraction of the modes the compaction pays.
+            if int(index.size) >= self.PCR_COMPACT_BELOW * nb_modes:
                 self._pcr_active.append(None)
                 levels.append(tuple(flat))
             else:

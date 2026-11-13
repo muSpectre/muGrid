@@ -1163,8 +1163,10 @@ bool axpy_interior_norm_sq(DS alpha, const DS* x, DS* y,
     if (nb_dofs <= 0 || n != nb_pixels * nb_dofs) {
         return false;
     }
+    // With one value per pixel the two layouts coincide; take it as AoS
+    // (its component axis, if any, has stride nb_pixels, not 1).
     const bool soa = nb_dofs > 1 && box.stride_c == nb_pixels;
-    const bool aos = box.stride_c == 1;
+    const bool aos = box.stride_c == 1 || nb_dofs == 1;
     if (!soa && !aos) {
         return false;
     }
