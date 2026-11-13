@@ -16,6 +16,12 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.6.2 (not yet released)
+-------------------------
+
+- PERF: The hybrid preconditioner's interface solve sends half as much data per exchange,
+  stores a third less per level, and on a GPU runs each reduction level as one kernel
+
 v1.6.1 (02Nov26)
 ----------------
 

@@ -38,6 +38,7 @@
 #include "linalg/linalg.hh"
 #include "linalg/block_matvec.hh"
 #include "linalg/block_thomas.hh"
+#include "linalg/pcr.hh"
 #include "linalg/green_symbol.hh"
 
 #include <pybind11/pybind11.h>
@@ -367,6 +368,64 @@ namespace {
             "blocks (n, n, nb_modes). Device addresses, not buffers.");
     }
 
+    /**
+     * Bind the device fused PCR level of the hybrid preconditioner for one
+     * precision. Device addresses as integers, as for the sweep; see
+     * `linalg/pcr.hh` for the layouts.
+     */
+    template <typename T>
+    void bind_pcr_gpu(py::module & mod, const char * step_name,
+                      const char * final_name) {
+        using C = std::complex<T>;
+        mod.def(
+            step_name,
+            [](muGrid::Index_t dim, muGrid::Index_t nb_modes,
+               std::uintptr_t dinv, std::uintptr_t a, std::uintptr_t c,
+               std::uintptr_t x, std::uintptr_t from_low,
+               std::uintptr_t from_high, std::uintptr_t x_out) {
+                py::gil_scoped_release release{};
+                muGrid::pcr::step_gpu<T>(
+                    dim, nb_modes, reinterpret_cast<const C *>(dinv),
+                    reinterpret_cast<const C *>(a),
+                    reinterpret_cast<const C *>(c),
+                    reinterpret_cast<const C *>(x),
+                    reinterpret_cast<const C *>(from_low),
+                    reinterpret_cast<const C *>(from_high),
+                    reinterpret_cast<C *>(x_out));
+            },
+            "dim"_a, "nb_modes"_a, "dinv"_a, "a"_a, "c"_a, "x"_a,
+            "from_low"_a, "from_high"_a, "x_out"_a,
+            "One PCR level, x_out = D^-1 x - A~ from_low - C~ from_high per "
+            "Fourier mode (x_out may be x). Device addresses, not buffers.");
+        mod.def(
+            final_name,
+            [](muGrid::Index_t dim, muGrid::Index_t nb_modes,
+               std::uintptr_t dinv, std::uintptr_t a, std::uintptr_t c,
+               std::uintptr_t x, std::uintptr_t from_low,
+               std::uintptr_t from_high, std::uintptr_t op_right,
+               std::uintptr_t op_left, std::uintptr_t to_right,
+               std::uintptr_t to_left) {
+                py::gil_scoped_release release{};
+                muGrid::pcr::final_step_gpu<T>(
+                    dim, nb_modes, reinterpret_cast<const C *>(dinv),
+                    reinterpret_cast<const C *>(a),
+                    reinterpret_cast<const C *>(c),
+                    reinterpret_cast<const C *>(x),
+                    reinterpret_cast<const C *>(from_low),
+                    reinterpret_cast<const C *>(from_high),
+                    reinterpret_cast<const C *>(op_right),
+                    reinterpret_cast<const C *>(op_left),
+                    reinterpret_cast<C *>(to_right),
+                    reinterpret_cast<C *>(to_left));
+            },
+            "dim"_a, "nb_modes"_a, "dinv"_a, "a"_a, "c"_a, "x"_a,
+            "from_low"_a, "from_high"_a, "op_right"_a, "op_left"_a,
+            "to_right"_a, "to_left"_a,
+            "The last PCR level fused with the closing solve: writes the "
+            "products the two neighbours need, to_right and to_left. Device "
+            "addresses, not buffers.");
+    }
+
     template <muGrid::Dim_t Dim, typename T>
     void bind_green_symbol_gpu(py::module & mod, const char * name) {
         using RArr =
@@ -469,6 +528,9 @@ void add_linalg_functions(py::module &mod) {
                                   "block_matvec_dense_gpu_f32");
     linalg.attr("block_matvec_gpu_max_components") =
         muGrid::block_matvec::MAX_COMPONENTS;
+    bind_pcr_gpu<Real>(linalg, "pcr_step_gpu", "pcr_final_step_gpu");
+    bind_pcr_gpu<Real32>(linalg, "pcr_step_gpu_f32",
+                         "pcr_final_step_gpu_f32");
     bind_green_symbol_gpu<2, Real>(linalg, "apply_green_symbol_gpu_2d");
     bind_green_symbol_gpu<3, Real>(linalg, "apply_green_symbol_gpu_3d");
     bind_green_symbol_gpu<2, Real32>(linalg, "apply_green_symbol_gpu_2d_f32");

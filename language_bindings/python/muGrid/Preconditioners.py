@@ -2350,8 +2350,9 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
     Sherman-Morrison correction a periodic tridiagonal would otherwise need
     disappears.
 
-    Per apply this exchanges only interface planes -- ``2 * dim`` complex numbers
-    per mode per rank -- against an all-to-all of the entire field.
+    Per apply this exchanges only interface planes -- ``dim`` complex numbers
+    per mode in each direction per exchange -- against an all-to-all of the
+    entire field.
 
     In formulas: let ``z`` be the last axis (distributed over ``P`` ranks,
     ``N_z`` planes, ``n_z = N_z / P`` per rank) and ``q`` the frequencies of
@@ -2535,6 +2536,17 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
                                and self.nb_ranks & (self.nb_ranks - 1) == 0
                                else 0)
         self._use_pcr = self._pcr_nb_levels > 0
+        # On a device the PCR levels run as one compiled kernel each
+        # (linalg/pcr.hh) when the build has it; otherwise, and always on the
+        # host, as batched array products.
+        self._pcr_kernels = None
+        if self._use_pcr and self._on_device:
+            suffix = ("_f32" if np.dtype(self._cdtype) == np.dtype(np.complex64)
+                      else "")
+            step = getattr(linalg, "pcr_step_gpu" + suffix, None)
+            final = getattr(linalg, "pcr_final_step_gpu" + suffix, None)
+            if step is not None and final is not None:
+                self._pcr_kernels = (step, final)
         if self._use_pcr:
             self._build_pcr()
         else:
@@ -2838,6 +2850,22 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         Cost per apply falls from one all-gather of ``P`` interface planes and a
         dense ``(2 d P)^2`` solve per mode, to ``log2(P) + 1`` neighbour
         exchanges and ``log2(P)`` products of ``2d x 2d`` blocks.
+
+        Two things are folded in here so that apply() moves and reads less.
+        ``A`` has a zero first and ``C`` a zero second column block --
+        ``u_p``'s left half couples only to the right half of the rank below,
+        its right half only to the left half of the rank above -- and both
+        products above keep that pattern, as does ``D^-1`` applied from the
+        left. So at every level a rank needs only ``R_{p-s}`` and
+        ``L_{p+s}``: ``d`` numbers per mode in each direction rather than
+        ``2d``. And with ``Ã = D^-1 A[:, d:]`` and ``C̃ = D^-1 C[:, :d]``
+        stored instead of ``A`` and ``C``, a level is
+
+            x'_p = D^-1 x_p - Ã R_{p-s} - C̃ L_{p+s} ,
+
+        three products that the device runs as one kernel
+        (``linalg/pcr.hh``), from two ``2d x d`` blocks where ``A`` and ``C``
+        were ``2d x 2d``.
         """
         xp = self._xp
         dim = self.dim
@@ -2878,12 +2906,23 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
         self._pcr_levels = []
         matmul = xp.matmul
         for _ in range(self._pcr_nb_levels):
+            # The halved exchange relies on these blocks being zero; they are
+            # by construction (exact zeros stay exact through the products),
+            # and checking costs nothing next to the inverse below.
+            if bool(xp.any(A[..., :, :dim])) or bool(xp.any(C[..., :, dim:])):
+                raise RuntimeError(
+                    "block-Thomas preconditioner: the PCR coefficients lost "
+                    "their zero column blocks, so the halved interface "
+                    "exchange would drop coupling terms.")
             D_inv = _batched_inverse(
                 identity - matmul(A, C) - matmul(C, A), xp,
                 singular_mode=self._zero_index)
             # The level keeps the coefficients it eliminates *with*, so store
-            # them before the stride doubles.
-            self._pcr_levels.append((A, C, D_inv))
+            # them before the stride doubles -- folded with D^-1 and cut to
+            # the column blocks that are not zero (see above).
+            self._pcr_levels.append((D_inv,
+                                     matmul(D_inv, A[..., :, dim:]),
+                                     matmul(D_inv, C[..., :, :dim])))
             A, C = (-matmul(D_inv, matmul(A, A)),
                     -matmul(D_inv, matmul(C, C)))
         self._pcr_final_inv = _batched_inverse(
@@ -2918,6 +2957,24 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             take_L = xp.concatenate([A0, zero], axis=-1)  # A0 [I 0]
             self._pcr_to_right = xp.matmul(take_R, self._pcr_final_inv)
             self._pcr_to_left = xp.matmul(take_L, self._pcr_final_inv)
+            # Folded into the two products above; nothing reads it again.
+            self._pcr_final_inv = None
+            if self._pcr_kernels is not None:
+                # The kernel's layout: structure-of-arrays, entry (i, j) of
+                # every mode's block contiguous (see linalg/pcr.hh). It
+                # replaces the batched layout rather than sitting beside it;
+                # _pcr_block() views it back for the array-product path.
+                nb_modes = int(np.prod(self._mode_shape))
+
+                def soa(block):
+                    rows, cols = block.shape[-2:]
+                    return xp.ascontiguousarray(
+                        block.reshape(nb_modes, rows * cols).T)
+
+                self._pcr_levels = [tuple(soa(b) for b in level)
+                                    for level in self._pcr_levels]
+                self._pcr_to_right = soa(self._pcr_to_right)
+                self._pcr_to_left = soa(self._pcr_to_left)
         else:
             # lambda = reduced_inv rhs, and the corrections read the right
             # plane of the rank before and the left plane of the rank after.
@@ -2964,32 +3021,102 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             self._receive_buffers[key] = buffer
         return buffer
 
-    def _solve_reduced_pcr(self, ends):
+    def _pcr_block(self, block, rows, cols):
+        """A PCR coefficient as a batched ``(*modes, rows, cols)`` array.
+
+        A view when the coefficients are stored in the device kernel's
+        structure-of-arrays layout (see _build_corrections), the array itself
+        otherwise.
+        """
+        if self._pcr_kernels is None:
+            return block
+        return block.T.reshape(self._mode_shape + (rows, cols))
+
+    def _solve_reduced_pcr(self, x_local, fused=True):
         """The interface solve by parallel cyclic reduction.
 
-        ``ends`` is this rank's two interface planes; the return is the pair
-        ``(A2 R_{p-1}, A0 L_{p+1})`` -- the corrections to this slab's first and
-        last plane -- each ``(*modes, dim, 1)``.
+        ``x_local`` is the first sweep's solution, ``(nz, *modes, dim, 1)``,
+        whose first and last planes are this rank's interface unknowns; the
+        return is the pair ``(A2 R_{p-1}, A0 L_{p+1})`` -- the corrections to
+        this slab's first and last plane -- each ``(*modes, dim, 1)``.
+
+        Each level sends only the half of ``x`` its partner reads: ``R`` up,
+        ``L`` down (see _build_pcr). On a device with the compiled kernel a
+        level is one launch, and the last one also applies the closing solve
+        and the neighbour products; pass ``fused=False`` for the
+        array-product path, which is what the host runs and the reference
+        the kernel is tested against.
         """
-        xp = self._xp
-        x = xp.ascontiguousarray(
-            ends.reshape(self._mode_shape + (2 * self.dim, 1)))
+        if fused and self._pcr_kernels is not None:
+            return self._solve_reduced_pcr_fused(x_local)
+
+        xp, d = self._xp, self.dim
+        m = 2 * d
+        x = xp.concatenate([x_local[0], x_local[-1]], axis=-2)
 
         matmul = xp.matmul
-        for level, (A, C, D_inv) in enumerate(self._pcr_levels):
+        for level, (D_inv, A_r, C_l) in enumerate(self._pcr_levels):
+            D_inv = self._pcr_block(D_inv, m, m)
+            A_r = self._pcr_block(A_r, m, d)
+            C_l = self._pcr_block(C_l, m, d)
             with self._timed("exchange"):
-                from_low, from_high = self._exchange(x, 1 << level)
+                from_low, from_high = self._exchange(
+                    xp.ascontiguousarray(x[..., d:, :]), 1 << level,
+                    to_low=xp.ascontiguousarray(x[..., :d, :]))
             with self._timed("matmul"):
-                x = matmul(D_inv,
-                           x - matmul(A, from_low) - matmul(C, from_high))
+                x = (matmul(D_inv, x) - matmul(A_r, from_low)
+                     - matmul(C_l, from_high))
 
         # The neighbours' products, computed here and sent to them (see
         # _build_corrections); what arrives is this slab's two corrections.
         with self._timed("matmul"):
-            to_right = matmul(self._pcr_to_right, x)
-            to_left = matmul(self._pcr_to_left, x)
+            to_right = matmul(self._pcr_block(self._pcr_to_right, d, m), x)
+            to_left = matmul(self._pcr_block(self._pcr_to_left, d, m), x)
         with self._timed("exchange"):
-            return self._exchange(to_right, 1, to_low=to_left)
+            return self._exchange(xp.ascontiguousarray(to_right), 1,
+                                  to_low=xp.ascontiguousarray(to_left))
+
+    def _solve_reduced_pcr_fused(self, x_local):
+        """_solve_reduced_pcr with one kernel launch per level.
+
+        Everything is structure-of-arrays, ``(components, nb_modes)``, so the
+        halves a level sends are contiguous row blocks of the work vector and
+        go to MPI without a copy. The kernel takes device addresses; every
+        array handed to it is a buffer kept across applies, so none can be
+        freed while a launch is still in flight.
+        """
+        xp, d = self._xp, self.dim
+        m = 2 * d
+        nb_modes = int(np.prod(self._mode_shape))
+        step, final = self._pcr_kernels
+
+        x = self._receive_buffer(x_local, "pcr_x", (m, nb_modes))
+        x[:d] = x_local[0].reshape(nb_modes, d).T
+        x[d:] = x_local[-1].reshape(nb_modes, d).T
+        to_right = self._receive_buffer(x_local, "pcr_to_right", (d, nb_modes))
+        to_left = self._receive_buffer(x_local, "pcr_to_left", (d, nb_modes))
+
+        last_level = len(self._pcr_levels) - 1
+        with xp.cuda.Device(x.device.id):
+            for level, (D_inv, A_r, C_l) in enumerate(self._pcr_levels):
+                with self._timed("exchange"):
+                    from_low, from_high = self._exchange(
+                        x[d:], 1 << level, to_low=x[:d])
+                with self._timed("matmul"):
+                    args = (d, nb_modes, D_inv.data.ptr, A_r.data.ptr,
+                            C_l.data.ptr, x.data.ptr, from_low.data.ptr,
+                            from_high.data.ptr)
+                    if level < last_level:
+                        step(*args, x.data.ptr)  # in place
+                    else:
+                        final(*args, self._pcr_to_right.data.ptr,
+                              self._pcr_to_left.data.ptr,
+                              to_right.data.ptr, to_left.data.ptr)
+
+        with self._timed("exchange"):
+            first, last = self._exchange(to_right, 1, to_low=to_left)
+        shape = self._mode_shape + (d, 1)
+        return first.T.reshape(shape), last.T.reshape(shape)
 
     def _build_zero_mode(self):
         """The all-zero mode, which the tridiagonal path cannot solve.
@@ -3134,13 +3261,13 @@ class HybridFourierTridiagonalPreconditioner(Preconditioner):
             x = self._solve_local(v)
 
         with self._timed("interface"):
-            ends = xp.stack([x[0, ..., 0], x[-1, ..., 0]], axis=-2)
             # first = A2 left, last = A0 right: the neighbours' interface
             # planes as they enter this slab's two end planes, each
             # (*modes, dim, 1). See _build_corrections.
             if self._use_pcr:
-                first, last = self._solve_reduced_pcr(ends)
+                first, last = self._solve_reduced_pcr(x)
             else:
+                ends = xp.stack([x[0, ..., 0], x[-1, ..., 0]], axis=-2)
                 if self.nb_ranks == 1:
                     rhs = ends.reshape(self._mode_shape + (2 * dim, 1))
                 else:

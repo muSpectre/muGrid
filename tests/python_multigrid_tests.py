@@ -1092,3 +1092,54 @@ def test_hybrid_runs_on_its_own_gpu(comm, dim, n):
         got = cp.asnumpy(cp.asarray(dz.p))
     want = np.asarray(hz.p)
     assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()
+
+
+@pytest.mark.skipif(not _has_gpu(), reason="needs a GPU")
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+@pytest.mark.parametrize("dtype,tol", [(np.float64, 1e-11),
+                                       (np.float32, 1e-4)])
+def test_hybrid_pcr_kernel_matches_the_products(comm, dim, n, dtype, tol):
+    """The fused device PCR level agrees with the array products it replaces.
+
+    Like `test_hybrid_fused_kernel_matches_the_loop` for the sweep: same
+    device, same data, so it fails for the kernel alone. It needs a
+    power-of-two rank count of at least two, where the interface is solved by
+    parallel cyclic reduction at all; it also checks that a GPU build has the
+    kernel, since the preconditioner would otherwise fall back silently.
+    """
+    import cupy as cp
+    from muGrid import linalg
+
+    nb_ranks = 1 if comm is None else comm.size
+    if nb_ranks < 2 or nb_ranks & (nb_ranks - 1):
+        pytest.skip("parallel cyclic reduction needs 2, 4, 8, ... ranks")
+    if n % nb_ranks or n // nb_ranks < 2:
+        pytest.skip(f"{n} planes do not split into {nb_ranks} slabs")
+    assert hasattr(linalg, "pcr_step_gpu"), "GPU build without the PCR kernel"
+
+    gpu = comm.rank % _nb_gpus()
+    cp.cuda.Device(gpu).use()
+    decomp = muGrid.CartesianDecomposition(
+        comm, [n] * dim, nb_subdivisions=[1] * (dim - 1) + [nb_ranks],
+        nb_ghosts_left=(1,) * dim, nb_ghosts_right=(1,) * dim,
+        device=muGrid.Device.gpu(gpu))
+    from muGrid.Preconditioners import HybridFourierTridiagonalPreconditioner
+    prec = HybridFourierTridiagonalPreconditioner(
+        decomp, (1.0 / n,) * dim, 1.3, 0.7, communicator=comm, dtype=dtype)
+    assert prec._pcr_kernels is not None
+
+    rng = cp.random.default_rng(17 + comm.rank)
+    shape = (prec.nz_local,) + prec._mode_shape + (dim, 1)
+    x = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)
+         ).astype(prec._cdtype)
+
+    # Copied out: both paths return views of the exchange's receive buffers,
+    # which the second call overwrites.
+    fused = [g.copy() for g in prec._solve_reduced_pcr(x)]
+    products = [g.copy() for g in prec._solve_reduced_pcr(x, fused=False)]
+
+    # The all-zero mode's coefficients are zero by design (it is solved
+    # separately), so both paths give zero there.
+    for got, want in zip(fused, products):
+        scale = float(cp.abs(want).max())
+        assert float(cp.abs(got - want).max()) <= tol * scale
