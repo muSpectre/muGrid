@@ -281,6 +281,8 @@ apply_green_symbol_3d_f32 = _linalg.apply_green_symbol_3d_f32
 # The device symbol application likewise; AnalyticReferencePreconditioner picks
 # it when its work field lives on a device. block_matvec_*_gpu are the in-place
 # per-mode block products of BlockFourierPreconditioner on a device.
+# pcr_*step_gpu are the fused interface-solve levels of
+# HybridFourierTridiagonalPreconditioner on a device.
 for _name in ("block_thomas_gpu_2d", "block_thomas_gpu_3d",
               "block_thomas_gpu_2d_f32", "block_thomas_gpu_3d_f32",
               "block_thomas_gpu_chunk", "block_thomas_gpu_threads",
@@ -288,6 +290,8 @@ for _name in ("block_thomas_gpu_2d", "block_thomas_gpu_3d",
               "block_matvec_hermitian_gpu", "block_matvec_dense_gpu",
               "block_matvec_hermitian_gpu_f32", "block_matvec_dense_gpu_f32",
               "block_matvec_gpu_max_components",
+              "pcr_step_gpu", "pcr_final_step_gpu",
+              "pcr_step_gpu_f32", "pcr_final_step_gpu_f32",
               "apply_green_symbol_gpu_2d", "apply_green_symbol_gpu_3d",
               "apply_green_symbol_gpu_2d_f32",
               "apply_green_symbol_gpu_3d_f32"):

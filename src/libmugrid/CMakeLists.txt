@@ -94,6 +94,7 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/block_thomas_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/block_matvec_gpu.cc)
+    list(APPEND MUGRID_SOURCES linalg/pcr_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/green_symbol_gpu.cc)
     list(APPEND MUGRID_SOURCES mpi/ghost_accumulate_gpu.cc)
     # Mark .cc files to be compiled as CUDA
@@ -107,6 +108,7 @@ if(MUGRID_ENABLE_CUDA)
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/block_thomas_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/block_matvec_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/linalg/pcr_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/green_symbol_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/mpi/ghost_accumulate_gpu.cc
         PROPERTIES LANGUAGE CUDA
@@ -121,6 +123,7 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES linalg/linalg_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/block_thomas_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/block_matvec_gpu.cc)
+    list(APPEND MUGRID_SOURCES linalg/pcr_gpu.cc)
     list(APPEND MUGRID_SOURCES linalg/green_symbol_gpu.cc)
     list(APPEND MUGRID_SOURCES mpi/ghost_accumulate_gpu.cc)
     # Mark .cc files to be compiled as HIP
@@ -134,6 +137,7 @@ elseif(MUGRID_ENABLE_HIP)
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/linalg_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/block_thomas_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/block_matvec_gpu.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/linalg/pcr_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/linalg/green_symbol_gpu.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/mpi/ghost_accumulate_gpu.cc
         PROPERTIES LANGUAGE HIP
