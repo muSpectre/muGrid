@@ -118,6 +118,33 @@ jobs:
             --cov=muGrid --cov-report=xml:build/coverage-python.xml \
             --cov-report=term-missing || true
 
+      # The serial run above never reaches code that needs several ranks --
+      # the hybrid preconditioner's parallel cyclic reduction, the overlapped
+      # ghost exchange -- although ctest runs those tests under mpiexec: ctest
+      # feeds only the C++ (gcov) counters. Measure the MPI-relevant Python
+      # tests again on four ranks. Every rank runs the same code paths, so
+      # rank 0 alone writes the report; each rank keeps its own data file so
+      # that they do not overwrite one another.
+      - name: Python wrapper-layer coverage on 4 ranks
+        if: matrix.mpi == 'yes'
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          export TESTS_BUILDDIR=$PWD/build/tests
+          mpirun -n 4 --oversubscribe sh -c '
+            rank=${OMPI_COMM_WORLD_RANK:-0}
+            report="--cov-report="
+            if [ "$rank" = 0 ]; then
+              report="--cov-report=xml:build/coverage-python-mpi.xml"
+            fi
+            COVERAGE_FILE=.coverage.rank$rank exec python3 -m pytest -q \
+              -p no:cacheprovider \
+              tests/python_multigrid_tests.py \
+              tests/python_ghost_overlap_tests.py \
+              tests/python_decomposition_tests.py \
+              tests/python_solvers_tests.py \
+              --cov=muGrid "$report"' || true
+
       - name: Upload coverage reports as artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -125,6 +152,7 @@ jobs:
           path: |
             build/coverage.xml
             build/coverage-python.xml
+            build/coverage-python-mpi.xml
             build/coverage_html/
           if-no-files-found: warn
 
@@ -136,7 +164,7 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: build/coverage.xml,build/coverage-python.xml
+          files: build/coverage.xml,build/coverage-python.xml,build/coverage-python-mpi.xml
           flags: mpi-${{ matrix.mpi }}
           fail_ci_if_error: false
 
@@ -235,6 +263,32 @@ jobs:
           python3 -m pytest tests -v -rA -p no:cacheprovider \
             --cov=muGrid --cov-report=xml:build/coverage-python.xml
 
+      # The serial run above never reaches code that needs several ranks --
+      # the hybrid preconditioner's parallel cyclic reduction, the overlapped
+      # ghost exchange -- although ctest runs those tests under mpiexec: ctest
+      # feeds only the C++ (gcov) counters. Measure the MPI-relevant Python
+      # tests again on four ranks. Every rank runs the same code paths, so
+      # rank 0 alone writes the report; each rank keeps its own data file so
+      # that they do not overwrite one another.
+      - name: Python wrapper-layer coverage on 4 ranks
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$PWD/build/language_bindings/python:$PWD/language_bindings/python
+          export TESTS_BUILDDIR=$PWD/build/tests
+          mpirun -n 4 --oversubscribe sh -c '
+            rank=${OMPI_COMM_WORLD_RANK:-0}
+            report="--cov-report="
+            if [ "$rank" = 0 ]; then
+              report="--cov-report=xml:build/coverage-python-mpi.xml"
+            fi
+            COVERAGE_FILE=.coverage.rank$rank exec python3 -m pytest -q \
+              -p no:cacheprovider \
+              tests/python_multigrid_tests.py \
+              tests/python_ghost_overlap_tests.py \
+              tests/python_decomposition_tests.py \
+              tests/python_solvers_tests.py \
+              --cov=muGrid "$report"' || true
+
       - name: Generate C++ coverage reports
         run: |
           source venv/bin/activate
@@ -247,6 +301,7 @@ jobs:
           path: |
             build/coverage.xml
             build/coverage-python.xml
+            build/coverage-python-mpi.xml
             build/coverage_html/
           if-no-files-found: warn
 
@@ -255,6 +310,6 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: build/coverage.xml,build/coverage-python.xml
+          files: build/coverage.xml,build/coverage-python.xml,build/coverage-python-mpi.xml
           flags: gpu
           fail_ci_if_error: false

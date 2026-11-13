@@ -21,6 +21,12 @@ v1.6.2 (not yet released)
 
 - PERF: The hybrid preconditioner's interface solve sends half as much data per exchange,
   stores a third less per level, and on a GPU runs each reduction level as one kernel
+- PERF: The hybrid preconditioner's interface solve exchanges and computes its deeper
+  reduction levels only for the modes still coupled across ranks, exactly as before
+- ENH: Ghost exchange can be started and finished separately, and the stiffness
+  operator applied to a range of planes, so a stencil can overlap the halo exchange
+- PERF: The fused residual update of CG reads its fields once on a GPU when they have
+  ghosts, and CG combines two of its three global reductions per iteration into one
 
 v1.6.1 (02Nov26)
 ----------------

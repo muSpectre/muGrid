@@ -102,6 +102,18 @@ namespace muGrid {
                             const std::complex<T> * op_left,
                             std::complex<T> * to_right,
                             std::complex<T> * to_left);
+
+        //! Only the neighbour products of the final variant, for when the
+        //! last level ran on a subset of the modes (see
+        //! HybridFourierTridiagonalPreconditioner._truncate_pcr):
+        //! `to_right = op_right x`, `to_left = op_left x` per mode.
+        template <typename T>
+        void products_gpu(Index_t dim, Index_t nb_modes,
+                          const std::complex<T> * op_right,
+                          const std::complex<T> * op_left,
+                          const std::complex<T> * x,
+                          std::complex<T> * to_right,
+                          std::complex<T> * to_left);
 #endif
 
     }  // namespace pcr

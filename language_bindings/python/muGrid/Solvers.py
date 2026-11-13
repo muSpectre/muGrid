@@ -432,19 +432,23 @@ def conjugate_gradients(
                 with timed("update_x"):
                     linalg.axpy(alpha, p, x)
 
-                # Update residual: r -= alpha * Ap
+                # Update residual: r -= alpha * Ap, and this rank's |r|^2
                 with timed("update_r"):
-                    next_rr = comm.sum(linalg.axpy_norm_sq(-alpha, Ap, r))
-
-                next_rr_val = float(next_rr)
+                    local_rr = linalg.axpy_norm_sq(-alpha, Ap, r)
 
                 # apply preconditioner z=P*r
                 with timed("prec"):
                     prec(r, z)
 
-                # Compute next_rz after applying preconditioner
+                # r^T z and |r|^2 in one global reduction: nothing reads |r|^2
+                # before this point, so it can wait for r^T z and share its
+                # allreduce -- one global synchronisation per iteration fewer
+                # (CG has three: p^T A p, |r|^2, r^T z).
                 with timed("dot_rz"):
-                    next_rz = comm.sum(linalg.vecdot(r, z))
+                    next_rr, next_rz = comm.sum(
+                        np.array([local_rr, linalg.vecdot(r, z)]))
+
+                next_rr_val = float(next_rr)
 
                 if callback:
                     with timed("callback"):

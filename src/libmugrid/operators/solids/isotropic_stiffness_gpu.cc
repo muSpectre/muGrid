@@ -1327,7 +1327,7 @@ void IsotropicStiffnessOperator<2>::apply_impl(
     const TypedFieldBase<T, DefaultDeviceSpace>& mu,
     T alpha,
     TypedFieldBase<T, DefaultDeviceSpace>& force,
-    bool increment) const {
+    bool increment, Index_t plane_begin, Index_t plane_end) const {
         DeviceGuard device_guard{displacement.get_device_id()};
 
     // Validate field collections and ghosts; the dimension-generic checks
@@ -1383,13 +1383,23 @@ void IsotropicStiffnessOperator<2>::apply_impl(
     Index_t mat_offset = mat_ghost_offset_x * mat_stride_x +
                          mat_ghost_offset_y * mat_stride_y;
 
+    // Only the planes [plane_begin, plane_end) of the last axis (see
+    // apply_planes): start that many planes in, compute fewer.
+    const auto planes = internal::plane_range(nny, plane_begin, plane_end);
+    if (planes.second == 0) {
+        return;
+    }
+    disp_offset += planes.first * disp_stride_y;
+    force_offset += planes.first * force_stride_y;
+    mat_offset += planes.first * mat_stride_y;
+
     isotropic_stiffness_kernels::isotropic_stiffness_2d_gpu<T>(
         displacement.view().data() + disp_offset,
         lambda.view().data() + mat_offset,
         mu.view().data() + mat_offset,
         force.view().data() + force_offset,
-        nnx, nny,  // Number of interior nodes
-        nelx, nely,  // Number of elements (same as nodes with node-based indexing)
+        nnx, planes.second,  // Number of interior nodes
+        nelx, planes.second, // Number of elements (same as nodes)
         disp_stride_x, disp_stride_y, disp_stride_d,
         mat_stride_x, mat_stride_y,
         force_stride_x, force_stride_y, force_stride_d,
@@ -1405,7 +1415,7 @@ void IsotropicStiffnessOperator<3>::apply_impl(
     const TypedFieldBase<T, DefaultDeviceSpace>& mu,
     T alpha,
     TypedFieldBase<T, DefaultDeviceSpace>& force,
-    bool increment) const {
+    bool increment, Index_t plane_begin, Index_t plane_end) const {
         DeviceGuard device_guard{displacement.get_device_id()};
 
     // Validate field collections and ghosts; the dimension-generic checks
@@ -1472,13 +1482,23 @@ void IsotropicStiffnessOperator<3>::apply_impl(
                          mat_ghost_offset_y * mat_stride_y +
                          mat_ghost_offset_z * mat_stride_z;
 
+    // Only the planes [plane_begin, plane_end) of the last axis (see
+    // apply_planes): start that many planes in, compute fewer.
+    const auto planes = internal::plane_range(nnz, plane_begin, plane_end);
+    if (planes.second == 0) {
+        return;
+    }
+    disp_offset += planes.first * disp_stride_z;
+    force_offset += planes.first * force_stride_z;
+    mat_offset += planes.first * mat_stride_z;
+
     isotropic_stiffness_kernels::isotropic_stiffness_3d_gpu<T>(
         displacement.view().data() + disp_offset,
         lambda.view().data() + mat_offset,
         mu.view().data() + mat_offset,
         force.view().data() + force_offset,
-        nnx, nny, nnz,  // Number of interior nodes
-        nelx, nely, nelz,  // Number of elements (same as nodes)
+        nnx, nny, planes.second,  // Number of interior nodes
+        nelx, nely, planes.second, // Number of elements (same as nodes)
         disp_stride_x, disp_stride_y, disp_stride_z, disp_stride_d,
         mat_stride_x, mat_stride_y, mat_stride_z,
         force_stride_x, force_stride_y, force_stride_z, force_stride_d,
@@ -1975,7 +1995,8 @@ std::array<Real, 9> IsotropicStiffnessOperator<3>::average_stress_impl(
         const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
         const TypedFieldBase<T, DefaultDeviceSpace> &,                         \
         const TypedFieldBase<T, DefaultDeviceSpace> &, T,                      \
-        TypedFieldBase<T, DefaultDeviceSpace> &, bool) const;                  \
+        TypedFieldBase<T, DefaultDeviceSpace> &, bool, Index_t,                \
+        Index_t) const;                                                        \
     template void IsotropicStiffnessOperator<D>::apply_uniform_impl<T>(        \
         const TypedFieldBase<T, DefaultDeviceSpace> &, T, T, T,                \
         TypedFieldBase<T, DefaultDeviceSpace> &, bool) const;                  \

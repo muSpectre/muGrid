@@ -162,6 +162,34 @@ namespace muGrid {
                 }
             }
 
+            template <int D, typename T>
+            __global__ void
+            products_kernel(const DevCplx<T> * MUGRID_RESTRICT op_right,
+                            const DevCplx<T> * MUGRID_RESTRICT op_left,
+                            const DevCplx<T> * MUGRID_RESTRICT x,
+                            DevCplx<T> * MUGRID_RESTRICT to_right,
+                            DevCplx<T> * MUGRID_RESTRICT to_left,
+                            Index_t M) {
+                const Index_t k{global_thread_x()};
+                if (k >= M) {
+                    return;
+                }
+                constexpr int m{2 * D};
+                DevCplx<T> y[m];
+                for (int j{0}; j < m; ++j) {
+                    y[j] = x[j * M + k];
+                }
+                for (int i{0}; i < D; ++i) {
+                    DevCplx<T> r{T(0), T(0)}, l{T(0), T(0)};
+                    for (int j{0}; j < m; ++j) {
+                        cfma(r, op_right[(i * m + j) * M + k], y[j]);
+                        cfma(l, op_left[(i * m + j) * M + k], y[j]);
+                    }
+                    to_right[i * M + k] = r;
+                    to_left[i * M + k] = l;
+                }
+            }
+
             void check_dim(Index_t dim, const char * name) {
                 if (dim != 2 && dim != 3) {
                     throw RuntimeError(std::string(name) +
@@ -247,6 +275,34 @@ namespace muGrid {
             GPU_KERNEL_DEBUG_SYNC("pcr::final_step");
         }
 
+        template <typename T>
+        void products_gpu(Index_t dim, Index_t nb_modes,
+                          const std::complex<T> * op_right,
+                          const std::complex<T> * op_left,
+                          const std::complex<T> * x,
+                          std::complex<T> * to_right,
+                          std::complex<T> * to_left) {
+            check_dim(dim, "pcr::products_gpu");
+            if (nb_modes == 0) {
+                return;
+            }
+            using DC = DevCplx<T>;
+            const auto * opr{reinterpret_cast<const DC *>(op_right)};
+            const auto * opl{reinterpret_cast<const DC *>(op_left)};
+            const auto * xx{reinterpret_cast<const DC *>(x)};
+            auto * tr{reinterpret_cast<DC *>(to_right)};
+            auto * tl{reinterpret_cast<DC *>(to_left)};
+            const Index_t grid{nb_blocks(nb_modes)};
+            if (dim == 2) {
+                GPU_LAUNCH_KERNEL((products_kernel<2, T>), grid, BLOCK_SIZE,
+                                  opr, opl, xx, tr, tl, nb_modes);
+            } else {
+                GPU_LAUNCH_KERNEL((products_kernel<3, T>), grid, BLOCK_SIZE,
+                                  opr, opl, xx, tr, tl, nb_modes);
+            }
+            GPU_KERNEL_DEBUG_SYNC("pcr::products");
+        }
+
         template void step_gpu<Real>(Index_t, Index_t,
                                      const std::complex<Real> *,
                                      const std::complex<Real> *,
@@ -277,6 +333,15 @@ namespace muGrid {
             const std::complex<Real32> *, const std::complex<Real32> *,
             const std::complex<Real32> *, std::complex<Real32> *,
             std::complex<Real32> *);
+
+        template void products_gpu<Real>(
+            Index_t, Index_t, const std::complex<Real> *,
+            const std::complex<Real> *, const std::complex<Real> *,
+            std::complex<Real> *, std::complex<Real> *);
+        template void products_gpu<Real32>(
+            Index_t, Index_t, const std::complex<Real32> *,
+            const std::complex<Real32> *, const std::complex<Real32> *,
+            std::complex<Real32> *, std::complex<Real32> *);
 
     }  // namespace pcr
 

@@ -667,3 +667,64 @@ class TestDeepCopy:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+@pytest.mark.parametrize("nb_grid_pts,ghosts_left,ghosts_right", [
+    ([7, 5], (1, 2), (2, 1)),
+    ([6, 5, 4], (1, 1, 2), (2, 1, 1)),
+    ([9], (2,), (1,)),
+])
+@pytest.mark.parametrize("nb_components", [1, 3])
+def test_axpy_norm_sq_with_ghosts_matches_numpy(device, nb_grid_pts,
+                                                ghosts_left, ghosts_right,
+                                                nb_components):
+    """axpy over the whole buffer, squared norm over the interior only.
+
+    On a device this is one fused pass (axpy_interior_norm_sq_kernel) that
+    decides per row whether it is interior; asymmetric ghosts and several
+    components exercise its row and range arithmetic for both layouts.
+    """
+    skip_if_gpu_unavailable(device)
+    dim = len(nb_grid_pts)
+    kwargs = {}
+    device_obj = create_device(device)
+    if device_obj is not None:
+        kwargs["device"] = device_obj
+    decomposition = muGrid.CartesianDecomposition(
+        muGrid.Communicator(), nb_grid_pts, nb_subdivisions=(1,) * dim,
+        nb_ghosts_left=ghosts_left, nb_ghosts_right=ghosts_right, **kwargs)
+    x = decomposition.real_field(f"fz-x-{dim}-{nb_components}",
+                                 (nb_components,))
+    y = decomposition.real_field(f"fz-y-{dim}-{nb_components}",
+                                 (nb_components,))
+
+    def host(a):
+        return a.get() if hasattr(a, "get") else np.array(a)
+
+    def assign(target, values):
+        if hasattr(target, "get"):
+            import cupy as cp
+            target[...] = cp.asarray(values)
+        else:
+            target[...] = values
+
+    rng = np.random.default_rng(9)
+    xs = rng.standard_normal(host(x.pg).shape)
+    ys = rng.standard_normal(host(y.pg).shape)
+    # Large ghosts: any of them leaking into the norm shows
+    interior = tuple(slice(gl, gl + n) for gl, n in
+                     zip(ghosts_left, nb_grid_pts))
+    ghost_mask = np.ones(ys.shape, dtype=bool)
+    ghost_mask[(Ellipsis,) + interior] = False
+    ys[ghost_mask] *= 1e6
+    assign(x.pg, xs)
+    assign(y.pg, ys)
+
+    alpha = -0.75
+    got = linalg.axpy_norm_sq(alpha, x, y)
+    want_y = ys + alpha * xs
+    want = float((want_y[(Ellipsis,) + interior] ** 2).sum())
+
+    assert got == pytest.approx(want, rel=1e-12)
+    np.testing.assert_allclose(host(y.pg), want_y, rtol=1e-14, atol=0)

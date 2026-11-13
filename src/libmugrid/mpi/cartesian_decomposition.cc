@@ -11,8 +11,15 @@
 #endif
 
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/device.hh"
 #include "memory/gpu_runtime.hh"
+#include "mpi/gpu_aware_mpi.hh"
 #endif
+#ifdef WITH_MPI
+#include "mpi/mpi_counts.hh"
+#include "mpi/type_descriptor_mpi.hh"
+#endif
+#include "core/exception.hh"
 
 #include "core/coordinates.hh"
 #include "core/enums.hh"
@@ -242,6 +249,16 @@ namespace muGrid {
 
     /* ---------------------------------------------------------------------- */
     void CartesianDecomposition::communicate_ghosts(const Field & field) const {
+        if (this->pending_ghosts) {
+            throw RuntimeError("communicate_ghosts: an exchange started by "
+                               "begin_communicate_ghosts is still in flight; "
+                               "end it first");
+        }
+        this->communicate_ghosts_upto(field, this->get_spatial_dim());
+    }
+
+    void CartesianDecomposition::communicate_ghosts_upto(
+        const Field & field, Dim_t nb_directions) const {
         this->check_field_is_of_this_collection(field, "communicate_ghosts");
         this->check_ghost_layout(field, "communicate_ghosts");
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
@@ -291,7 +308,7 @@ namespace muGrid {
         // through the SubPt strides.
 
         // For each direction...
-        for (Dim_t direction{0}; direction < spatial_dims; ++direction) {
+        for (Dim_t direction{0}; direction < nb_directions; ++direction) {
             // Grid size
             auto nb_subdomain_grid_pts_without_ghosts{
                 this->get_nb_subdomain_grid_pts_without_ghosts()[direction]};
@@ -436,6 +453,199 @@ namespace muGrid {
                     std::min(nb_ghosts_right - nb_cum_send_left, nb_recv_right);
             }
         }
+    }
+
+    struct PendingGhostExchange {
+        //! The field whose ghosts are being filled
+        const Field * field{nullptr};
+#ifdef WITH_MPI
+        std::vector<MPI_Request> requests{};
+#endif
+        //! Host bounce buffers, when MPI cannot read the device memory: the
+        //! sends are copied here before posting, the receives copied from
+        //! here to `recv_targets` at the end
+        std::vector<std::vector<char>> host_send{};
+        std::vector<std::vector<char>> host_recv{};
+        std::vector<char *> recv_targets{};
+    };
+
+    bool CartesianDecomposition::overlaps_ghost_communication() const {
+#ifdef WITH_MPI
+        const auto last{this->get_spatial_dim() - 1};
+        if (this->cart_comm->get_mpi_comm() == MPI_COMM_NULL ||
+            this->nb_sendrecv_steps[last] != 1) {
+            return false;
+        }
+        const int rank{this->cart_comm->rank()};
+        return !(this->cart_comm->get_left_rank(last) == rank &&
+                 this->cart_comm->get_right_rank(last) == rank);
+#else
+        return false;
+#endif
+    }
+
+    void CartesianDecomposition::begin_communicate_ghosts(
+        const Field & field) const {
+        if (this->pending_ghosts) {
+            throw RuntimeError("begin_communicate_ghosts: an exchange is "
+                               "already in flight; end it first");
+        }
+        if (!this->overlaps_ghost_communication()) {
+            this->communicate_ghosts(field);
+            return;
+        }
+#ifdef WITH_MPI
+        const auto spatial_dims{this->get_spatial_dim()};
+        const Dim_t last{spatial_dims - 1};
+        // Every axis but the last, as communicate_ghosts would: the slices
+        // sent along the last axis then carry the corner ghosts already.
+        this->communicate_ghosts_upto(field, last);
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        std::optional<DeviceGuard> device_guard;
+        if (field.is_on_device()) {
+            device_guard.emplace(field.get_device_id());
+        }
+#endif
+        // The slice layout along the last axis, as in communicate_ghosts:
+        // `nb_blocks` blocks `block_stride` apart (one for AoS, one per
+        // component for SoA), in each of which k consecutive slices are one
+        // contiguous run of k * block_len elements -- so every message is a
+        // contiguous run and goes to MPI without packing.
+        const auto strides{field.get_strides(IterUnit::SubPt)};
+        const auto nb_total{static_cast<Index_t>(field.get_buffer_size())};
+        const auto block_len{strides[strides.size() - spatial_dims + last]};
+        const auto first_spatial_stride{strides[strides.size() - spatial_dims]};
+        const bool is_soa{strides[0] > first_spatial_stride};
+        const Index_t last_non_spatial_stride{
+            strides.size() > static_cast<size_t>(spatial_dims)
+                ? strides[strides.size() - spatial_dims - 1]
+                : nb_total};
+        const Index_t block_stride{is_soa ? last_non_spatial_stride
+                                          : nb_total};
+        const Index_t nb_blocks{nb_total / block_stride};
+
+        const auto n{this->get_nb_subdomain_grid_pts_without_ghosts()[last]};
+        const auto ng_left{this->get_nb_ghosts_left()[last]};
+        const auto nb_send_right{this->send_right_sequence[last][0]};
+        const auto nb_send_left{this->send_left_sequence[last][0]};
+        const auto nb_recv_left{this->recv_left_sequence[last][0]};
+        const auto nb_recv_right{this->recv_right_sequence[last][0]};
+        // In slices along the last axis
+        const Index_t send_right_at{ng_left + n - nb_send_right};
+        const Index_t send_left_at{ng_left};
+        const Index_t recv_left_at{ng_left - nb_recv_left};
+        const Index_t recv_right_at{ng_left + n};
+
+        auto * data{static_cast<char *>(field.get_void_data_ptr(false))};
+        const auto element_size{
+            static_cast<Index_t>(field.get_element_size_in_bytes())};
+        const MPI_Datatype mpi_type{
+            descriptor_to_mpi_type(field.get_type_descriptor())};
+        const MPI_Comm comm{this->cart_comm->get_mpi_comm()};
+        const int left{this->cart_comm->get_left_rank(last)};
+        const int right{this->cart_comm->get_right_rank(last)};
+
+        bool bounce{false};
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        if (field.is_on_device()) {
+            // MPI does not order itself after the kernels that wrote the
+            // field (including the ghost fills just done)
+            GPU_STREAM_SYNCHRONIZE_DEFAULT();
+            bounce = !(mpi_is_gpu_aware() ||
+                       host_can_read_device_pointer(data));
+        }
+#endif
+
+        auto pending{std::make_shared<PendingGhostExchange>()};
+        pending->field = &field;
+        // Stable addresses for the bounce buffers MPI is handed
+        pending->host_send.reserve(2 * nb_blocks);
+        pending->host_recv.reserve(2 * nb_blocks);
+        // Distinct tags per block and direction; nothing else is in flight
+        // on this communicator while the exchange is (MPI calls are
+        // blocking elsewhere), but tags keep the two directions apart when
+        // the left and the right neighbour are the same rank (two ranks).
+        constexpr int TAG_BASE{19783};
+        auto post = [&](bool is_send, Index_t at_slice, Index_t nb_slices,
+                        int peer, int tag, Index_t block) {
+            const Index_t count{nb_slices * block_len};
+            if (count == 0) {
+                return;
+            }
+            char * address{data + (block * block_stride + at_slice * block_len) *
+                                      element_size};
+            const auto bytes{static_cast<std::size_t>(count * element_size)};
+            void * buffer{address};
+            if (bounce) {
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+                auto & host{is_send ? pending->host_send : pending->host_recv};
+                host.emplace_back(bytes);
+                buffer = host.back().data();
+                if (is_send) {
+                    GPU_MEMCPY_D2H(buffer, address, bytes);
+                } else {
+                    pending->recv_targets.push_back(address);
+                }
+#endif
+            }
+            MPI_Request request;
+            const int mpi_count{checked_mpi_int(count, "ghost slice")};
+            if (is_send) {
+                MPI_Isend(buffer, mpi_count, mpi_type, peer, tag, comm,
+                          &request);
+            } else {
+                MPI_Irecv(buffer, mpi_count, mpi_type, peer, tag, comm,
+                          &request);
+            }
+            pending->requests.push_back(request);
+        };
+        for (Index_t block{0}; block < nb_blocks; ++block) {
+            const int to_right_tag{TAG_BASE + 2 * static_cast<int>(block)};
+            const int to_left_tag{to_right_tag + 1};
+            // Receives first, so the matching sends find them posted
+            post(false, recv_left_at, nb_recv_left, left, to_right_tag, block);
+            post(false, recv_right_at, nb_recv_right, right, to_left_tag,
+                 block);
+        }
+        for (Index_t block{0}; block < nb_blocks; ++block) {
+            const int to_right_tag{TAG_BASE + 2 * static_cast<int>(block)};
+            const int to_left_tag{to_right_tag + 1};
+            post(true, send_right_at, nb_send_right, right, to_right_tag,
+                 block);
+            post(true, send_left_at, nb_send_left, left, to_left_tag, block);
+        }
+        this->pending_ghosts = std::move(pending);
+#endif
+    }
+
+    void CartesianDecomposition::end_communicate_ghosts(
+        const Field & field) const {
+        if (!this->pending_ghosts) {
+            return;  // begin did the whole exchange (nothing to overlap)
+        }
+        // Checked before anything is consumed: the exchange stays in flight
+        // for the right call to complete.
+        if (this->pending_ghosts->field != &field) {
+            throw RuntimeError("end_communicate_ghosts: called for another "
+                               "field than begin_communicate_ghosts");
+        }
+        auto pending{std::move(this->pending_ghosts)};
+        this->pending_ghosts.reset();
+#ifdef WITH_MPI
+        MPI_Waitall(static_cast<int>(pending->requests.size()),
+                    pending->requests.data(), MPI_STATUSES_IGNORE);
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        if (!pending->recv_targets.empty()) {
+            DeviceGuard device_guard{field.get_device_id()};
+            for (std::size_t i{0}; i < pending->recv_targets.size(); ++i) {
+                GPU_MEMCPY_H2D(pending->recv_targets[i],
+                               pending->host_recv[i].data(),
+                               pending->host_recv[i].size());
+            }
+        }
+#endif
+#endif
     }
 
     void CartesianDecomposition::communicate_ghosts(

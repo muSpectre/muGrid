@@ -7,6 +7,9 @@
 #include "mpi/cartesian_communicator.hh"
 #include "mpi/decomposition.hh"
 
+#include <memory>
+#include <vector>
+
 namespace muGrid {
     /**
      * Block decomposition of a periodic d-dimensional grid of
@@ -40,6 +43,9 @@ namespace muGrid {
      * The ghost exchange requires column-major pixel storage (first axis
      * fastest); the per-pixel dof layout may be AoS or SoA.
      */
+    //! State of a ghost exchange in flight (cartesian_decomposition.cc)
+    struct PendingGhostExchange;
+
     class CartesianDecomposition : public Decomposition {
        public:
         using Parent_t = Decomposition;
@@ -110,6 +116,33 @@ namespace muGrid {
         //! fill the ghost buffers with the values from the neighboring
         //! processes.
         void communicate_ghosts(const std::string & field_name) const override;
+
+        /**
+         * Start communicate_ghosts(field) without waiting for the last axis.
+         *
+         * The ghosts along every axis but the last are filled before this
+         * returns; the exchange along the last axis -- the one a slab
+         * decomposition distributes over ranks -- is posted as non-blocking
+         * messages. Work that reads none of the last axis's ghosts can run
+         * while they are in flight; end_communicate_ghosts(field) completes
+         * the exchange, after which the ghosts are exactly what
+         * communicate_ghosts(field) gives. Until then `field` must not be
+         * written and its last-axis ghosts are undefined. One exchange can be
+         * in flight per decomposition.
+         *
+         * Where there is nothing to overlap -- no MPI, a single rank along the
+         * last axis, or ghosts wider than a neighbour's interior (several
+         * relay steps) -- this simply calls communicate_ghosts and the end is
+         * a no-op. Collective over the communicator.
+         */
+        void begin_communicate_ghosts(const Field & field) const;
+
+        //! Complete begin_communicate_ghosts(field). Collective.
+        void end_communicate_ghosts(const Field & field) const;
+
+        //! Whether begin_communicate_ghosts overlaps anything, i.e. leaves the
+        //! last axis's exchange in flight (see there)
+        bool overlaps_ghost_communication() const;
 
         //! accumulate ghost buffer contributions back to the interior domain,
         //! i.e. apply G^T (see class documentation). This is the adjoint
@@ -201,6 +234,14 @@ namespace muGrid {
         std::vector<std::vector<Index_t>> send_left_sequence;
         //! Number of steps per direction
         std::vector<Index_t> nb_sendrecv_steps;
+
+        //! Fill the ghosts along the first `nb_directions` axes, in axis order
+        //! (communicate_ghosts is all of them)
+        void communicate_ghosts_upto(const Field & field,
+                                     Dim_t nb_directions) const;
+
+        //! The exchange begin_communicate_ghosts left in flight, if any
+        mutable std::shared_ptr<PendingGhostExchange> pending_ghosts{};
 
         //! Throw unless `n` has the spatial dimension of the collection
         void check_dimension(const DynGridIndex & n,

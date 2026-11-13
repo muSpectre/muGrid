@@ -940,6 +940,47 @@ static void add_stiffness_real32_device_overloads(py::class_<Op> & cls) {
 }
 #endif
 
+// apply_planes on an IsotropicStiffness class, for host and (in a GPU
+// build) device fields in both precisions.
+template <class Op>
+static void add_stiffness_apply_planes(py::class_<Op> & cls) {
+    const char * doc{
+        "apply() for the nodes in planes [plane_begin, plane_end) of the "
+        "last axis only, counted within the computable region (plane_end "
+        "-1: to its end); other nodes of `force` are left untouched. The "
+        "stencil reads displacement planes plane_begin - 1 .. plane_end, so "
+        "a range off the first and last computable plane reads none of the "
+        "last axis's ghosts and can overlap their exchange (see "
+        "CartesianDecomposition.begin_communicate_ghosts)."};
+    auto bind = [&cls, doc](auto field_tag) {
+        using F = typename decltype(field_tag)::type;
+        cls.def("apply_planes",
+                static_cast<void (Op::*)(const F &, const F &, const F &, F &,
+                                         muGrid::Index_t, muGrid::Index_t)
+                                const>(&Op::apply_planes),
+                "displacement"_a, "lambda_field"_a, "mu_field"_a, "force"_a,
+                "plane_begin"_a, "plane_end"_a = -1, doc);
+    };
+    struct Host {
+        using type = TypedFieldBase<Real>;
+    };
+    struct Host32 {
+        using type = TypedFieldBase<Real32>;
+    };
+    bind(Host{});
+    bind(Host32{});
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    struct Dev {
+        using type = TypedFieldBase<Real, muGrid::DefaultDeviceSpace>;
+    };
+    struct Dev32 {
+        using type = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    };
+    bind(Dev{});
+    bind(Dev32{});
+#endif
+}
+
 // Bind class IsotropicStiffnessOperator2D
 void add_isotropic_stiffness_operator_2d(py::module & mod) {
     // The finite element used by the fused stiffness operator (selected at
@@ -1158,6 +1199,7 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
     // Single-precision (float32) device apply overloads.
     add_stiffness_real32_device_overloads<IsotropicStiffnessOperator2D, 4>(op);
 #endif
+    add_stiffness_apply_planes<IsotropicStiffnessOperator2D>(op);
 }
 
 // Bind class IsotropicStiffnessOperator3D
@@ -1364,6 +1406,7 @@ void add_isotropic_stiffness_operator_3d(py::module & mod) {
     // Single-precision (float32) device apply overloads.
     add_stiffness_real32_device_overloads<IsotropicStiffnessOperator3D, 9>(op);
 #endif
+    add_stiffness_apply_planes<IsotropicStiffnessOperator3D>(op);
 }
 
 

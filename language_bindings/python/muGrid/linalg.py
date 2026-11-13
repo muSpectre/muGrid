@@ -292,6 +292,7 @@ for _name in ("block_thomas_gpu_2d", "block_thomas_gpu_3d",
               "block_matvec_gpu_max_components",
               "pcr_step_gpu", "pcr_final_step_gpu",
               "pcr_step_gpu_f32", "pcr_final_step_gpu_f32",
+              "pcr_products_gpu", "pcr_products_gpu_f32",
               "apply_green_symbol_gpu_2d", "apply_green_symbol_gpu_3d",
               "apply_green_symbol_gpu_2d_f32",
               "apply_green_symbol_gpu_3d_f32"):
