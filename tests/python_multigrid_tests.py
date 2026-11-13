@@ -578,6 +578,24 @@ def test_hybrid_is_the_exact_reference_inverse(comm, dim, n):
     assert np.sqrt(err / ref) < 1e-11
 
 
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+def test_hybrid_pcr_level_zero_keeps_every_mode(comm, dim, n):
+    """Level 0 couples every mode, so it must run on all of them -- through
+    the plain path (and on a GPU the fused last-level kernel), not a gather
+    of nearly all. The all-zero mode never looks coupled (its coefficients
+    are zero by design); it is kept anyway. Without PCR there are no levels.
+    """
+    nb_ranks = 1 if comm is None else comm.size
+    if n % nb_ranks or n // nb_ranks < 2:
+        pytest.skip(f"{n} planes do not split into {nb_ranks} slabs")
+    _, _, prec, _, _ = _slab_setup(comm, dim, n)
+    if not prec._use_pcr:
+        assert prec.pcr_nb_coupled_modes == []
+        return
+    assert prec._pcr_active[0] is None
+    assert prec.pcr_nb_coupled_modes[0] == int(np.prod(prec._mode_shape))
+
+
 @pytest.mark.parametrize("dim,n", [(2, 128), (3, 64)])
 def test_hybrid_pcr_truncation_is_exact(comm, dim, n):
     """Dropping the modes a PCR level no longer couples keeps K M^-1 = I.
