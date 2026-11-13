@@ -375,7 +375,7 @@ namespace {
      */
     template <typename T>
     void bind_pcr_gpu(py::module & mod, const char * step_name,
-                      const char * final_name) {
+                      const char * final_name, const char * products_name) {
         using C = std::complex<T>;
         mod.def(
             step_name,
@@ -424,6 +424,24 @@ namespace {
             "The last PCR level fused with the closing solve: writes the "
             "products the two neighbours need, to_right and to_left. Device "
             "addresses, not buffers.");
+        mod.def(
+            products_name,
+            [](muGrid::Index_t dim, muGrid::Index_t nb_modes,
+               std::uintptr_t op_right, std::uintptr_t op_left,
+               std::uintptr_t x, std::uintptr_t to_right,
+               std::uintptr_t to_left) {
+                py::gil_scoped_release release{};
+                muGrid::pcr::products_gpu<T>(
+                    dim, nb_modes, reinterpret_cast<const C *>(op_right),
+                    reinterpret_cast<const C *>(op_left),
+                    reinterpret_cast<const C *>(x),
+                    reinterpret_cast<C *>(to_right),
+                    reinterpret_cast<C *>(to_left));
+            },
+            "dim"_a, "nb_modes"_a, "op_right"_a, "op_left"_a, "x"_a,
+            "to_right"_a, "to_left"_a,
+            "The neighbour products alone, to_right = op_right x and "
+            "to_left = op_left x per mode. Device addresses, not buffers.");
     }
 
     template <muGrid::Dim_t Dim, typename T>
@@ -528,9 +546,10 @@ void add_linalg_functions(py::module &mod) {
                                   "block_matvec_dense_gpu_f32");
     linalg.attr("block_matvec_gpu_max_components") =
         muGrid::block_matvec::MAX_COMPONENTS;
-    bind_pcr_gpu<Real>(linalg, "pcr_step_gpu", "pcr_final_step_gpu");
-    bind_pcr_gpu<Real32>(linalg, "pcr_step_gpu_f32",
-                         "pcr_final_step_gpu_f32");
+    bind_pcr_gpu<Real>(linalg, "pcr_step_gpu", "pcr_final_step_gpu",
+                       "pcr_products_gpu");
+    bind_pcr_gpu<Real32>(linalg, "pcr_step_gpu_f32", "pcr_final_step_gpu_f32",
+                         "pcr_products_gpu_f32");
     bind_green_symbol_gpu<2, Real>(linalg, "apply_green_symbol_gpu_2d");
     bind_green_symbol_gpu<3, Real>(linalg, "apply_green_symbol_gpu_3d");
     bind_green_symbol_gpu<2, Real32>(linalg, "apply_green_symbol_gpu_2d_f32");

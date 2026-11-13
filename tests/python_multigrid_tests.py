@@ -578,6 +578,38 @@ def test_hybrid_is_the_exact_reference_inverse(comm, dim, n):
     assert np.sqrt(err / ref) < 1e-11
 
 
+@pytest.mark.parametrize("dim,n", [(2, 128), (3, 64)])
+def test_hybrid_pcr_truncation_is_exact(comm, dim, n):
+    """Dropping the modes a PCR level no longer couples keeps K M^-1 = I.
+
+    Past level 0 only the long-wavelength modes are still coupled at working
+    precision (see _truncate_pcr); these grids are large enough that some are
+    dropped once there are four or more ranks, and the result must not move.
+    """
+    nb_ranks = 1 if comm is None else comm.size
+    if nb_ranks < 4 or nb_ranks & (nb_ranks - 1):
+        pytest.skip("truncation needs a PCR of two or more levels "
+                    "(4, 8, ... ranks)")
+    if n % nb_ranks or n // nb_ranks < 2:
+        pytest.skip(f"{n} planes do not split into {nb_ranks} slabs")
+    decomp, op, prec, lam, mu = _slab_setup(comm, dim, n)
+    counts = prec.pcr_nb_coupled_modes
+    nb_modes = int(np.prod(prec._mode_shape))
+    assert len(counts) == nb_ranks.bit_length() - 1
+    assert all(a >= b for a, b in zip(counts, counts[1:])), "not nested"
+    assert counts[-1] < nb_modes, f"nothing truncated: {counts}"
+
+    fc = decomp.collection
+    r, z, f = (fc.real_field(f"hyb-trunc-{s}", (dim,)) for s in "rzf")
+    r.p[...] = _slab_slice(decomp, _zero_mean_global(dim, n, 4))
+    prec.apply(r, z)
+    decomp.communicate_ghosts(z)
+    op.apply_uniform(z, lam, mu, f)
+    err = _global_sum(comm, ((np.asarray(f.p) - np.asarray(r.p)) ** 2).sum())
+    ref = _global_sum(comm, (np.asarray(r.p) ** 2).sum())
+    assert np.sqrt(err / ref) < 1e-11
+
+
 @pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
 def test_hybrid_is_symmetric(comm, dim, n):
     """<M^-1 a, b> == <a, M^-1 b>, which is what lets plain CG use it."""
@@ -1095,7 +1127,7 @@ def test_hybrid_runs_on_its_own_gpu(comm, dim, n):
 
 
 @pytest.mark.skipif(not _has_gpu(), reason="needs a GPU")
-@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16)])
+@pytest.mark.parametrize("dim,n", [(2, 32), (3, 16), (2, 128), (3, 64)])
 @pytest.mark.parametrize("dtype,tol", [(np.float64, 1e-11),
                                        (np.float32, 1e-4)])
 def test_hybrid_pcr_kernel_matches_the_products(comm, dim, n, dtype, tol):
