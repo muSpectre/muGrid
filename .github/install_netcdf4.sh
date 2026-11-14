@@ -52,7 +52,7 @@ cd ..
 rm -rf build-libxml2 libxml2-${XML2_VERSION}
 
 # Build NetCDF from source using CMake
-NETCDF_VERSION="4.9.3"
+NETCDF_VERSION="4.10.1"
 echo "Installing netcdf-c-${NETCDF_VERSION}"
 curl -L https://github.com/Unidata/netcdf-c/archive/refs/tags/v${NETCDF_VERSION}.tar.gz | tar -zx
 mkdir -p build-netcdf

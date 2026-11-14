@@ -19,6 +19,7 @@ Change log for µGrid
 v1.6.2 (13Nov26)
 ----------------
 
+- BUILD: Wheels bundle NetCDF 4.10.1 (was 4.9.3)
 - PERF: The hybrid preconditioner's interface solve sends half as much data per exchange,
   stores a third less per level, and on a GPU runs each reduction level as one kernel
 - PERF: The hybrid preconditioner's interface solve exchanges and computes its deeper

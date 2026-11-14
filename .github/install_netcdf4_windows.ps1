@@ -66,7 +66,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Download and build NetCDF-C
-$netcdfVersion = "4.9.3"
+$netcdfVersion = "4.10.1"
 Write-Host "Installing netcdf-c-$netcdfVersion"
 $netcdfUrl = "https://github.com/Unidata/netcdf-c/archive/refs/tags/v$netcdfVersion.zip"
 $netcdfArchive = "$buildDir/netcdf.zip"
