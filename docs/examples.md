@@ -175,7 +175,9 @@ Voigt notation.
 to $\lambda = E\nu/((1+\nu)(1-2\nu))$, $\mu = E/(2(1+\nu))$. The
 microstructure (`--inclusion-type`) is a centred spherical (circular) inclusion
 of radius `--inclusion-radius` (0.25), a $2^d$ checkerboard, or a random
-30 % inclusion fraction.
+30 % inclusion fraction. With `--inclusion-type file --scale-file s.npy` the
+material is $s(\mathbf{x})\,\mathbf{C}(E_\text{matrix}, \nu)$ with a scale
+$s \ge 0$ per voxel read from the file (fused kernel only).
 
 It demonstrates:
 
@@ -184,14 +186,20 @@ It demonstrates:
   $\langle\boldsymbol{\sigma}\rangle$, so no strain or stress field is stored,
   versus an explicit gradient–stress–divergence sequence with the full
   per-quadrature-point $\mathbf{C}$ (`-k generic`);
-- preconditioners (`-P`): `reference` (the reference-material Green's function
-  in Fourier space), `multigrid` (its V-cycle approximation with an FFT solve
-  on the coarsest grid) and `hybrid` (FFT in the rank-local axes, tridiagonal
-  solve along the distributed axis); see
-  [Preconditioners](linalg.md#preconditioners);
+- preconditioners (`-P`):
+    - `reference`: the reference-material Green's function in Fourier space;
+    - `green-jacobi`: the reference scaled by the Jacobi diagonal;
+    - `multigrid`: the reference's V-cycle approximation, with an FFT solve on the coarsest grid;
+    - `hybrid`: FFT in the rank-local axes and a tridiagonal solve along the distributed axis;
+    - `heterogeneous-multigrid`: a V-cycle on the heterogeneous operator itself, see
+      [Heterogeneous multigrid](heterogeneous_multigrid.md).
+
+    `--preconditioner-precision single` runs `reference`, `green-jacobi` or
+    `heterogeneous-multigrid` in float32 between double-precision CG vectors. See
+    [Preconditioners](linalg.md#preconditioners);
 - the choice of domain decomposition (`--decomposition auto|cartesian|fft`):
-  `auto` uses the `FFTEngine` as decomposition for `-P reference` (whose
-  transforms need it) and a `CartesianDecomposition` otherwise (split only
+  `auto` uses the `FFTEngine` as decomposition for `-P reference` and
+  `-P green-jacobi` (whose transforms need it) and a `CartesianDecomposition` otherwise (split only
   along the last axis for `-P hybrid`);
 - single precision (`--precision single`), MPI and GPU execution with the same
   code.
@@ -199,6 +207,7 @@ It demonstrates:
 ```bash
 python examples/homogenization.py -n 64,64
 python examples/homogenization.py -n 32,32,32 -P reference
+python examples/homogenization.py -n 64,64,64 -P heterogeneous-multigrid -d gpu
 mpiexec -n 4 python examples/homogenization.py -n 128,128
 python examples/homogenization.py -n 256,256 -d gpu
 ```

@@ -36,6 +36,7 @@
 # Benchmark per-point result cache (regenerable; the committed results.csv is
 # the aggregate — see benchmarks/README.md)
 /benchmarks/cache/
+/benchmarks/heterogeneous_multigrid/cache/
 
 # Agents
 AGENTS.md

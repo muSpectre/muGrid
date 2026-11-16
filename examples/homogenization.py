@@ -34,9 +34,11 @@ import numpy as np
 
 import muGrid
 from muGrid import parprint
+from muGrid.Multigrid import MultigridPreconditioner, ScaledLocalMatrices
 from muGrid.Preconditioners import (
     HybridFourierTridiagonalPreconditioner,
     MultigridReferencePreconditioner,
+    make_green_jacobi_preconditioner,
     make_reference_stiffness_preconditioner,
 )
 from muGrid.Solvers import conjugate_gradients
@@ -231,9 +233,19 @@ parser.add_argument(
 
 parser.add_argument(
     "--inclusion-type",
-    choices=["single", "checkerboard", "random"],
+    choices=["single", "checkerboard", "random", "file"],
     default="single",
-    help="Type of inclusion pattern (default: single)",
+    help="Type of inclusion pattern; 'file' reads a material scale per voxel "
+    "from --scale-file (default: single)",
+)
+
+parser.add_argument(
+    "--scale-file",
+    default=None,
+    help="With --inclusion-type file: a .npy array of the global grid's shape "
+    "holding the material scale s >= 0 of every voxel; the material is "
+    "s * C(E_matrix, nu), i.e. lambda = s lambda_matrix, mu = s mu_matrix "
+    "(fused kernel only)",
 )
 
 parser.add_argument(
@@ -350,9 +362,15 @@ parser.add_argument(
 parser.add_argument(
     "-P",
     "--preconditioner",
-    choices=["none", "reference", "multigrid", "hybrid"],
+    choices=["none", "reference", "multigrid", "hybrid", "green-jacobi",
+             "heterogeneous-multigrid"],
     default="none",
-    help="Preconditioner for the PCG solver: 'none', 'reference' or "
+    help="Preconditioner for the PCG solver. 'green-jacobi' scales the "
+    "reference preconditioner symmetrically by the Jacobi diagonal of the "
+    "actual operator (J-FFT). 'heterogeneous-multigrid' is a V-cycle on the "
+    "heterogeneous operator itself (Galerkin coarse levels, Chebyshev-Jacobi "
+    "smoothing with a guaranteed eigenvalue bound, no FFT; muGrid.Multigrid). "
+    "Both need the fused kernel. Otherwise: 'none', 'reference' or "
     "'multigrid'. 'reference' is the reference-material Green's-function "
     "preconditioner of Ladecky et al. (2023), applied in Fourier space; it "
     "makes the iteration count nearly independent of grid size. 'multigrid' "
@@ -367,6 +385,16 @@ parser.add_argument(
     "decomposition (default: none)",
 )
 
+parser.add_argument(
+    "--preconditioner-precision",
+    choices=["double", "single"],
+    default=None,
+    help="Precision of the preconditioner (reference, green-jacobi, "
+    "heterogeneous-multigrid): a single-precision preconditioner between "
+    "double-precision CG vectors halves its memory and bytes moved "
+    "(default: the solver's --precision)",
+)
+
 args = parser.parse_args()
 
 # JSON output (to stdout or a file) implies quiet mode
@@ -376,9 +404,13 @@ if args.json or args.json_out:
 # The V-cycle drives the *uniform* reference operator from two scalar Lame
 # parameters, which only the fused kernel's per-pixel Lame fields provide; the
 # generic kernel carries the full C tensor instead.
-if args.preconditioner in ("multigrid", "hybrid") and args.kernel != "fused":
+if args.preconditioner in ("multigrid", "hybrid", "green-jacobi",
+                           "heterogeneous-multigrid") and args.kernel != "fused":
     parser.error(
         f"--preconditioner {args.preconditioner} requires --kernel fused")
+if args.inclusion_type == "file" and (args.scale_file is None
+                                      or args.kernel != "fused"):
+    parser.error("--inclusion-type file needs --scale-file and --kernel fused")
 
 # Select array library based on memory location
 if args.device == "cpu":
@@ -421,6 +453,11 @@ if dim not in (2, 3):
 # the CG solver and (for the reference preconditioner) the FFT engine all pick up
 # the precision from the fields they are handed -- no separate code path.
 dtype = np.float32 if args.precision == "single" else np.float64
+# The preconditioner may run in another precision than the CG vectors (a
+# float32 preconditioner between float64 vectors is the usual pairing).
+prec_dtype = (dtype if args.preconditioner_precision is None
+              else np.float32 if args.preconditioner_precision == "single"
+              else np.float64)
 
 # Physical domain size (unit cell)
 domain_size = np.ones(dim)
@@ -464,11 +501,13 @@ if args.preconditioner == "hybrid":
 
 # 'auto' ties the decomposition to the preconditioner, which is what every run
 # wants except a baseline measurement that is trying to tell the two apart.
+_FFT_PRECONDITIONERS = ("reference", "green-jacobi")
 if args.decomposition == "auto":
-    use_fft_decomposition = args.preconditioner == "reference"
+    use_fft_decomposition = args.preconditioner in _FFT_PRECONDITIONERS
 else:
     use_fft_decomposition = args.decomposition == "fft"
-    if args.preconditioner == "reference" and not use_fft_decomposition:
+    if (args.preconditioner in _FFT_PRECONDITIONERS
+            and not use_fft_decomposition):
         parser.error("--preconditioner reference needs the FFT engine's "
                      "decomposition; --decomposition cartesian cannot provide "
                      "the transforms it applies")
@@ -524,7 +563,22 @@ local_coords = decomposition.coords
 coords = [local_coords[d] for d in range(dim)]
 
 # Create the microstructure (phase field) - only for local portion
-phase = create_microstructure(coords, args.inclusion_type, args.inclusion_radius)
+if args.inclusion_type == "file":
+    # The material scale of every voxel, read whole by every rank and cut to
+    # its subdomain; the phase is only used for the reported volume fraction.
+    _scale_global = np.load(args.scale_file)
+    if tuple(_scale_global.shape) != tuple(args.nb_grid_pts):
+        parser.error(f"--scale-file holds a {_scale_global.shape} grid, the "
+                     f"run is {tuple(args.nb_grid_pts)}")
+    scale_local = np.ascontiguousarray(_scale_global[tuple(
+        slice(int(o), int(o) + int(n)) for o, n in zip(
+            decomposition.subdomain_locations, local_grid_shape))])
+    del _scale_global
+    phase = (scale_local >= 0.5).astype(float)
+else:
+    scale_local = None
+    phase = create_microstructure(coords, args.inclusion_type,
+                                  args.inclusion_radius)
 
 # Create the material stiffness tensor at each pixel
 C_matrix = isotropic_stiffness(dim, args.E_matrix, args.nu)
@@ -626,8 +680,14 @@ if args.kernel == "fused":
     # Phase is defined at grid points, element properties taken at grid points
     # (for element (i,j), use material at grid point (i,j))
     # phase is already local (from decomposition.coords), so no slicing needed
-    lambda_field.p[...] = arr.asarray(lam_matrix * (1 - phase) + lam_inclusion * phase)
-    mu_field.p[...] = arr.asarray(mu_matrix * (1 - phase) + mu_inclusion * phase)
+    if scale_local is not None:                     # s * C(E_matrix, nu)
+        lambda_field.p[...] = arr.asarray(lam_matrix * scale_local)
+        mu_field.p[...] = arr.asarray(mu_matrix * scale_local)
+    else:
+        lambda_field.p[...] = arr.asarray(
+            lam_matrix * (1 - phase) + lam_inclusion * phase)
+        mu_field.p[...] = arr.asarray(
+            mu_matrix * (1 - phase) + mu_inclusion * phase)
 
     # Fill ghost cells for material fields (only needs to be done once)
     decomposition.communicate_ghosts(lambda_field)
@@ -1054,7 +1114,7 @@ if args.preconditioner == "reference":
         # only supply the action of the reference stiffness Kʳᵉᶠ.
         prec = make_reference_stiffness_preconditioner(
             decomposition, apply_reference_stiffness, dim, timer=timer,
-            dtype=dtype
+            dtype=prec_dtype
         )
 
     if not args.quiet:
@@ -1108,6 +1168,96 @@ elif args.preconditioner == "multigrid":
                  f"μ = {mu_ref:.4f}", comm=comm)
         parprint(f"  Levels: {prec.nb_levels}, ν = {prec.nu}, "
                  f"ω = {prec.omega:.4f}, cycles = {prec.nb_cycles}", comm=comm)
+
+elif args.preconditioner == "green-jacobi":
+    # Green-Jacobi (J-FFT): the reference preconditioner above, scaled
+    # symmetrically by the Jacobi diagonal of the actual operator. The
+    # reference Lame parameters default to the volume means, as above.
+    lam_prec, mu_prec = lambda_field, mu_field
+    if np.dtype(prec_dtype) != np.dtype(dtype):
+        lam_prec = fc.real_field("lambda-prec", dtype=prec_dtype)
+        mu_prec = fc.real_field("mu-prec", dtype=prec_dtype)
+        lam_prec.sg[...] = lambda_field.sg
+        mu_prec.sg[...] = mu_field.sg
+    with timer("preconditioner_setup"):
+        prec = make_green_jacobi_preconditioner(
+            decomposition, fused_stiffness_op, lam_prec, mu_prec, dim,
+            element=_elem, grid_spacing=list(grid_spacing), timer=timer,
+            dtype=prec_dtype)
+    if not args.quiet:
+        parprint("Using Green-Jacobi preconditioner", comm=comm)
+elif args.preconditioner == "heterogeneous-multigrid":
+    # Multigrid on the heterogeneous operator itself (muGrid.Multigrid): the
+    # coarse levels are the Galerkin products R A P, probed from the operator,
+    # and the Chebyshev smoother uses a guaranteed bound of lambda_max(D^-1 A).
+    # The bound is constant per level when the material is a scaled reference,
+    # lambda = s lambda_0, mu = s mu_0 with s >= 0 -- the case here whenever
+    # both phases share nu; otherwise it is computed from the operator's
+    # entries. The cycle gets its own (un-instrumented) fused applies, so the
+    # matvec statistics below count CG's matvecs only.
+    def _mg_fields(field_dtype):
+        if np.dtype(field_dtype) == np.dtype(dtype):
+            return lambda_field, mu_field
+        lam_f = fc.real_field(f"lambda-{np.dtype(field_dtype).name}",
+                              dtype=field_dtype)
+        mu_f = fc.real_field(f"mu-{np.dtype(field_dtype).name}",
+                             dtype=field_dtype)
+        lam_f.sg[...] = lambda_field.sg
+        mu_f.sg[...] = mu_field.sg
+        return lam_f, mu_f
+
+    def _mg_operator(field_dtype):
+        lam_f, mu_f = _mg_fields(field_dtype)
+
+        def apply(u_in, f_out):
+            decomposition.communicate_ghosts(u_in)
+            fused_stiffness_op.apply(u_in, lam_f, mu_f, f_out)
+        return apply
+
+    single_prec = np.dtype(prec_dtype) == np.dtype(np.float32)
+    lam0, mu0 = lam_matrix, mu_matrix
+    # Scaled reference? |mu lam0 - lam mu0| = 0 everywhere (global verdict).
+    _lam_host = arr.asnumpy(lambda_field.p) if hasattr(arr, "asnumpy") \
+        else np.asarray(lambda_field.p)
+    _mu_host = arr.asnumpy(mu_field.p) if hasattr(arr, "asnumpy") \
+        else np.asarray(mu_field.p)
+    scaled = comm.max(float(np.abs(_mu_host * lam0 - _lam_host * mu0).max()
+                            if _lam_host.size else 0.0)) <= 1e-6 * max(
+        comm.max(float(np.abs(_mu_host).max() * lam0
+                       if _mu_host.size else 0.0)), 1e-300)
+    local_matrices = None
+    if scaled:
+        mg_scale = fc.real_field("mg-scale", dtype=np.float64)
+        mg_scale.sg[...] = lambda_field.sg / lam0
+        local_matrices = ScaledLocalMatrices.isotropic_stiffness(
+            fused_stiffness_op, lam0, mu0, mg_scale)
+    with timer("preconditioner_setup"):
+        prec = MultigridPreconditioner(
+            _mg_operator(np.float64), decomposition, dim,
+            local_matrices=local_matrices,
+            precision="single" if single_prec else "double",
+            operator_single=_mg_operator(np.float32) if single_prec else None,
+            communicator=comm, timer=timer)
+        prec.setup()
+    if not args.quiet:
+        parprint("Using heterogeneous multigrid preconditioner", comm=comm)
+        parprint(f"  Levels: {[lvl.nb_grid_pts for lvl in prec.levels]}, "
+                 f"bounds {[round(b, 3) for _, b, _ in prec.level_summary()]}",
+                 comm=comm)
+
+# A preconditioner in another precision than the CG vectors: copy r in and z
+# out through a pair of fields of its own precision (the multigrid does this
+# itself).
+if (prec is not None and np.dtype(prec_dtype) != np.dtype(dtype)
+        and args.preconditioner in ("reference", "green-jacobi")):
+    _prec_inner = prec
+    _r_prec = fc.real_field("prec-r", (dim,), dtype=prec_dtype)
+    _z_prec = fc.real_field("prec-z", (dim,), dtype=prec_dtype)
+
+    def prec(r, z):
+        _r_prec.sg[...] = r.sg
+        _prec_inner(_r_prec, _z_prec)
+        z.sg[...] = _z_prec.sg
 
 
 # Storage for homogenized stiffness
@@ -1350,6 +1500,8 @@ if args.json or args.json_out:
             "kernel": args.kernel,
             "preconditioner": args.preconditioner,
             "precision": args.precision,
+            "preconditioner_precision": np.dtype(prec_dtype).name,
+            "scale_file": args.scale_file,
             # How the domain was actually split, not how it was asked for: the
             # FFT engine picks its own split and ignores suggest_subdivisions.
             "decomposition": "fft" if use_fft_decomposition else "cartesian",
