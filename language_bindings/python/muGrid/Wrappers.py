@@ -2183,6 +2183,67 @@ class GridTransfer:
         return f"GridTransfer({self._cpp.spatial_dim})"
 
 
+
+class VariableStencilOperator:
+    """
+    Nodal operator with its own symmetric ``3^dim`` stencil at every node.
+
+    ``y_i(n) = Σ_s Σ_j A(n, n+s)_ij x_j(n+s)`` over the offsets
+    ``s ∈ {-1, 0, 1}^dim``, with ``nc × nc`` blocks that vary from node to node.
+    This is the explicit form of the Galerkin coarse operator ``R A P`` of the
+    heterogeneous multigrid (:mod:`muGrid.Multigrid`).
+
+    The coefficients are a field with :attr:`nb_entries` components per node,
+    on the collection of ``x`` and ``y``. The operator is symmetric, so only half
+    of the blocks are stored. Entry ``k nc² + i nc + j`` of node ``n`` is
+    ``A(n, n + s_k)_ij`` for the offsets ``s_k`` of :attr:`half_offsets`. The
+    centre block ``A(n, n)`` follows as its upper triangle, row by row.
+
+    ``x`` and the stencil field need one ghost layer on each side, filled by
+    ``communicate_ghosts``. Only the interior nodes of ``y`` are written.
+
+    Parameters
+    ----------
+    spatial_dim : int
+        2 or 3.
+    nb_components : int
+        Unknowns per node (1, 2 or 3).
+    """
+
+    def __init__(self, spatial_dim: int, nb_components: int) -> None:
+        if spatial_dim == 2:
+            self._cpp = _muGrid.VariableStencilOperator2D(nb_components)
+        elif spatial_dim == 3:
+            self._cpp = _muGrid.VariableStencilOperator3D(nb_components)
+        else:
+            raise ValueError(
+                f"VariableStencilOperator supports 2 or 3 spatial dimensions, "
+                f"got {spatial_dim}")
+        self._spatial_dim = spatial_dim
+
+    @property
+    def spatial_dim(self) -> int:
+        return self._spatial_dim
+
+    def apply(self, stencil: Any, x: Any, y: Any) -> None:
+        """``y = A x``."""
+        self._cpp.apply(_unwrap(stencil), _unwrap(x), _unwrap(y))
+
+    def apply_increment(self, stencil: Any, x: Any, alpha: float,
+                        y: Any) -> None:
+        """``y += alpha A x``."""
+        self._cpp.apply_increment(_unwrap(stencil), _unwrap(x), alpha,
+                                  _unwrap(y))
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying C++ object."""
+        return getattr(self._cpp, name)
+
+    def __repr__(self) -> str:
+        return (f"VariableStencilOperator(spatial_dim={self._spatial_dim}, "
+                f"nb_components={self._cpp.nb_components})")
+
+
 class GridTransfer2D(GridTransfer):
     """Convenience wrapper fixing the spatial dimension to 2."""
 

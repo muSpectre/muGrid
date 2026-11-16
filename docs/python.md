@@ -432,7 +432,26 @@ its exact adjoint $P^\top$, the tensor product of the stencil
 $[\tfrac12, 1, \tfrac12]$. Both act component-wise. Each rank's fine subdomain
 must have twice the extent and twice the global offset of its coarse subdomain
 (use the same power-of-two `nb_subdivisions` on every level). Communicate the
-ghosts of the input field first; neither method writes ghosts.
+ghosts of the input field first; neither method writes ghosts. Both run on host
+and device fields, in double and single precision.
+
+### VariableStencilOperator
+
+```python
+muGrid.VariableStencilOperator(spatial_dim, nb_components)
+apply(stencil, x, y)                 # y = A x
+apply_increment(stencil, x, alpha, y)
+```
+
+- **What it is:** a nodal operator with its own symmetric $3^d$ stencil of $n_c \times n_c$ blocks at
+  every node. It is the explicit form of a Galerkin coarse operator (see
+  [Operators](operators.md#variablestenciloperator)).
+- **The coefficients:** a field with `nb_entries` components on the collection of `x` and `y`.
+- **Ghosts:** `x` and the stencil field need one ghost layer on each side, filled by
+  `communicate_ghosts`. Only interior nodes of `y` are written.
+- **Precision and device:** float64 and float32, host and device fields.
+- **Properties:** `nb_components`, `nb_entries`, `spatial_dim`, `half_offsets` (the stored offsets, in
+  storage order).
 
 ## FFT engine
 

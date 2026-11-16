@@ -41,14 +41,17 @@
 #include "collection/field_collection_global.hh"
 #include "field/field_typed.hh"
 #include "memory/memory_space.hh"
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+#include "memory/gpu_runtime.hh"
+#endif
 
 #include <array>
 #include <sstream>
 
 namespace muGrid {
 
-    // Kernel implementations (transfer.cc; host only -- GridTransfer has no
-    // device overloads). The kernels take explicit pixel and dof strides
+    // Kernel implementations (transfer.cc on the host, transfer_gpu.cc on a
+    // device). The kernels take explicit pixel and dof strides
     // (`c*`/`f*` for the coarse/fine grid, `*d` the stride between scalars of
     // one pixel), so they do not depend on the dof layout; the caller
     // supplies the strides of its fields. Pointers are pre-offset to the
@@ -129,6 +132,26 @@ namespace muGrid {
                               Index_t csx, Index_t csy, Index_t csz,
                               Index_t csd);
 
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        /**
+         * @brief Device prolongation and restriction (2D and 3D in one kernel
+         *        each: in 2D ncz = 1 and the z strides are unused). Same
+         *        stencils and pointer conventions as the host kernels.
+         */
+        template <typename T>
+        void prolong_gpu(const T * coarse, T * fine, Index_t ncx, Index_t ncy,
+                         Index_t ncz, Index_t nb_dof, Index_t csx,
+                         Index_t csy, Index_t csz, Index_t csd, Index_t fsx,
+                         Index_t fsy, Index_t fsz, Index_t fsd, bool three_d);
+
+        template <typename T>
+        void restrict_gpu(const T * fine, T * coarse, Index_t ncx, Index_t ncy,
+                          Index_t ncz, Index_t nb_dof, Index_t fsx,
+                          Index_t fsy, Index_t fsz, Index_t fsd, Index_t csx,
+                          Index_t csy, Index_t csz, Index_t csd,
+                          bool three_d);
+#endif
     }  // namespace transfer_kernels
 
     namespace internal {
@@ -174,7 +197,8 @@ namespace muGrid {
      * multigrid preconditioner rediscretises every level and only converges
      * somewhat more slowly for P1; it remains correct.
      *
-     * Both operations are host-only and cost O(nb_dof · coarse nodes):
+     * Both operations run on host and device fields and cost
+     * O(nb_dof · coarse nodes):
      * 2^Dim writes (prolong) or 3^Dim multiply-adds (restrict) per coarse
      * node.
      *
@@ -221,6 +245,28 @@ namespace muGrid {
             this->restrict_impl<Real32>(fine, coarse);
         }
 
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        //! Device overloads: the same transfers on device fields.
+        void prolong(const TypedFieldBase<Real, DefaultDeviceSpace> & coarse,
+                     TypedFieldBase<Real, DefaultDeviceSpace> & fine) const {
+            this->prolong_device<Real>(coarse, fine);
+        }
+        void prolong(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> & coarse,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & fine) const {
+            this->prolong_device<Real32>(coarse, fine);
+        }
+        void restrict(const TypedFieldBase<Real, DefaultDeviceSpace> & fine,
+                      TypedFieldBase<Real, DefaultDeviceSpace> & coarse) const {
+            this->restrict_device<Real>(fine, coarse);
+        }
+        void restrict(
+            const TypedFieldBase<Real32, DefaultDeviceSpace> & fine,
+            TypedFieldBase<Real32, DefaultDeviceSpace> & coarse) const {
+            this->restrict_device<Real32>(fine, coarse);
+        }
+#endif
+
     private:
         static const char * operator_name() {
             return Dim == 2 ? "GridTransfer2D" : "GridTransfer3D";
@@ -235,7 +281,8 @@ namespace muGrid {
          * every node.
          */
         static std::array<internal::TransferGridInfo<Dim>, 2>
-        validate(const Field & coarse_field, const Field & fine_field) {
+        validate(const Field & coarse_field, const Field & fine_field,
+                 bool device = false) {
             const std::string op{operator_name()};
 
             auto as_global = [&op](const Field & field, const char * which) {
@@ -287,7 +334,14 @@ namespace muGrid {
 
                 auto & side_info = info[side];
                 side_info.nb_dof = nb_dof;
-                side_info.stride_dof = 1;  // host: array of structures
+                // host: array of structures (dofs of a pixel adjacent);
+                // device: structure of arrays (one plane per dof)
+                Index_t nb_pixels{1};
+                for (Dim_t dir{0}; dir < Dim; ++dir) {
+                    nb_pixels *= with_ghosts[dir];
+                }
+                side_info.stride_dof = device ? nb_pixels : 1;
+                const Index_t pixel_scalars{device ? 1 : nb_dof};
                 side_info.offset = 0;
                 Index_t expected_pixel_stride{1};
                 for (Dim_t dir{0}; dir < Dim; ++dir) {
@@ -311,7 +365,8 @@ namespace muGrid {
                         throw RuntimeError{err.str()};
                     }
                     side_info.nb_interior[dir] = interior[dir];
-                    side_info.strides[dir] = expected_pixel_stride * nb_dof;
+                    side_info.strides[dir] =
+                        expected_pixel_stride * pixel_scalars;
                     side_info.offset +=
                         ghosts_left[dir] * side_info.strides[dir];
                     expected_pixel_stride *= with_ghosts[dir];
@@ -395,6 +450,46 @@ namespace muGrid {
                     c.strides[2], c.stride_dof);
             }
         }
+
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+        template <typename T>
+        void prolong_device(
+            const TypedFieldBase<T, DefaultDeviceSpace> & coarse_field,
+            TypedFieldBase<T, DefaultDeviceSpace> & fine_field) const {
+            DeviceGuard device_guard{coarse_field.get_device_id()};
+            const auto info = validate(coarse_field, fine_field, true);
+            const auto & c = info[0];
+            const auto & f = info[1];
+            const bool three_d{Dim == 3};
+            transfer_kernels::prolong_gpu<T>(
+                coarse_field.view().data() + c.offset,
+                fine_field.view().data() + f.offset, c.nb_interior[0],
+                c.nb_interior[1], three_d ? c.nb_interior[Dim - 1] : 1,
+                c.nb_dof, c.strides[0], c.strides[1],
+                three_d ? c.strides[Dim - 1] : 0, c.stride_dof, f.strides[0],
+                f.strides[1], three_d ? f.strides[Dim - 1] : 0, f.stride_dof,
+                three_d);
+        }
+
+        template <typename T>
+        void restrict_device(
+            const TypedFieldBase<T, DefaultDeviceSpace> & fine_field,
+            TypedFieldBase<T, DefaultDeviceSpace> & coarse_field) const {
+            DeviceGuard device_guard{fine_field.get_device_id()};
+            const auto info = validate(coarse_field, fine_field, true);
+            const auto & c = info[0];
+            const auto & f = info[1];
+            const bool three_d{Dim == 3};
+            transfer_kernels::restrict_gpu<T>(
+                fine_field.view().data() + f.offset,
+                coarse_field.view().data() + c.offset, c.nb_interior[0],
+                c.nb_interior[1], three_d ? c.nb_interior[Dim - 1] : 1,
+                c.nb_dof, f.strides[0], f.strides[1],
+                three_d ? f.strides[Dim - 1] : 0, f.stride_dof, c.strides[0],
+                c.strides[1], three_d ? c.strides[Dim - 1] : 0, c.stride_dof,
+                three_d);
+        }
+#endif
     };
 
     //! 2D grid transfer (bilinear prolongation).

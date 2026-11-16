@@ -282,6 +282,39 @@ $d$ weights in registers. The equivalent `GenericLinearOperator` sweeps the
 output once per stencil non-zero ($2d+1$ passes) and resolves offsets at run
 time.
 
+## VariableStencilOperator
+
+A nodal operator whose $3^d$ stencil of $n_c \times n_c$ blocks differs from node to node:
+
+$$
+y_i(\mathbf{n}) = \sum_{\mathbf{s} \in \{-1,0,1\}^d} \sum_j
+  A(\mathbf{n}, \mathbf{n}+\mathbf{s})_{ij}\; x_j(\mathbf{n} + \mathbf{s}).
+$$
+
+- **Symmetry:** the operator is symmetric, $A(\mathbf{n}, \mathbf{n}+\mathbf{s}) =
+  A(\mathbf{n}+\mathbf{s}, \mathbf{n})^\top$, so half of the blocks are stored:
+    - the blocks of the "positive" offsets $\mathbf{s}_k$, those with flat index
+      $\sum_\alpha (s_\alpha + 1)\,3^\alpha$ above the centre's: 4 in 2D, 13 in 3D;
+    - the centre block, as its upper triangle.
+- **Layout:** entry $k n_c^2 + i n_c + j$ of node $\mathbf{n}$ is
+  $A(\mathbf{n}, \mathbf{n}+\mathbf{s}_k)_{ij}$, followed by the centre's upper triangle row by row.
+  That makes `nb_entries` = $|H|\,n_c^2 + n_c(n_c+1)/2$, e.g. 123 for 3D elasticity.
+- **Apply:** the block of a negative offset is read at the neighbour, as
+  $A_k(\mathbf{n}-\mathbf{s}_k)^\top$. So the apply reads `x` and the stencil field one node away on
+  each side and needs one ghost layer of both.
+- **Cost:** $(2|H| + 1)\, n_c^2$ multiply-adds per node, in one pass over the stencil.
+- **Use:** the coarse operators of the
+  [heterogeneous multigrid](heterogeneous_multigrid.md) are such stencils.
+
+```python
+op = muGrid.VariableStencilOperator(3, 3)        # 3D, three components
+stencil = decomposition.real_field("stencil", (op.nb_entries,))
+# ... fill stencil, then
+decomposition.communicate_ghosts(stencil)
+decomposition.communicate_ghosts(x)
+op.apply(stencil, x, y)
+```
+
 ## IsotropicStiffnessOperator
 
 The fused stiffness operator computes the action of the FE stiffness matrix of
