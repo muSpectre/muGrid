@@ -300,6 +300,7 @@ and under MPI.
 | `GreenJacobiPreconditioner(green, diagonal)` | $\mathbf{J}^{1/2}\,\mathbf{G}\,\mathbf{J}^{1/2}$, $\mathbf{J} = \operatorname{diag}(\mathbf{K})^{-1}$ | one apply of $\mathbf{G}$ plus $O(N)$ |
 | `MultigridReferencePreconditioner(...)` | V-cycle approximation of the reference Green's function | $O(N)$ plus a coarse-grid FFT solve |
 | `HybridFourierTridiagonalPreconditioner(...)` | reference Green's function via FFT in the rank-local axes and a block-tridiagonal solve in the distributed axis | no all-to-all |
+| `MultigridPreconditioner(operator, decomposition, nc, ...)` (`muGrid.Multigrid`) | V-cycle on the heterogeneous operator itself: Galerkin coarse levels, Chebyshev–Jacobi smoothing with a guaranteed eigenvalue bound | $O(N)$, no FFT |
 
 **Jacobi.** $\mathbf{D}^{-1/2}\mathbf{A}\mathbf{D}^{-1/2}$ has unit diagonal,
 and among all diagonal scalings Jacobi is within a factor of the number of
@@ -346,6 +347,18 @@ re-clusters it while keeping $\mathbf{M}$ symmetric positive definite (the
 J-FFT scheme of Ladecký et al.). `make_green_jacobi_preconditioner` builds
 $\mathbf{G}$ and $\operatorname{diag}(\mathbf{K})$ (via
 `IsotropicStiffnessOperator.assemble_diagonal`) together.
+
+**Heterogeneous multigrid.**
+- The reference-material preconditioners approximate $\mathbf{K}^{-1}$ by the inverse of a homogeneous
+  operator, so their iteration count grows with the material contrast and, for smooth or localised
+  data, with the grid.
+- `MultigridPreconditioner` works on $\mathbf{K}$ itself. Its coarse operators are the Galerkin
+  products $\mathbf{R}\mathbf{K}\mathbf{P}$, measured by probing the operator's action. Its Chebyshev
+  smoother uses a guaranteed upper bound of $\lambda_\text{max}(\mathbf{D}^{-1}\mathbf{K})$ on every
+  level.
+- The CG count is then independent of the grid and the contrast. At contrast $10^4$ it is 11–12 at
+  $64^3$ and $128^3$, against 76–203 for Green-Jacobi.
+- See [Heterogeneous multigrid](heterogeneous_multigrid.md).
 
 ### Example: spectral preconditioning of the Poisson problem
 
