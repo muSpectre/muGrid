@@ -64,6 +64,10 @@ parser.add_argument("--data", default=os.environ.get("MUFFTTO_CH3D_DATA"),
                          "ch3d_<geometry>.npy (default: $MUFFTTO_CH3D_DATA; "
                          "not needed once the material is cached)")
 parser.add_argument("--rtol", type=float, default=1e-6)
+parser.add_argument("--coarsening", choices=["galerkin", "rediscretised"],
+                    default="galerkin",
+                    help="mugrid: Galerkin coarse operators, or re-discretised "
+                         "ones (muGrid.MultigridCoarsening, as muFFTTO)")
 parser.add_argument("--lmax", choices=["bound", "power"], default="bound",
                     help="muFFTTO reference: smoother bound or power estimate")
 parser.add_argument("--repeat", type=int, default=20, help="V-cycles timed")
@@ -196,12 +200,19 @@ def setup_mugrid(s):
         decomposition.communicate_ghosts(u)
         op.apply(u, lam32, mu32, f)
 
+    coarsening = "galerkin"
+    if args.coarsening == "rediscretised":
+        from muGrid.MultigridCoarsening import IsotropicRediscretisation
+        coarsening = IsotropicRediscretisation(
+            muGrid.FEMElement.q1, [1.0 / N] * 3, (lam, mu),
+            lambda_over_mu=LAMBDA_0 / MU_0)
     t0 = time.perf_counter()
     mg = MultigridPreconditioner(
         apply, decomposition, 3,
         local_matrices=ScaledLocalMatrices.isotropic_stiffness(
             op, LAMBDA_0, MU_0, scale),
-        precision=args.precision, operator_single=apply_single if single else None)
+        precision=args.precision, operator_single=apply_single if single else None,
+        coarsening=coarsening)
     t_build = time.perf_counter() - t0
     rhs = decomposition.real_field("rhs", (3,))
     op.apply_macro_rhs(lam, mu, E_XX, rhs)
@@ -362,6 +373,7 @@ def main():
     result = dict(method=args.method, N=N, precision=args.precision, device=args.device,
                   geometry=args.geometry, eta=args.eta, rtol=args.rtol,
                   lmax=args.lmax if args.method == "muffto" else "-",
+                  coarsening=args.coarsening if args.method == "mugrid" else "-",
                   iterations=max(iterations), true_residual=true_residual,
                   C11=stress[0], t_build=case["t_build"], t_setup=t_setup,
                   t_vcycle=t_vcycle, t_cg=t_cg,

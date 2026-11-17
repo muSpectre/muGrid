@@ -79,6 +79,7 @@ conjugate_gradients(comm, decomposition.collection, b, x,
 | `precision` | `"double"` or `"single"`: the cycle runs in float32 between float64 CG vectors |
 | `operator_single` | the operator on float32 fields; with `"single"` the fine level then runs in float32 too |
 | `communicator` | needed under MPI with a `CartesianDecomposition` (an `FFTEngine` brings its own) |
+| `coarsening` | `"galerkin"` (default) or a coarsening rule such as `IsotropicRediscretisation` (below) |
 
 `ScaledLocalMatrices(matrices, scales)` declares A = Σ_pixels Σ_k s_k(pixel) K_k:
 - `matrices` has shape `(n_k, 2^d nc, 2^d nc)`. These are the fixed local matrices of a pixel's corner
@@ -91,6 +92,20 @@ Helpers build it without hard-coding an element:
   per quadrature point.
 - `probe_pixel_matrix(apply, decomposition, nc, pixel)`: any other operator, probed on one pixel of a
   4^d grid. That grid must keep the problem's pixel size, because 3D element matrices scale with h.
+
+For the fused isotropic operator the coarse levels can instead be re-discretised (see
+[Re-discretised coarse levels](#re-discretised-coarse-levels-option)):
+
+```python
+from muGrid.MultigridCoarsening import IsotropicRediscretisation
+
+rule = IsotropicRediscretisation(muGrid.FEMElement.q1, [1 / N] * 3, (lam, mu),
+                                 lambda_over_mu=lam0 / mu0)   # None: λ, μ independent
+mg = MultigridPreconditioner(
+    apply, decomposition, 3,
+    local_matrices=ScaledLocalMatrices.isotropic_stiffness(op, lam0, mu0, scale),
+    communicator=comm, coarsening=rule)
+```
 
 The [homogenization example](examples.md#homogenization) runs it with
 `-P heterogeneous-multigrid`.
@@ -122,6 +137,25 @@ The [homogenization example](examples.md#homogenization) runs it with
   "positive" offsets plus the upper triangle of the centre block. That is 123 values per node in 3D
   elasticity. `muGrid.VariableStencilOperator` applies it (host and device kernels, float64 and
   float32).
+
+### Re-discretised coarse levels (option)
+
+- **What:** with `coarsening=IsotropicRediscretisation(...)` every coarse level applies the fine
+  operator's own fused kernel at its spacing 2^l h, with λ_l, μ_l the arithmetic means of the 2^d child
+  voxels of the next finer level (as muFFTTO's multigrid). No probing, no RAP, no stencils.
+- **Element:** Q1 only (bilinear 2D, trilinear 3D), where multilinear interpolation is nested: for a
+  homogeneous material the re-discretised levels equal the Galerkin ones. P1 is refused.
+- **Bound and coarsest level:** a re-discretised level is again Σ_cells s K of one element matrix
+  (one family with `lambda_over_mu`, else the two families λ, μ), so the diagonal, the guaranteed
+  bound (the mediant inequality of the element matrix: a constant) and the coarsest dense matrix all
+  come from its local matrices.
+- **Safeguard:** at construction the rule's operator at spacing h with the fine λ, μ is compared with
+  the caller's operator on a random vector, which catches a wrong spacing, element or field.
+- **MPI:** the material of the last distributed level is gathered on rank 0, which averages it down its
+  serial tail.
+- **Trade-off** (CH3D, contrast 1e4, 128³, float32, laptop GPU): 14 instead of 12 CG iterations, a
+  V-cycle of 16.0 instead of 16.3 ms, a repeated setup of 0.05 instead of 0.80 s, and 80 B/voxel less
+  memory. It pays when the material changes often (topology optimisation) or memory is tight.
 
 ### Smoother and its guaranteed bound
 
@@ -157,10 +191,13 @@ The [homogenization example](examples.md#homogenization) runs it with
 - **Coarsest level:** a dense pseudo-inverse assembled from its stencil. The periodic operator is
   singular; its constants are cut off.
 - **Single precision:**
-  - The setup always runs in double: probing, RAP, bounds and the pseudo-inverse.
-  - Stencils, work vectors and the pseudo-inverse are then stored in float32.
-  - A float32 fine level probes with its float32 operator. Its blocks are still summed in double, and
-    the pseudo-inverse cuts at 1e-5 instead of 1e-12.
+  - Stencils, work vectors and the pseudo-inverse are stored in float32. The stencils are measured
+    straight into them: a float32 fine level probes with its float32 operator (its entries are float32
+    values), RAP accumulates in double and rounds each entry once, the Gershgorin bound promotes to
+    double, and the coarsest matrix is factorised in double on the host.
+  - The pseudo-inverse cuts at 1e-5 instead of 1e-12 for a float32 coarsest stencil (also under a
+    double fine level), whose null space rounding leaves at about 1e-7.
+  - The Jacobi step and the float32 ↔ float64 casts run over whole contiguous buffers on a device.
 - **MPI:**
   - Levels are distributed with the fine level's subdivisions while every rank keeps an even number of
     at least 4 nodes per axis and the grid stays ≥ `n_agglomerate`. The first coarsening is
@@ -180,8 +217,9 @@ Per fine voxel, 3D elasticity:
 | level-1 stencil | 123 B | 62 B |
 | level-1 vectors and levels ≥ 2 | ~38 B | ~19 B |
 
-Measured on a GPU, the whole process (CG vectors and material fields included) needs 113–144 B per voxel
-more than muFFTTO's multigrid with re-discretised coarse levels.
+A setup needs about 47 B/voxel beyond these fields (the double fine diagonal, the RAP block; 64³), and
+the safeguard's two check vectors are freed after construction. With re-discretised coarse levels the
+level stencils are replaced by λ_l, μ_l (about 1 B/voxel in total).
 
 Setup per material update:
 - 192 fine applies of the probing (3D, power-of-two grids);
@@ -262,7 +300,8 @@ Problem:
 - **Grid sizes:** every axis must stay even down to the coarsest level.
 - **MPI:** every rank needs an even number of at least 4 nodes per axis on the levels it distributes.
 - **Setup cost:** the probing costs nc ∏ k_α fine applies at every material update. In float64 on GPUs
-  with weak double throughput this dominates the setup.
+  with weak double throughput this dominates the setup. For the fused isotropic operator the
+  re-discretised levels avoid it.
 
 ## References
 

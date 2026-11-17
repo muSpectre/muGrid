@@ -121,6 +121,7 @@ install(FILES
     muGrid/linalg.py
     muGrid/MemoryProfiler.py
     muGrid/Multigrid.py
+    muGrid/MultigridCoarsening.py
     muGrid/Parallel.py
     muGrid/Preconditioners.py
     muGrid/Solvers.py

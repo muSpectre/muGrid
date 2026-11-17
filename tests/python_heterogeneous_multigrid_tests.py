@@ -405,11 +405,15 @@ def crack(nb_grid_pts, depth=1e-4):
 
 
 class FusedProblem:
-    """Fused isotropic elasticity A = s(x) K(λ₀, μ₀), one s per pixel."""
+    """Fused isotropic elasticity A = s(x) K(λ₀, μ₀), one s per pixel.
+
+    ``coarsening``: "galerkin" (default); "rediscretised" (the coarsening
+    rule with λ/μ = λ₀/μ₀, one family); "rediscretised-lame" (the rule with
+    two families λ, μ)."""
 
     def __init__(self, nb_grid_pts, element=muGrid.FEMElement.q1,
                  structured=True, device=None, precision="double",
-                 single_fine=True, comm=None):
+                 single_fine=True, comm=None, coarsening="galerkin"):
         self.dim = dim = len(nb_grid_pts)
         self.nb_grid_pts = nb_grid_pts
         self.comm = comm
@@ -427,10 +431,16 @@ class FusedProblem:
         self.set_scale(np.ones(nb_grid_pts))
         local = (ScaledLocalMatrices.isotropic_stiffness(
             self.op, LAMBDA_0, MU_0, self.scale) if structured else None)
+        if coarsening != "galerkin":
+            from muGrid.MultigridCoarsening import IsotropicRediscretisation
+            coarsening = IsotropicRediscretisation(
+                element, [1.0 / n for n in nb_grid_pts], (self.lam, self.mu),
+                lambda_over_mu=(LAMBDA_0 / MU_0
+                                if coarsening == "rediscretised" else None))
         self.mg = MultigridPreconditioner(
             self.apply, d, dim, local_matrices=local, precision=precision,
             operator_single=self.apply_single if single_fine else None,
-            communicator=comm)
+            communicator=comm, coarsening=coarsening)
 
     def set_scale(self, s):
         """``s`` on the global grid; this rank's part is used."""
@@ -1077,3 +1087,216 @@ def test_precision_cast_copies_whole_buffers(device):
     _copy_cast(single, back)
     np.testing.assert_array_equal(host(back.sg),
                                   values.astype(np.float32).astype(np.float64))
+
+
+# --------------------------------------------------------------------------- #
+# Re-discretised coarse levels (muGrid.MultigridCoarsening)
+# --------------------------------------------------------------------------- #
+
+RULES = ["rediscretised", "rediscretised-lame"]
+
+
+def block_mean(s, levels):
+    """The material ``s`` averaged ``levels`` times over 2^d child voxels."""
+    for _ in range(levels):
+        dim = s.ndim
+        s = np.mean([s[tuple(slice(o, None, 2) for o in offset)]
+                     for offset in np.ndindex(*(2,) * dim)], axis=0)
+    return s
+
+
+@pytest.mark.parametrize("coarsening", RULES)
+@pytest.mark.parametrize("nb_grid_pts", [(16, 16), (8, 8, 8)])
+def test_rediscretised_level_is_the_coarse_fused_operator(nb_grid_pts,
+                                                          coarsening):
+    """Every coarse level applies the fused operator of the coarse grid
+    (spacing 2^l h) with λ, μ the means of the child voxels, built here
+    independently on its own decomposition (dense, on the host; the device
+    is compared with the host below)."""
+    device = None
+    s = MATERIALS["random 1e4"](nb_grid_pts)
+    problem = FusedProblem(nb_grid_pts, device=device, coarsening=coarsening)
+    problem.set_scale(s)
+    problem.mg.setup()
+    dim = len(nb_grid_pts)
+    for level in problem.mg.levels[1:]:
+        # the fused operator on its own coarse decomposition
+        d = decomposition(level.nb_grid_pts, device=device)
+        op = muGrid.IsotropicStiffnessOperator(
+            dim, [2 ** level.index / n for n in nb_grid_pts],
+            muGrid.FEMElement.q1)
+        lam, mu = d.real_field("ref-lambda"), d.real_field("ref-mu")
+        coarse = block_mean(s, level.index)
+        put(lam.s[0], LAMBDA_0 * coarse)
+        put(mu.s[0], MU_0 * coarse)
+        d.communicate_ghosts(lam)
+        d.communicate_ghosts(mu)
+
+        def reference(u, f, d=d, op=op, lam=lam, mu=mu):
+            d.communicate_ghosts(u)
+            op.apply(u, lam, mu, f)
+
+        A = dense(level.apply, level.decomposition, dim, f"rule{level.index}")
+        expected = dense(reference, d, dim, f"ref{level.index}")
+        np.testing.assert_allclose(A, expected, rtol=1e-12,
+                                   atol=1e-12 * np.abs(expected).max())
+
+
+@pytest.mark.parametrize("nb_grid_pts", [(16, 16), (8, 8, 8)])
+def test_rediscretised_equals_galerkin_for_a_homogeneous_material(
+        nb_grid_pts):
+    """For a homogeneous Q1 material the re-discretised and the Galerkin
+    coarse operators are the same (multilinear interpolation is exact)."""
+    dim = len(nb_grid_pts)
+    operators = []
+    for coarsening in ("galerkin", "rediscretised"):
+        problem = FusedProblem(nb_grid_pts, coarsening=coarsening)
+        problem.set_scale(np.ones(nb_grid_pts))
+        problem.mg.setup()
+        level = problem.mg.levels[1]
+        operators.append(dense(level.apply, level.decomposition, dim,
+                               f"homogeneous-{coarsening}"))
+    np.testing.assert_allclose(operators[1], operators[0], rtol=1e-11,
+                               atol=1e-11 * np.abs(operators[0]).max())
+
+
+@pytest.mark.parametrize("coarsening", RULES)
+@pytest.mark.parametrize("material", list(MATERIALS))
+@pytest.mark.parametrize("nb_grid_pts", [(16, 16), (16, 16, 8)])
+def test_rediscretised_bound_is_above_lambda_max(nb_grid_pts, material,
+                                                 coarsening):
+    """b_l ≥ λmax(D_l⁻¹A_l) on every smoothed re-discretised level (dense
+    eigensolver), for all test materials, with one family (λ/μ fixed) and
+    with two (λ, μ)."""
+    problem = FusedProblem(nb_grid_pts, coarsening=coarsening)
+    problem.set_scale(MATERIALS[material](nb_grid_pts))
+    problem.mg.setup()
+    for level in problem.mg.levels[:-1]:
+        if np.prod(level.nb_grid_pts) * problem.dim > 2600:
+            continue                       # dense eigensolver too large
+        lmax = true_lambda_max(level_matrix(problem.mg, level.index))
+        assert lmax <= level.bound * (1 + 1e-12), (level.index, lmax,
+                                                   level.bound)
+
+
+@pytest.mark.parametrize("coarsening", RULES)
+def test_rediscretised_cycle_is_symmetric_positive_definite(coarsening):
+    """The cycle with re-discretised levels is a fixed linear SPD operator on
+    zero-mean vectors (dense spectrum, 2D)."""
+    n = (16, 16)
+    problem = FusedProblem(n, coarsening=coarsening)
+    problem.set_scale(MATERIALS["random 1e4"](n))
+    problem.mg.setup()
+    d, nc = problem.decomposition, problem.dim
+    M = dense(problem.mg, d, nc, "M-rule")
+    zero_mean = np.eye(M.shape[0]) - np.kron(
+        np.eye(nc), np.full((np.prod(n),) * 2, 1 / np.prod(n)))
+    M0 = zero_mean @ M @ zero_mean
+    np.testing.assert_allclose(M0, M0.T, atol=1e-10 * np.abs(M0).max())
+    eigenvalues = np.linalg.eigvalsh(0.5 * (M0 + M0.T))
+    assert (eigenvalues > -1e-10 * eigenvalues.max()).all()
+    assert np.sum(eigenvalues > 1e-10 * eigenvalues.max()) == M.shape[0] - nc
+
+
+@pytest.mark.parametrize("device", devices(),
+                         ids=lambda d: "gpu" if d is not None else "cpu")
+@pytest.mark.parametrize("precision", ["double", "single"])
+@pytest.mark.parametrize("nb_grid_pts", [(64, 64), (32, 32, 32)])
+def test_rediscretised_cg_iterations_are_close_to_galerkin(nb_grid_pts,
+                                                           precision, device):
+    """Phase field, contrast 1e4: the re-discretised levels cost at most a
+    few CG iterations more than Galerkin's, in both precisions, and leave no
+    stencil."""
+    scale = phase_field(nb_grid_pts, 1e4)
+    counts = {}
+    for coarsening in ("galerkin", "rediscretised"):
+        problem = FusedProblem(nb_grid_pts, device=device,
+                               precision=precision, coarsening=coarsening)
+        problem.set_scale(scale)
+        problem.mg.setup()
+        counts[coarsening] = cg_iterations(problem)
+        if coarsening != "galerkin":
+            assert all(level.stencil is None
+                       for level in problem.mg.levels)
+    print(nb_grid_pts, precision, counts)
+    assert counts["rediscretised"] <= counts["galerkin"] + 4
+
+
+def test_rediscretised_cg_iterations_are_grid_independent():
+    """Phase field 2D, contrast 1e4: PCG iterations stay flat under
+    refinement with re-discretised levels too."""
+    counts = []
+    for n in (32, 64, 128):
+        problem = FusedProblem((n, n), coarsening="rediscretised")
+        problem.set_scale(phase_field((n, n), 1e4))
+        problem.mg.setup()
+        counts.append(cg_iterations(problem))
+    print("phase field 2D, re-discretised, N = 32/64/128:", counts)
+    assert max(counts) < 30
+    assert max(counts) - min(counts) <= 4
+
+
+@pytest.mark.skipif(len(devices()) < 2, reason="needs a GPU")
+def test_rediscretised_on_device_matches_host():
+    """The same V-cycle output on the device as on the host (double)."""
+    n = (16, 16, 16)
+    scale = phase_field(n, 1e4)
+    outputs = []
+    for device in devices():
+        problem = FusedProblem(n, device=device, coarsening="rediscretised")
+        problem.set_scale(scale)
+        problem.mg.setup()
+        d = problem.decomposition
+        r = d.real_field("rule-r", (3,))
+        z = d.real_field("rule-z", (3,))
+        put(r.s, global_rhs(problem, 3, 5))
+        problem.mg(r, z)
+        outputs.append(host(z.s).copy())
+    np.testing.assert_allclose(outputs[1], outputs[0], rtol=1e-9,
+                               atol=1e-9 * np.abs(outputs[0]).max())
+
+
+def test_rediscretisation_refuses_p1_and_a_wrong_grid_spacing():
+    """P1 has no nested re-discretisation; a grid spacing that does not match
+    the fine operator is caught at construction (in 3D: the 2D elastic
+    element matrix does not depend on an isotropic h)."""
+    from muGrid.MultigridCoarsening import IsotropicRediscretisation
+
+    with pytest.raises(ValueError, match="q1"):
+        FusedProblem((16, 16), element=muGrid.FEMElement.p1,
+                     coarsening="rediscretised")
+    problem = FusedProblem((8, 8, 8))
+    wrong = IsotropicRediscretisation(muGrid.FEMElement.q1, [2 / 8] * 3,
+                                      (problem.lam, problem.mu))
+    with pytest.raises(ValueError, match="does not reproduce"):
+        MultigridPreconditioner(problem.apply, problem.decomposition, 3,
+                                coarsening=wrong)
+    with pytest.raises(ValueError, match="coarsening"):
+        MultigridPreconditioner(problem.apply, problem.decomposition, 3,
+                                coarsening="algebraic")
+
+
+@pytest.mark.parametrize("device", devices(),
+                         ids=lambda d: "gpu" if d is not None else "cpu")
+def test_rediscretised_setup_needs_little_memory(device):
+    """A repeated setup with re-discretised levels allocates almost nothing
+    beyond the cycle's fields: the double fine diagonal (~26 B/voxel)."""
+    n = (32, 32, 32)
+    problem = FusedProblem(n, device=device, precision="single",
+                           coarsening="rediscretised")
+    problem.set_scale(phase_field(n, 1e4))
+    problem.mg.setup()
+    pool = "host" if device is None else "cuda"
+    muGrid.memory_profiler.enable()
+    try:
+        muGrid.memory_profiler.reset()
+        problem.mg.setup()
+        report = muGrid.memory_profiler.report()
+    finally:
+        muGrid.memory_profiler.disable()
+    transient = sum(p["peak_bytes"] - p["current_bytes"]
+                    for name, p in report["pools"].items()
+                    if name.startswith(pool))
+    per_voxel = transient / np.prod(n)
+    print(f"re-discretised setup transient {per_voxel:.1f} B/voxel")
+    assert per_voxel < 40
