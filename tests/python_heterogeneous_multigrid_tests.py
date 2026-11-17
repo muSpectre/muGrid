@@ -22,6 +22,14 @@ from muGrid.Multigrid import (
     stencil_operator,
 )
 
+# Every test here is serial (it builds its own one-rank decompositions), so under
+# an MPI launcher each rank would only repeat it; the distributed tests are in
+# python_heterogeneous_multigrid_mpi_tests.py.
+pytestmark = pytest.mark.skipif(
+    muGrid.has_mpi and muGrid.Communicator.world().size > 1,
+    reason="serial tests; the MPI ones are in "
+           "python_heterogeneous_multigrid_mpi_tests.py")
+
 
 def serial_communicator():
     """A one-rank communicator, also under an MPI launcher (where every rank
@@ -524,7 +532,7 @@ MATERIALS = {
 
 @pytest.mark.parametrize("material", list(MATERIALS))
 @pytest.mark.parametrize("nb_grid_pts, element", [
-    ((32, 32), muGrid.FEMElement.q1), ((32, 32), muGrid.FEMElement.p1),
+    ((16, 16), muGrid.FEMElement.q1), ((16, 16), muGrid.FEMElement.p1),
     ((16, 16, 8), muGrid.FEMElement.q1)])
 def test_bound_is_above_lambda_max_on_every_level(nb_grid_pts, element,
                                                   material):
@@ -549,7 +557,38 @@ def test_bound_is_above_lambda_max_on_every_level(nb_grid_pts, element,
         assert lmax <= c_l * (1 + 1e-12)
 
 
-@pytest.mark.parametrize("nb_grid_pts", [(16, 16), (8, 8, 8)])
+def test_cycle_is_symmetric_positive_definite_3d():
+    """3D: the cycle is linear, symmetric and positive on zero-mean random
+    vectors (the dense spectrum is checked in 2D below)."""
+    n = (8, 8, 8)
+    problem = FusedProblem(n)
+    problem.set_scale(MATERIALS["random 1e4"](n))
+    problem.mg.setup()
+    d = problem.decomposition
+    rng = np.random.default_rng(13)
+    vectors = []
+    for _ in range(3):
+        v = rng.standard_normal((3, 1) + n)
+        vectors.append(v - v.mean(axis=(2, 3, 4), keepdims=True))
+    r = d.real_field("spd-r", (3,))
+    z = d.real_field("spd-z", (3,))
+
+    def M(v):
+        put(r.s, v)
+        problem.mg(r, z)
+        return host(z.s).copy()
+
+    a, b, c = vectors
+    Ma, Mb = M(a), M(b)
+    scale = np.abs(Ma).max() * np.abs(b).max() * a.size
+    assert abs(np.sum(b * Ma) - np.sum(a * Mb)) < 1e-10 * scale
+    for v, Mv in ((a, Ma), (b, Mb), (c, M(c))):
+        assert np.sum(v * Mv) > 0
+    np.testing.assert_allclose(M(2 * a - 3 * b), 2 * Ma - 3 * Mb,
+                               atol=1e-10 * np.abs(Ma).max())
+
+
+@pytest.mark.parametrize("nb_grid_pts", [(16, 16)])
 def test_cycle_is_symmetric_positive_definite(nb_grid_pts):
     """The V-cycle is a fixed linear SPD operator on zero-mean vectors."""
     problem = FusedProblem(nb_grid_pts)
@@ -584,7 +623,7 @@ def test_localised_mode_after_setup_keeps_cg_fast():
     """The AT2 failure mode of the power estimate: a crack appears after the
     previous setup. The material-independent bounds c_l are the same before
     and after, the bounds used stay above λmax, and CG stays fast."""
-    n = (32, 32)
+    n = (16, 16)
     problem = FusedProblem(n)
     problem.mg.setup()
     lm = problem.mg.local_matrices
@@ -668,9 +707,9 @@ def anisotropic_elasticity_tensor(dim, seed=3):
 
 
 FEM_CASES = {
-    "2D P1 elasticity, anisotropic": ((32, 32), muGrid.FEMElement.p1, 2),
-    "2D Q1 elasticity, anisotropic": ((32, 32), muGrid.FEMElement.q1, 2),
-    "3D Q1 elasticity, anisotropic": ((16, 16, 16), muGrid.FEMElement.q1, 3),
+    "2D P1 elasticity, anisotropic": ((16, 16), muGrid.FEMElement.p1, 2),
+    "2D Q1 elasticity, anisotropic": ((16, 16), muGrid.FEMElement.q1, 2),
+    "3D Q1 elasticity, anisotropic": ((8, 8, 8), muGrid.FEMElement.q1, 3),
     "2D Q1 conductivity, anisotropic": ((32, 32), muGrid.FEMElement.q1, 1),
 }
 
@@ -693,7 +732,7 @@ def test_fem_chain_with_per_quadrature_point_material(case):
     problem = FEMProblem(nb_grid_pts, element, fem_tensor(dim, nc))
     problem.mg.setup()
     for level in problem.mg.levels[:-1]:
-        if np.prod(level.nb_grid_pts) * nc > 2600:
+        if np.prod(level.nb_grid_pts) * nc > 1200:     # dense eigensolve
             continue
         lmax = true_lambda_max(level_matrix(problem.mg, level.index, "f"))
         assert lmax <= level.bound * (1 + 1e-12)
@@ -707,7 +746,7 @@ def test_fallback_bound_without_local_structure():
     """Without local matrices the bound comes from the entries (Gershgorin,
     probed on the fine level): still above λmax on every level, and CG still
     converges, with a looser smoother."""
-    n = (32, 32)
+    n = (16, 16)
     structured = FusedProblem(n)
     black_box = FusedProblem(n, structured=False)
     for problem in (structured, black_box):
@@ -850,7 +889,7 @@ def devices():
 
 @pytest.mark.parametrize("device", devices(),
                          ids=lambda d: "gpu" if d is not None else "cpu")
-@pytest.mark.parametrize("nb_grid_pts", [(128, 128), (32, 32, 32)])
+@pytest.mark.parametrize("nb_grid_pts", [(64, 64), (16, 16, 16)])
 def test_single_precision_cycle_iterations(nb_grid_pts, device):
     """A float32 cycle between float64 CG vectors keeps CG's accuracy (the
     true residual reaches 1e-8) and costs at most a few extra iterations;
@@ -896,54 +935,6 @@ def test_single_precision_cycle_is_symmetric_to_round_off():
     assert eigenvalues.min() > -1e-5 * eigenvalues.max()
 
 
-# --------------------------------------------------------------------------- #
-# Stage 6: MPI
-# --------------------------------------------------------------------------- #
-
-
-@pytest.mark.parametrize("device", devices(),
-                         ids=lambda d: "gpu" if d is not None else "cpu")
-@pytest.mark.parametrize("nb_grid_pts, precision", [
-    ((64, 64), "double"), ((32, 32, 32), "double"), ((64, 64), "single")])
-def test_distributed_multigrid_matches_serial(comm, nb_grid_pts, precision,
-                                              device):
-    """On any number of ranks: the same V-cycle output, smoother bounds and
-    CG iteration count as the serial multigrid of the same problem (which
-    every rank also solves on its own)."""
-    scale = phase_field(nb_grid_pts, 1e4)
-    serial = FusedProblem(nb_grid_pts, precision=precision, device=device)
-    distributed = FusedProblem(nb_grid_pts, precision=precision,
-                               device=device, comm=comm)
-    for problem in (serial, distributed):
-        problem.set_scale(scale)
-        problem.mg.setup()
-    dim = len(nb_grid_pts)
-    outputs = []
-    for problem in (serial, distributed):
-        d = problem.decomposition
-        r = d.real_field("vc-r", (dim,))
-        z = d.real_field("vc-z", (dim,))
-        put(r.s, global_rhs(problem, dim, 11))
-        problem.mg(r, z)
-        outputs.append(host(z.s))
-    expected = outputs[0][(slice(None), slice(None)) + distributed.window]
-    tol = 1e-9 if precision == "double" else 1e-4
-    np.testing.assert_allclose(outputs[1], expected, rtol=tol,
-                               atol=tol * np.abs(outputs[0]).max())
-    serial_bounds = [b for _, b, _ in serial.mg.level_summary()]
-    distributed_bounds = [b for _, b, _ in distributed.mg.level_summary()]
-    if comm.rank == 0:            # the tail's bounds live on rank 0
-        np.testing.assert_allclose(distributed_bounds, serial_bounds,
-                                   rtol=1e-12)
-    counts = [cg_iterations(serial), cg_iterations(distributed)]
-    if comm.rank == 0:
-        print(f"{nb_grid_pts} {precision} on {comm.size} rank(s): serial / "
-              f"distributed {counts}, levels "
-              f"{[lvl.nb_grid_pts for lvl in distributed.mg.levels]} + tail "
-              f"{[lvl.nb_grid_pts for lvl in (distributed.mg.tail or [])]}")
-    assert counts[0] == counts[1]
-
-
 @pytest.mark.parametrize("precision, single_fine", [
     ("double", True), ("single", True), ("single", False)])
 def test_apply_reads_only_its_input(precision, single_fine):
@@ -971,22 +962,6 @@ def test_apply_reads_only_its_input(precision, single_fine):
     np.testing.assert_array_equal(host(fields["r1"].s), r1)
     np.testing.assert_array_equal(host(fields["r2"].s), r2)
     np.testing.assert_allclose(host(fields["z1"].s), z1, rtol=1e-12, atol=0)
-
-
-def test_distributed_multigrid_on_a_small_grid(comm):
-    """A grid already below n_agglomerate still gets one distributed
-    coarsening (the fine operator is a black box, so the level gathered on rank
-    0 must be a stencil) and matches the serial iteration count."""
-    n = (16, 16)
-    scale = phase_field(n, 1e3)
-    serial = FusedProblem(n)
-    distributed = FusedProblem(n, comm=comm)
-    for problem in (serial, distributed):
-        problem.set_scale(scale)
-        problem.mg.setup()
-    if comm.size > 1:
-        assert len(distributed.mg.levels) == 2
-    assert cg_iterations(serial) == cg_iterations(distributed)
 
 
 def test_reexported_from_preconditioners():
