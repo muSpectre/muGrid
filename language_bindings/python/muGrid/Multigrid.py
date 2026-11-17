@@ -174,7 +174,7 @@ def axis_colouring(n):
 
 def galerkin_by_probing(apply_fine, transfer, fine_decomposition,
                         coarse_decomposition, layout, stencil,
-                        name="mg-probe", dtype=np.float64):
+                        name="mg-probe", dtype=np.float64, fine_vectors=None):
     """Measure ``R A P`` into the coarse stencil field ``stencil``.
 
     ``apply_fine(x, y)`` computes ``y = A x`` on nodal fields of
@@ -192,6 +192,13 @@ def galerkin_by_probing(apply_fine, transfer, fine_decomposition,
 
     ``dtype`` is the precision of the probe vectors, i.e. of ``apply_fine``;
     the measured blocks are written into ``stencil`` in its own precision.
+
+    ``fine_vectors``, optional: two nodal fields of ``fine_decomposition`` in
+    ``dtype`` to hold ``P e`` and ``A P e`` (e.g. a multigrid level's own work
+    vectors, free while the setup runs). Without them two fields are created
+    (named ``<name>-Pe``, ``<name>-APe``). Their content on entry does not
+    matter: the prolongation and ``apply_fine`` overwrite the interior, and
+    ghosts are exchanged before they are read.
     """
     nc = layout.nb_components
     dim = layout.dim
@@ -200,8 +207,14 @@ def galerkin_by_probing(apply_fine, transfer, fine_decomposition,
     local = tuple(int(n) for n in coarse_decomposition.nb_subdomain_grid_pts)
 
     probe = _real_field(coarse_decomposition, f"{name}-e", nc, dtype)
-    fine_in = _real_field(fine_decomposition, f"{name}-Pe", nc, dtype)
-    fine_out = _real_field(fine_decomposition, f"{name}-APe", nc, dtype)
+    if fine_vectors is None:
+        fine_in = _real_field(fine_decomposition, f"{name}-Pe", nc, dtype)
+        fine_out = _real_field(fine_decomposition, f"{name}-APe", nc, dtype)
+    else:
+        fine_in, fine_out = fine_vectors
+        if any(np.dtype(v.dtype) != np.dtype(dtype) for v in fine_vectors):
+            raise ValueError("fine_vectors must have the probe precision "
+                             f"{np.dtype(dtype)}")
     response = _real_field(coarse_decomposition, f"{name}-RAPe", nc, dtype)
     xp = _array_module(probe)
 
@@ -630,6 +643,19 @@ class ScaledLocalMatrices:
         the verdict is collective.
         """
         comm = _communicator(decomposition, communicator)
+        try:
+            return self._check_operator(apply, decomposition, nb_components,
+                                        comm, nb_patches, seed, rtol)
+        finally:
+            # two vectors of the fine grid, needed only here: freed, not kept
+            # for the whole run (their memory goes once x and y are gone)
+            collection = _collection(decomposition)
+            for name in ("mg-check-x", "mg-check-y"):
+                if collection.field_exists(name):
+                    collection.pop_field(name)
+
+    def _check_operator(self, apply, decomposition, nb_components, comm,
+                        nb_patches, seed, rtol):
         x = _real_field(decomposition, "mg-check-x", nb_components)
         y = _real_field(decomposition, "mg-check-y", nb_components)
         local = tuple(x.s.shape[2:])
@@ -1055,8 +1081,10 @@ class MultigridPreconditioner(Preconditioner):
         Jacobi diagonals, smoother bounds and the coarsest pseudo-inverse.
         Call after every change of the operator (material update).
 
-        Computed in double precision into transient fields, then stored in the
-        cycle's precision; the transient fields are freed."""
+        The coarse stencils are measured straight into the levels' own
+        fields, in the cycle's precision (see :meth:`_setup_stencils`); the
+        diagonal of the fine level is computed in double precision. Fields
+        used only by the setup are freed at its end."""
         if self.local_matrices is not None:
             self.local_matrices.check_nonnegative(self.comm)
         # double-precision fine level for the setup: the cycle's own, or a
@@ -1076,11 +1104,14 @@ class MultigridPreconditioner(Preconditioner):
             # GPUs with weak double throughput the double operator costs ~10x
             # more, and probing dominates the setup. The blocks are summed in
             # double either way (R A P is accumulated in the stencil field).
+            # The probe vectors on the fine grid are the fine level's own
+            # work vectors d and t (free while the setup runs).
             galerkin_by_probing(fine.operator, self.transfer,
                                 self.decomposition,
                                 self.levels[1].decomposition, self.layout,
                                 stencils[1], name=f"{self._name}-probe",
-                                dtype=fine.dtype)
+                                dtype=fine.dtype,
+                                fine_vectors=(fine.d, fine.t))
             self._rap_chain(self.levels[1:], stencils)
         with self._timed("setup: bounds"):
             fine.decomposition.communicate_ghosts(diagonal_0)
@@ -1099,21 +1130,21 @@ class MultigridPreconditioner(Preconditioner):
                                         self.levels[-1])
                 if self.comm.rank == 0:
                     self._setup_tail(gathered)
-        self._install(self.levels[1:], stencils)
         if setup_fine is not fine:
             for field_name in ("dinv", "r", "d", "t"):
                 setup_fine.pop(field_name)
         self._free_probe_fields()
 
     def _setup_stencils(self, levels):
-        """The double-precision stencils of the setup: the levels' own in a
-        double cycle, transient copies in a single one."""
-        if self.dtype == np.float64:
-            return {level.index: level.stencil for level in levels}
-        return {level.index: make_stencil_field(
-                    level.decomposition, self.layout,
-                    f"{level.name}-stencil64")
-                for level in levels}
+        """The stencils the setup measures into: the levels' own, in the
+        cycle's precision. A single-precision cycle loses nothing by this: a
+        float32 fine level probes with its float32 operator (the measured
+        entries are float32 values), RAP accumulates in double and rounds
+        each entry once, the Gershgorin bound promotes the entries to double,
+        and the coarsest level is factorised in double on the host. Transient
+        double copies of all coarse stencils were the largest part of the
+        setup's memory (about 175 bytes per fine voxel in 3D elasticity)."""
+        return {level.index: level.stencil for level in levels}
 
     def _rap_chain(self, levels, stencils):
         for upper, lower in zip(levels[:-1], levels[1:]):
@@ -1135,14 +1166,6 @@ class MultigridPreconditioner(Preconditioner):
                 _copy_cast(diagonal, level.dinv)
                 level.pop("dinv64")
 
-    def _install(self, levels, stencils):
-        """Store the double setup stencils in the cycle's precision."""
-        if self.dtype == np.float64:
-            return
-        for level in levels:
-            _copy_cast(stencils[level.index], level.stencil)
-            level.pop("stencil64")
-
     def _setup_tail(self, gathered):
         """Rank 0: the serial hierarchy below the last distributed level,
         starting from that level's gathered stencil."""
@@ -1157,7 +1180,6 @@ class MultigridPreconditioner(Preconditioner):
         self._smoother_setup(tail[:-1], stencils,
                              comm=_serial_communicator())
         self._factorise_coarsest(tail[-1], stencils[tail[-1].index])
-        self._install(tail, stencils)
 
     def _free_probe_fields(self):
         """The fine probe vectors and the RAP block are setup-only."""
@@ -1322,16 +1344,18 @@ class MultigridPreconditioner(Preconditioner):
 
     def _factorise_coarsest(self, level, stencil):
         """Dense pseudo-inverse of the coarsest operator (periodic: the
-        constants are its null space), from its double-precision stencil.
+        constants are its null space), from its stencil, in double precision
+        on the host.
 
-        The cut-off is relative to the largest eigenvalue: 1e-12 when the
-        hierarchy was probed in double, 1e-5 when in single precision, where
-        rounding leaves the null space at about 1e-7 instead of 0 (it must be
-        cut, not inverted); the smallest nonzero eigenvalue of a 4^d grid is
-        O(0.1) of the largest."""
+        The cut-off is relative to the largest eigenvalue and follows the
+        precision of the stencil: 1e-12 for a double stencil, 1e-5 for a
+        float32 one (also when the fine level probed in double), whose
+        rounding leaves the null space at about 1e-7 instead of 0, possibly
+        negative: it must be cut, not inverted. The smallest nonzero
+        eigenvalue of a 4^d grid is O(0.1) of the largest."""
         A = dense_from_stencil(stencil, self.layout)
         A = 0.5 * (A + A.T)
-        rcond = 1e-12 if self.levels[0].dtype == np.float64 else 1e-5
+        rcond = 1e-12 if np.dtype(stencil.dtype) == np.float64 else 1e-5
         pinv = np.linalg.pinv(A, rcond=rcond, hermitian=True)
         xp = _array_module(level.x)
         self._coarse_pinv = xp.asarray(pinv.astype(level.dtype))
@@ -1430,9 +1454,22 @@ class MultigridPreconditioner(Preconditioner):
 
     @staticmethod
     def _jacobi(level, r, z):
-        """``z = D⁻¹ r`` on the interior."""
+        """``z = D⁻¹ r``, exact on the interior.
+
+        On a GPU the product runs over the whole contiguous buffers (see
+        :func:`_contiguous_view`): an elementwise kernel on the strided
+        ghost-free views ``.s`` computes a multi-dimensional index per
+        element and took a sixth of a V-cycle at 128³. The ghost entries of
+        ``z`` then hold ``dinv · r`` of the ghosts; they are finite (``dinv``
+        is inverted on the whole buffer) and every reader of ``z`` exchanges
+        its ghosts first."""
         xp = _array_module(r)
-        xp.multiply(level.dinv.s, r.s, out=z.s)
+        dim = len(level.nb_grid_pts)
+        views = [_contiguous_view(field, dim) for field in (level.dinv, r, z)]
+        if all(view is not None for view in views):
+            xp.multiply(views[0], views[1], out=views[2])
+        else:
+            xp.multiply(level.dinv.s, r.s, out=z.s)
 
     # -- diagnostics -------------------------------------------------------------
 
@@ -1464,6 +1501,24 @@ def _invert_in_place(field):
     xp = _array_module(field)
     values[values == 0] = 1.0
     xp.divide(1.0, values, out=values)
+
+
+def _contiguous_view(field, dim):
+    """The whole buffer of a device field (ghosts included) as a C-contiguous
+    array, or None if there is no such view (host fields keep the components
+    of a node together).
+
+    On a device muGrid stores a field component by component with the grid
+    points innermost, x fastest: reversing the spatial axes of ``field.sg``
+    gives a C-contiguous array ``[components..., sub-points, z, y, x]``.
+    Elementwise kernels on it run at memory bandwidth; use it for pointwise
+    operations whose result on the ghosts does not matter."""
+    values = field.sg
+    if _array_module(field) is np:
+        return None
+    lead = values.ndim - dim
+    view = values.transpose(*range(lead), *reversed(range(lead, values.ndim)))
+    return view if view.flags.c_contiguous else None
 
 
 def _copy_cast(source, target):

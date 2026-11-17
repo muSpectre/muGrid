@@ -972,3 +972,87 @@ def test_reexported_from_preconditioners():
     with pytest.raises(AttributeError):
         from muGrid import Preconditioners
         Preconditioners.NoSuchPreconditioner  # noqa: B018
+
+
+# --------------------------------------------------------------------------- #
+# Lean setup and cycle
+# --------------------------------------------------------------------------- #
+
+LEFTOVER_TAGS = ("mg-check", "stencil64", "dinv64", "-probe-", "-setup-",
+                 "rap-block")
+
+
+@pytest.mark.parametrize("device", devices(),
+                         ids=lambda d: "gpu" if d is not None else "cpu")
+@pytest.mark.parametrize("precision", ["double", "single"])
+def test_only_the_cycle_fields_stay(precision, device):
+    """After construction and two setups no field of the operator check, the
+    probing, the setup's double copies or the RAP is left in any level's
+    collection (the operator check's two fine vectors used to stay for the
+    whole run)."""
+    problem = FusedProblem((16, 16, 16), device=device, precision=precision)
+    problem.set_scale(phase_field((16, 16, 16), 1e4))
+    problem.mg.setup()
+    problem.mg.setup()
+    decompositions = [problem.decomposition] + [
+        level.decomposition for level in problem.mg.levels[1:]]
+    leftover = [name for d in decompositions for name in _collection_names(d)
+                if any(tag in name for tag in LEFTOVER_TAGS)]
+    assert leftover == []
+
+
+@pytest.mark.parametrize("device", devices(),
+                         ids=lambda d: "gpu" if d is not None else "cpu")
+def test_setup_needs_little_memory_beyond_the_cycle(device):
+    """A repeated setup of a float32 cycle allocates at most ~50 bytes per
+    fine voxel beyond the fields the cycle keeps (the double diagonal of the
+    fine level, the RAP block): the coarse stencils are measured in place,
+    the probes use the fine level's vectors. It used to be ~250 B/voxel,
+    mostly double copies of the stencils."""
+    n = (32, 32, 32)
+    problem = FusedProblem(n, device=device, precision="single")
+    problem.set_scale(phase_field(n, 1e4))
+    problem.mg.setup()
+    pool = "host" if device is None else "cuda"
+
+    def bytes_of(report, key):
+        return sum(p[key] for name, p in report["pools"].items()
+                   if name.startswith(pool))
+
+    muGrid.memory_profiler.enable()
+    try:
+        muGrid.memory_profiler.reset()
+        problem.mg.setup()
+        report = muGrid.memory_profiler.report()
+    finally:
+        muGrid.memory_profiler.disable()
+    transient = bytes_of(report, "peak_bytes") - bytes_of(report,
+                                                          "current_bytes")
+    per_voxel = transient / np.prod(n)
+    print(f"setup transient {per_voxel:.1f} B/voxel")
+    assert per_voxel < 80
+
+
+@pytest.mark.skipif(len(devices()) < 2, reason="needs a GPU")
+@pytest.mark.parametrize("precision", ["double", "single"])
+def test_jacobi_on_whole_buffers_is_exact(precision):
+    """On a device the Jacobi step multiplies whole contiguous buffers; on the
+    interior it equals D⁻¹ r exactly, also with arbitrary finite values in
+    the ghosts of r and z."""
+    from muGrid.Multigrid import _contiguous_view
+
+    problem = FusedProblem((16, 16, 16), device=devices()[1],
+                           precision=precision)
+    problem.set_scale(phase_field((16, 16, 16), 1e4))
+    mg = problem.mg
+    mg.setup()
+    rng = np.random.default_rng(3)
+    for level in mg.levels[:-1]:
+        r, z = level.vector("jacobi-r"), level.vector("jacobi-z")
+        for field in (r, z):
+            put(field.sg, rng.standard_normal(field.sg.shape))
+        assert all(_contiguous_view(f, 3) is not None
+                   for f in (level.dinv, r, z))
+        expected = host(level.dinv.s) * host(r.s)
+        MultigridPreconditioner._jacobi(level, r, z)
+        np.testing.assert_array_equal(host(z.s), expected)
