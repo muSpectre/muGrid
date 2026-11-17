@@ -1523,8 +1523,17 @@ def _contiguous_view(field, dim):
 
 def _copy_cast(source, target):
     """``target = source`` for fields of possibly different precision (whole
-    buffers, ghosts included)."""
+    buffers, ghosts included). On a device the cast runs over the contiguous
+    buffers (:func:`_contiguous_view`): on the component-first strided view
+    ``.sg`` the elementwise kernel computes an index per element, which made
+    the two casts per V-cycle 7 ms of 43 at 256³ on an L40S."""
     if np.dtype(source.dtype) == np.dtype(target.dtype):
         linalg.copy(source, target)
+        return
+    dim = len(_ghosts_left(source))
+    source_view = _contiguous_view(source, dim)
+    target_view = _contiguous_view(target, dim)
+    if source_view is not None and target_view is not None:
+        target_view[...] = source_view
     else:
         target.sg[...] = source.sg

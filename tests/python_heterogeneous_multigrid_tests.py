@@ -1056,3 +1056,24 @@ def test_jacobi_on_whole_buffers_is_exact(precision):
         expected = host(level.dinv.s) * host(r.s)
         MultigridPreconditioner._jacobi(level, r, z)
         np.testing.assert_array_equal(host(z.s), expected)
+
+
+@pytest.mark.parametrize("device", devices(),
+                         ids=lambda d: "gpu" if d is not None else "cpu")
+def test_precision_cast_copies_whole_buffers(device):
+    """The float64 <-> float32 copies between CG and cycle copy every entry,
+    ghosts included (on a device over the contiguous buffers)."""
+    from muGrid.Multigrid import _copy_cast
+
+    d = decomposition((8, 6, 4), device=device)
+    rng = np.random.default_rng(4)
+    double = d.real_field("cast-double", (3,))
+    single = d.real_field("cast-single", (3,), dtype=np.float32)
+    back = d.real_field("cast-back", (3,))
+    values = rng.standard_normal(double.sg.shape)
+    put(double.sg, values)
+    _copy_cast(double, single)
+    np.testing.assert_array_equal(host(single.sg), values.astype(np.float32))
+    _copy_cast(single, back)
+    np.testing.assert_array_equal(host(back.sg),
+                                  values.astype(np.float32).astype(np.float64))
