@@ -287,8 +287,13 @@ def setup_muffto(s):
                                  element_type="trilinear_hexahedron_1Q",
                                  device=args.device)
     t0 = time.perf_counter()
+    # muFFTTO versions before the guaranteed bound have no ``lmax`` option
+    # (they estimate it); pass it only where it exists
+    import inspect
+    options = ({"lmax": args.lmax} if "lmax" in inspect.signature(
+        multigrid.Multigrid).parameters else {})
     mg = multigrid.Multigrid(disc, C_0, operator="fused", precision=args.precision,
-                             lmax=args.lmax)
+                             **options)
     t_build = time.perf_counter() - t0
     mg.scale.s[0, 0] = to_device(s[None])
     fine = mg.fine_operator
