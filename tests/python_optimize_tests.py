@@ -494,11 +494,14 @@ def test_start_outside_the_box_is_projected():
 
 @serial_only
 def test_preconditioner_reduces_the_evaluations():
+    # gtol 1e-5: its square stays well above the round-off of the objective
+    # (|f| ~ 7e3), so both runs can reach it on any platform; with 1e-6 the
+    # unpreconditioned run stalled at maxiter on some CPUs
     fun_grad, helmholtz = laplacian()
     plain, _, _ = solve_on_fields(
-        fun_grad, np.zeros(256), gtol=1e-6, maxiter=5000)
+        fun_grad, np.zeros(256), gtol=1e-5, maxiter=5000)
     smoothed, _, _ = solve_on_fields(
-        fun_grad, np.zeros(256), gtol=1e-6, precond=helmholtz(0.05))
+        fun_grad, np.zeros(256), gtol=1e-5, precond=helmholtz(0.05))
     assert plain.success and smoothed.success
     assert smoothed.nfev < plain.nfev / 5
 
