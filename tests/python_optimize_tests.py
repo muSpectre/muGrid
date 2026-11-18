@@ -385,10 +385,11 @@ def problem_list():
         dict(lower=-5.0, upper=5.0, gtol=1e-6, maxiter=2000,
              precond=helmholtz(0.05)))
     fun_grad, smoother = many_active_bounds()
-    # gtol 1e-5: at 1e-6 the decrease the line search asks for (about
-    # gtol^2) is below the round-off of the objective (about 1e-14), and
-    # whether the iteration stalls then depends on the arithmetic
-    box = dict(lower=0.0, upper=1.0, gtol=1e-5, maxiter=3000)
+    # gtol 1e-4: the path to the minimum is chaotic (many changes of the
+    # active set), and round-off can lead it into a stall at a projected
+    # gradient near 1e-5: of starts perturbed at round-off level, 1-3 % stall
+    # at gtol 1e-5 and none of 1000 at 1e-4
+    box = dict(lower=0.0, upper=1.0, gtol=1e-4, maxiter=3000)
     problems["many-active"] = (fun_grad, np.full(200, 0.5), box)
     problems["many-active-smoother"] = (
         fun_grad, np.full(200, 0.5), dict(precond=smoother, **box))
@@ -468,10 +469,14 @@ def test_kernels_reach_the_same_minimum(name, device):
         assert result.max_grad < options["gtol"]
         assert result.fun == pytest.approx(f_ref, rel=1e-9)
     else:
-        # stopped by xtol or ftol, which are loose tests
-        assert result.fun == pytest.approx(f_ref, rel=1e-5)
-    # a comparable effort
-    assert result.nit < 2 * nit_ref + 10
+        # stopped by xtol or ftol, which are loose tests (starts perturbed
+        # at round-off level stop up to 8e-6 apart)
+        assert result.fun == pytest.approx(f_ref, rel=1e-4)
+    # A comparable effort. Starts perturbed at round-off level take up to
+    # 2.7 times the reference's iterations, except on many-active without a
+    # smoother, whose path length is chaotic (0.6 to 13 times).
+    if name != "many-active":
+        assert result.nit < 3 * nit_ref + 10
 
 
 @serial_only
