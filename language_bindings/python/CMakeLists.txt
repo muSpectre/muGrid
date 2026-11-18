@@ -120,6 +120,7 @@ install(FILES
     muGrid/Field.py
     muGrid/linalg.py
     muGrid/MemoryProfiler.py
+    muGrid/Optimize.py
     muGrid/Parallel.py
     muGrid/Preconditioners.py
     muGrid/Solvers.py

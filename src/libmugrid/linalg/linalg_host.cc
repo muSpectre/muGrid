@@ -802,5 +802,219 @@ void leray_project<HostSpace>(const TypedField<Real32, HostSpace>& k,
                             N.view().data(), out.view().data(), npix, soa);
 }
 
+/* ---------------------------------------------------------------------- */
+/* Kernels for bound-constrained optimisation                              */
+/* ---------------------------------------------------------------------- */
+
+namespace internal {
+
+//! Throw unless `other` has the collection and the size of `reference`.
+template <typename T>
+void check_same_layout(const char* op,
+                       const TypedField<T, HostSpace>& reference,
+                       const TypedField<T, HostSpace>& other) {
+    if (&reference.get_collection() != &other.get_collection()) {
+        throw FieldError(std::string(op) +
+                         ": fields must belong to the same collection");
+    }
+    if (reference.get_nb_entries() != other.get_nb_entries() ||
+        reference.get_nb_components() != other.get_nb_components()) {
+        throw FieldError(std::string(op) +
+                         ": fields must have the same number of entries");
+    }
+}
+
+/**
+ * `max |a|` over the interior (non-ghost) region. The bounds and strides
+ * are those of interior_vecdot.
+ */
+template <typename T>
+Real interior_max_abs(const T* a_data, const GlobalFieldCollection& coll,
+                      Index_t nb_components_per_pixel) {
+    const auto spatial_dim = coll.get_spatial_dim();
+    const auto& nb_pts = coll.get_nb_subdomain_grid_pts_with_ghosts();
+    const auto& nb_ghosts_left = coll.get_nb_ghosts_left();
+    const auto& nb_ghosts_right = coll.get_nb_ghosts_right();
+    const auto& strides = coll.get_pixels_with_ghosts().get_strides();
+
+    if (spatial_dim < 1 || spatial_dim > 3) {
+        throw FieldError("norm_inf only supports 1D, 2D and 3D fields");
+    }
+    check_interior_reduction_layout(coll, nb_components_per_pixel, "norm_inf");
+
+    // Interior bounds; unused trailing dimensions degenerate to one pass
+    Index_t start[3]{0, 0, 0};
+    Index_t end[3]{1, 1, 1};
+    Index_t stride[3]{0, 0, 0};
+    for (Dim_t d = 0; d < spatial_dim; ++d) {
+        start[d] = nb_ghosts_left[d];
+        end[d] = nb_pts[d] - nb_ghosts_right[d];
+        stride[d] = strides[d];
+    }
+
+    Real result{0};
+    for (Index_t iz = start[2]; iz < end[2]; ++iz) {
+        for (Index_t iy = start[1]; iy < end[1]; ++iy) {
+            if (stride[0] == 1) {
+                // x fastest with unit stride: the interior of one grid row
+                // is contiguous, so Eigen can vectorise it
+                const Index_t row_len =
+                    (end[0] - start[0]) * nb_components_per_pixel;
+                if (row_len <= 0) {
+                    continue;
+                }
+                const Index_t offset =
+                    (start[0] + iy * stride[1] + iz * stride[2]) *
+                    nb_components_per_pixel;
+                Eigen::Map<const Eigen::Matrix<T, Eigen::Dynamic, 1>> row(
+                    a_data + offset, row_len);
+                result = std::max(
+                    result, static_cast<Real>(row.cwiseAbs().maxCoeff()));
+                continue;
+            }
+            for (Index_t ix = start[0]; ix < end[0]; ++ix) {
+                const Index_t offset =
+                    (ix * stride[0] + iy * stride[1] + iz * stride[2]) *
+                    nb_components_per_pixel;
+                for (Index_t c = 0; c < nb_components_per_pixel; ++c) {
+                    result = std::max(
+                        result,
+                        static_cast<Real>(std::abs(a_data[offset + c])));
+                }
+            }
+        }
+    }
+    return result;
+}
+
+template <typename T>
+Real norm_inf_host(const TypedField<T, HostSpace>& x) {
+    const auto& coll = x.get_collection();
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        const auto& global_coll =
+            static_cast<const GlobalFieldCollection&>(coll);
+        if (has_ghosts(global_coll)) {
+            return interior_max_abs(
+                x.data(), global_coll,
+                x.get_nb_components() * x.get_nb_sub_pts());
+        }
+    }
+    // No ghosts: the whole buffer is interior
+    if (x.eigen_vec().size() == 0) {
+        return 0.0;
+    }
+    return static_cast<Real>(x.eigen_vec().cwiseAbs().maxCoeff());
+}
+
+// The scalar and the field form of the bounds share one body: `lower` and
+// `upper` are either scalars or Eigen array expressions of the bound fields.
+template <typename T, typename Lower, typename Upper>
+void axpy_clip_host(T alpha, const TypedField<T, HostSpace>& d,
+                    const TypedField<T, HostSpace>& x, const Lower& lower,
+                    const Upper& upper, TypedField<T, HostSpace>& out) {
+    check_same_layout("axpy_clip", x, d);
+    check_same_layout("axpy_clip", x, out);
+    out.eigen_vec().array() =
+        (x.eigen_vec().array() + alpha * d.eigen_vec().array())
+            .max(lower)
+            .min(upper);
+}
+
+// `lower_at(i)` and `upper_at(i)` return the bounds of entry i: a constant for
+// scalar bounds, the entry of a bound field otherwise.
+template <typename T, typename LowerAt, typename UpperAt>
+void mask_bound_active_host(const TypedField<T, HostSpace>& gradient,
+                            const TypedField<T, HostSpace>& x,
+                            const LowerAt& lower_at, const UpperAt& upper_at,
+                            const TypedField<T, HostSpace>& v,
+                            TypedField<T, HostSpace>& out) {
+    check_same_layout("mask_bound_active", x, gradient);
+    check_same_layout("mask_bound_active", x, v);
+    check_same_layout("mask_bound_active", x, out);
+    const T tolerance{static_cast<T>(BOUND_TOLERANCE)};
+    const T zero{0};
+    const Index_t n{static_cast<Index_t>(x.eigen_vec().size())};
+    const T* x_values{x.data()};
+    const T* g_values{gradient.data()};
+    const T* v_values{v.data()};
+    T* out_values{out.data()};
+    // Entry i of the output depends on entry i of the inputs only, so the
+    // loop may be vectorised even when `out` is `v`. Without the hint the
+    // compiler emits a scalar loop with a branch that random data
+    // mispredicts half of the time (17 ns per value instead of about 1).
+#if defined(_MSC_VER)
+    #pragma loop(ivdep)
+#elif defined(__clang__)
+    #pragma clang loop vectorize(enable) interleave(enable)
+#elif defined(__GNUC__) && !defined(__NVCOMPILER)
+    #pragma GCC ivdep
+#endif
+    for (Index_t i = 0; i < n; ++i) {
+        // on the lower bound and pushed further down, or on the upper bound
+        // and pushed further up
+        const T x_i{x_values[i]};
+        const T g_i{g_values[i]};
+        const int on_lower{x_i <= lower_at(i) + tolerance};
+        const int on_upper{x_i >= upper_at(i) - tolerance};
+        const int pushed_down{g_i >= zero};
+        const int pushed_up{g_i <= zero};
+        const int active{(on_lower & pushed_down) | (on_upper & pushed_up)};
+        out_values[i] = active ? zero : v_values[i];
+    }
+}
+
+}  // namespace internal
+
+#define MUGRID_LINALG_HOST_BOUND_KERNELS(T)                                    \
+    template <>                                                                \
+    Real norm_inf<T, HostSpace>(const TypedField<T, HostSpace>& x) {           \
+        return internal::norm_inf_host(x);                                     \
+    }                                                                          \
+    template <>                                                                \
+    void axpy_clip<T, HostSpace>(T alpha, const TypedField<T, HostSpace>& d,   \
+                                 const TypedField<T, HostSpace>& x, T lower,   \
+                                 T upper, TypedField<T, HostSpace>& out) {     \
+        internal::axpy_clip_host(alpha, d, x, lower, upper, out);              \
+    }                                                                          \
+    template <>                                                                \
+    void axpy_clip<T, HostSpace>(T alpha, const TypedField<T, HostSpace>& d,   \
+                                 const TypedField<T, HostSpace>& x,            \
+                                 const TypedField<T, HostSpace>& lower,        \
+                                 const TypedField<T, HostSpace>& upper,        \
+                                 TypedField<T, HostSpace>& out) {              \
+        internal::check_same_layout("axpy_clip", x, lower);                    \
+        internal::check_same_layout("axpy_clip", x, upper);                    \
+        internal::axpy_clip_host(alpha, d, x, lower.eigen_vec().array(),       \
+                                 upper.eigen_vec().array(), out);              \
+    }                                                                          \
+    template <>                                                                \
+    void mask_bound_active<T, HostSpace>(                                      \
+        const TypedField<T, HostSpace>& gradient,                              \
+        const TypedField<T, HostSpace>& x, T lower, T upper,                   \
+        const TypedField<T, HostSpace>& v, TypedField<T, HostSpace>& out) {    \
+        internal::mask_bound_active_host(                                      \
+            gradient, x, [lower](Index_t) { return lower; },                   \
+            [upper](Index_t) { return upper; }, v, out);                       \
+    }                                                                          \
+    template <>                                                                \
+    void mask_bound_active<T, HostSpace>(                                      \
+        const TypedField<T, HostSpace>& gradient,                              \
+        const TypedField<T, HostSpace>& x,                                     \
+        const TypedField<T, HostSpace>& lower,                                 \
+        const TypedField<T, HostSpace>& upper,                                 \
+        const TypedField<T, HostSpace>& v, TypedField<T, HostSpace>& out) {    \
+        internal::check_same_layout("mask_bound_active", x, lower);            \
+        internal::check_same_layout("mask_bound_active", x, upper);            \
+        const T* lower_values{lower.data()};                                   \
+        const T* upper_values{upper.data()};                                   \
+        internal::mask_bound_active_host(                                      \
+            gradient, x,                                                       \
+            [lower_values](Index_t i) { return lower_values[i]; },             \
+            [upper_values](Index_t i) { return upper_values[i]; }, v, out);    \
+    }
+MUGRID_LINALG_HOST_BOUND_KERNELS(Real)
+MUGRID_LINALG_HOST_BOUND_KERNELS(Real32)
+#undef MUGRID_LINALG_HOST_BOUND_KERNELS
+
 }  // namespace linalg
 }  // namespace muGrid

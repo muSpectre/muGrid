@@ -1658,6 +1658,346 @@ void leray_project<DeviceSpace>(const TypedField<Real32, DeviceSpace>& k,
     leray_project_device(k, invk, N, out);
 }
 
+/* ---------------------------------------------------------------------- */
+/* Kernels for bound-constrained optimisation                              */
+/* ---------------------------------------------------------------------- */
+
+namespace gpu_kernels {
+
+//! min(max(v, lower), upper)
+template <typename T>
+__device__ inline T clip(T v, T lower, T upper) {
+    v = v < lower ? lower : v;
+    return v > upper ? upper : v;
+}
+
+//! True if a variable sits on a bound with the gradient pushing it out of
+//! the box (see linalg::mask_bound_active).
+template <typename T>
+__device__ inline bool bound_active(T x, T g, T lower, T upper,
+                                    T tolerance) {
+    return (x <= lower + tolerance && g >= T(0)) ||
+           (x >= upper - tolerance && g <= T(0));
+}
+
+// out = clip(x + alpha * d), scalar bounds
+template <typename T>
+__global__ void axpy_clip_kernel(T alpha, const T* d, const T* x, T lower,
+                                 T upper, T* out, Index_t n) {
+    Index_t idx = global_thread_x();
+    if (idx < n) {
+        out[idx] = clip(x[idx] + alpha * d[idx], lower, upper);
+    }
+}
+
+// out = clip(x + alpha * d), one bound pair per entry
+template <typename T>
+__global__ void axpy_clip_field_kernel(T alpha, const T* d, const T* x,
+                                       const T* lower, const T* upper, T* out,
+                                       Index_t n) {
+    Index_t idx = global_thread_x();
+    if (idx < n) {
+        out[idx] = clip(x[idx] + alpha * d[idx], lower[idx], upper[idx]);
+    }
+}
+
+// out = 0 where bound-active, v elsewhere; scalar bounds
+template <typename T>
+__global__ void mask_bound_active_kernel(const T* g, const T* x, T lower,
+                                         T upper, T tolerance, const T* v,
+                                         T* out, Index_t n) {
+    Index_t idx = global_thread_x();
+    if (idx < n) {
+        out[idx] = bound_active(x[idx], g[idx], lower, upper, tolerance)
+                       ? T(0)
+                       : v[idx];
+    }
+}
+
+// out = 0 where bound-active, v elsewhere; one bound pair per entry
+template <typename T>
+__global__ void mask_bound_active_field_kernel(const T* g, const T* x,
+                                               const T* lower, const T* upper,
+                                               T tolerance, const T* v, T* out,
+                                               Index_t n) {
+    Index_t idx = global_thread_x();
+    if (idx < n) {
+        out[idx] =
+            bound_active(x[idx], g[idx], lower[idx], upper[idx], tolerance)
+                ? T(0)
+                : v[idx];
+    }
+}
+
+/**
+ * max |a| over the interior box, one partial maximum per block. The
+ * traversal is that of interior_dot_kernel.
+ */
+template <typename T>
+__global__ void interior_max_abs_kernel(
+    const T* a, Real* partial_max,
+    Index_t nx, Index_t ny, Index_t nz,
+    Index_t x0, Index_t y0, Index_t z0,
+    Index_t stride_c, Index_t stride_x, Index_t stride_y, Index_t stride_z,
+    Index_t nb_components) {
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Index_t nb_pixels = nx * ny * nz;
+
+    Real largest{0};
+    for (Index_t pixel_idx = global_thread_x(); pixel_idx < nb_pixels;
+         pixel_idx += grid_stride_x()) {
+        Index_t ix = x0 + pixel_idx % nx;
+        Index_t rem = pixel_idx / nx;
+        Index_t iy = y0 + rem % ny;
+        Index_t iz = z0 + rem / ny;
+        Index_t offset = ix * stride_x + iy * stride_y + iz * stride_z;
+        for (Index_t c = 0; c < nb_components; ++c) {
+            const Real value = a[offset + c * stride_c];
+            const Real magnitude = value < 0 ? -value : value;
+            largest = magnitude > largest ? magnitude : largest;
+        }
+    }
+
+    shared_data[tid] = largest;
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride && shared_data[tid + stride] > shared_data[tid]) {
+            shared_data[tid] = shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        partial_max[blockIdx.x] = shared_data[0];
+    }
+}
+
+//! Maximum of the `n` partial maxima, written to data[0].
+__global__ void final_max_kernel(Real* data, Index_t n) {
+    __shared__ Real shared_data[REDUCE_BLOCK_SIZE];
+
+    Index_t tid = threadIdx.x;
+    Real largest{0};
+    for (Index_t i = tid; i < n; i += blockDim.x) {
+        largest = data[i] > largest ? data[i] : largest;
+    }
+    shared_data[tid] = largest;
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride && shared_data[tid + stride] > shared_data[tid]) {
+            shared_data[tid] = shared_data[tid + stride];
+        }
+        __syncthreads();
+    }
+    if (tid == 0) {
+        data[0] = shared_data[0];
+    }
+}
+
+}  // namespace gpu_kernels
+
+namespace {
+
+//! Throw unless `other` has the collection and the size of `reference`, and
+//! contiguous storage.
+template <typename T>
+void check_same_layout(const char* op,
+                       const TypedField<T, DeviceSpace>& reference,
+                       const TypedField<T, DeviceSpace>& other) {
+    if (&reference.get_collection() != &other.get_collection()) {
+        throw FieldError(std::string(op) +
+                         ": fields must belong to the same collection");
+    }
+    if (reference.get_nb_entries() != other.get_nb_entries() ||
+        reference.get_nb_components() != other.get_nb_components()) {
+        throw FieldError(std::string(op) +
+                         ": fields must have the same number of entries");
+    }
+    internal::check_contiguous(op, other);
+}
+
+//! Number of values in the full buffer of a field.
+template <typename T>
+Index_t nb_buffer_values(const TypedField<T, DeviceSpace>& f) {
+    return f.get_nb_entries() * f.get_nb_components();
+}
+
+inline int elementwise_blocks(Index_t n) {
+    return static_cast<int>((n + gpu_kernels::BLOCK_SIZE - 1) /
+                            gpu_kernels::BLOCK_SIZE);
+}
+
+template <typename T>
+Real norm_inf_device(const TypedField<T, DeviceSpace>& x) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("norm_inf", x);
+
+    // The interior of a global collection is a box inside the buffer. A
+    // local collection has no ghosts: treat its buffer as one row of scalars.
+    InteriorBox box;
+    const auto& coll = x.get_collection();
+    if (coll.get_domain() == FieldCollection::ValidityDomain::Global) {
+        box = interior_box(x,
+                           static_cast<const GlobalFieldCollection&>(coll));
+    } else {
+        box.extent[0] = nb_buffer_values(x);
+        box.stride[0] = 1;
+        box.nb_components_per_pixel = 1;
+        box.nb_interior_pixels = box.extent[0];
+    }
+    if (box.nb_interior_pixels <= 0) {
+        return 0.0;  // e.g. an MPI rank without local pixels
+    }
+
+    const int num_blocks =
+        gpu_kernels::reduction_blocks(box.nb_interior_pixels);
+    Real* d_partial = scratch_as<Real>(0, num_blocks);
+    GPU_LAUNCH_KERNEL(gpu_kernels::interior_max_abs_kernel<T>,
+                      num_blocks, gpu_kernels::REDUCE_BLOCK_SIZE,
+                      device_ptr(x), d_partial, box.extent[0], box.extent[1],
+                      box.extent[2], box.start[0], box.start[1], box.start[2],
+                      box.stride_c, box.stride[0], box.stride[1],
+                      box.stride[2], box.nb_components_per_pixel);
+    GPU_LAUNCH_KERNEL(gpu_kernels::final_max_kernel,
+                      1, gpu_kernels::REDUCE_BLOCK_SIZE, d_partial,
+                      static_cast<Index_t>(num_blocks));
+    Real result;
+    GPU_MEMCPY_D2H(&result, d_partial, sizeof(Real));
+    return result;
+}
+
+template <typename T>
+void axpy_clip_device(T alpha, const TypedField<T, DeviceSpace>& d,
+                      const TypedField<T, DeviceSpace>& x, T lower, T upper,
+                      TypedField<T, DeviceSpace>& out) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("axpy_clip", x);
+    check_same_layout("axpy_clip", x, d);
+    check_same_layout("axpy_clip", x, out);
+    const Index_t n = nb_buffer_values(x);
+    if (n <= 0) {
+        return;
+    }
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_clip_kernel<T>,
+                      elementwise_blocks(n), gpu_kernels::BLOCK_SIZE, alpha,
+                      device_ptr(d), device_ptr(x), lower, upper,
+                      device_ptr(out), n);
+}
+
+template <typename T>
+void axpy_clip_field_device(T alpha, const TypedField<T, DeviceSpace>& d,
+                            const TypedField<T, DeviceSpace>& x,
+                            const TypedField<T, DeviceSpace>& lower,
+                            const TypedField<T, DeviceSpace>& upper,
+                            TypedField<T, DeviceSpace>& out) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("axpy_clip", x);
+    for (const auto* f : {&d, &lower, &upper}) {
+        check_same_layout("axpy_clip", x, *f);
+    }
+    check_same_layout("axpy_clip", x, out);
+    const Index_t n = nb_buffer_values(x);
+    if (n <= 0) {
+        return;
+    }
+    GPU_LAUNCH_KERNEL(gpu_kernels::axpy_clip_field_kernel<T>,
+                      elementwise_blocks(n), gpu_kernels::BLOCK_SIZE, alpha,
+                      device_ptr(d), device_ptr(x), device_ptr(lower),
+                      device_ptr(upper), device_ptr(out), n);
+}
+
+template <typename T>
+void mask_bound_active_device(const TypedField<T, DeviceSpace>& gradient,
+                              const TypedField<T, DeviceSpace>& x, T lower,
+                              T upper, const TypedField<T, DeviceSpace>& v,
+                              TypedField<T, DeviceSpace>& out) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("mask_bound_active", x);
+    for (const auto* f : {&gradient, &v}) {
+        check_same_layout("mask_bound_active", x, *f);
+    }
+    check_same_layout("mask_bound_active", x, out);
+    const Index_t n = nb_buffer_values(x);
+    if (n <= 0) {
+        return;
+    }
+    GPU_LAUNCH_KERNEL(gpu_kernels::mask_bound_active_kernel<T>,
+                      elementwise_blocks(n), gpu_kernels::BLOCK_SIZE,
+                      device_ptr(gradient), device_ptr(x), lower, upper,
+                      static_cast<T>(BOUND_TOLERANCE), device_ptr(v),
+                      device_ptr(out), n);
+}
+
+template <typename T>
+void mask_bound_active_field_device(
+    const TypedField<T, DeviceSpace>& gradient,
+    const TypedField<T, DeviceSpace>& x,
+    const TypedField<T, DeviceSpace>& lower,
+    const TypedField<T, DeviceSpace>& upper,
+    const TypedField<T, DeviceSpace>& v, TypedField<T, DeviceSpace>& out) {
+    DeviceGuard device_guard{x.get_device_id()};
+    internal::check_contiguous("mask_bound_active", x);
+    for (const auto* f : {&gradient, &lower, &upper, &v}) {
+        check_same_layout("mask_bound_active", x, *f);
+    }
+    check_same_layout("mask_bound_active", x, out);
+    const Index_t n = nb_buffer_values(x);
+    if (n <= 0) {
+        return;
+    }
+    GPU_LAUNCH_KERNEL(gpu_kernels::mask_bound_active_field_kernel<T>,
+                      elementwise_blocks(n), gpu_kernels::BLOCK_SIZE,
+                      device_ptr(gradient), device_ptr(x), device_ptr(lower),
+                      device_ptr(upper), static_cast<T>(BOUND_TOLERANCE),
+                      device_ptr(v), device_ptr(out), n);
+}
+
+}  // namespace
+
+#define MUGRID_LINALG_DEVICE_BOUND_KERNELS(T)                                  \
+    template <>                                                                \
+    Real norm_inf<T, DeviceSpace>(const TypedField<T, DeviceSpace>& x) {       \
+        return norm_inf_device(x);                                             \
+    }                                                                          \
+    template <>                                                                \
+    void axpy_clip<T, DeviceSpace>(                                            \
+        T alpha, const TypedField<T, DeviceSpace>& d,                          \
+        const TypedField<T, DeviceSpace>& x, T lower, T upper,                 \
+        TypedField<T, DeviceSpace>& out) {                                     \
+        axpy_clip_device(alpha, d, x, lower, upper, out);                      \
+    }                                                                          \
+    template <>                                                                \
+    void axpy_clip<T, DeviceSpace>(                                            \
+        T alpha, const TypedField<T, DeviceSpace>& d,                          \
+        const TypedField<T, DeviceSpace>& x,                                   \
+        const TypedField<T, DeviceSpace>& lower,                               \
+        const TypedField<T, DeviceSpace>& upper,                               \
+        TypedField<T, DeviceSpace>& out) {                                     \
+        axpy_clip_field_device(alpha, d, x, lower, upper, out);                \
+    }                                                                          \
+    template <>                                                                \
+    void mask_bound_active<T, DeviceSpace>(                                    \
+        const TypedField<T, DeviceSpace>& gradient,                            \
+        const TypedField<T, DeviceSpace>& x, T lower, T upper,                 \
+        const TypedField<T, DeviceSpace>& v,                                   \
+        TypedField<T, DeviceSpace>& out) {                                     \
+        mask_bound_active_device(gradient, x, lower, upper, v, out);           \
+    }                                                                          \
+    template <>                                                                \
+    void mask_bound_active<T, DeviceSpace>(                                    \
+        const TypedField<T, DeviceSpace>& gradient,                            \
+        const TypedField<T, DeviceSpace>& x,                                   \
+        const TypedField<T, DeviceSpace>& lower,                               \
+        const TypedField<T, DeviceSpace>& upper,                               \
+        const TypedField<T, DeviceSpace>& v,                                   \
+        TypedField<T, DeviceSpace>& out) {                                     \
+        mask_bound_active_field_device(gradient, x, lower, upper, v, out);     \
+    }
+MUGRID_LINALG_DEVICE_BOUND_KERNELS(Real)
+MUGRID_LINALG_DEVICE_BOUND_KERNELS(Real32)
+#undef MUGRID_LINALG_DEVICE_BOUND_KERNELS
+
 }  // namespace linalg
 
 namespace {

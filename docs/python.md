@@ -699,12 +699,76 @@ alternative approximations of $(\mathbf{K}^\mathrm{ref})^{-1}$; their
 docstrings give the full parameter lists. Usage is shown on the
 [Examples](linalg.md#preconditioners) page.
 
+## Optimisation
+
+`muGrid.Optimize` holds minimisers for nonlinear problems. Their vectors are
+muGrid fields: they live on the host or the device with the fields of the
+problem, are distributed under MPI like them, and are allocated once. Only
+scalars reach the host.
+
+```python
+from muGrid.Optimize import l_bfgs_bounded
+```
+
+### l_bfgs_bounded
+
+```python
+result = l_bfgs_bounded(comm, fc, fun, x, lower=0.0, upper=1.0, precond=None,
+                        maxcor=20, gtol=1e-5, xtol=0.0, ftol=0.0, maxiter=500,
+                        c1=1e-4, max_halvings=40, callback=None, timer=None)
+```
+
+Limited-memory BFGS for
+$\min f(\mathbf{x})$ subject to
+$\mathrm{lower} \le \mathbf{x} \le \mathrm{upper}$. The method works on
+the *projected gradient* $\mathbf{r}$: the gradient on the free variables,
+zero on those that sit on a bound with the gradient pushing them out of the
+box. Each iteration takes the quasi-Newton direction
+$\mathbf{d} = -\mathbf{H}\mathbf{r}$ from the last `maxcor` pairs
+$(\mathbf{s}, \mathbf{y})$ of steps and changes of $\mathbf{r}$, and
+searches along the projected path
+$\operatorname{clip}(\mathbf{x} + \alpha\mathbf{d})$, halving
+$\alpha$ from 1 until the Armijo condition
+$f \le f_0 + c_1 \alpha\, \mathbf{r}^\top\mathbf{d}$ holds.
+
+With `precond`, a symmetric positive definite operator $\mathbf{M}$, the
+initial inverse Hessian of the recursion is
+$\gamma\, \mathbf{P}\mathbf{M}\mathbf{P}$ in place of
+$\gamma\, \mathbf{I}$, with $\mathbf{P}$ the projector onto the free
+variables and
+$\gamma = \mathbf{s}^\top\mathbf{y} /
+\mathbf{y}^\top\mathbf{P}\mathbf{M}\mathbf{P}\mathbf{y}$. A smoother is a
+good choice, e.g. a Helmholtz filter for the density of a topology
+optimisation. The algorithm is that of `NuMPI.Optimization.l_bfgs_bounded`.
+
+| Parameter | Description |
+|-----------|-------------|
+| `comm` | `Communicator` for the global reductions. |
+| `fc` | Collection of `x`; it also holds the work fields, named `lbfgs-work...`: 2 · `maxcor` for the pairs and 8 more (10 with a preconditioner). |
+| `fun` | `fun(x, gradient)` writes the gradient at the field `x` into the field `gradient` and returns the objective, summed over all processes. Evaluate the objective in double precision also for `float32` fields. |
+| `x` | Start (clipped to the bounds); overwritten with the solution. |
+| `lower`, `upper` | Scalars, fields with one bound per entry, or `None` for no bound. Scalar bounds use no field. |
+| `precond` | Optional `precond(v, Mv)` writing $\mathbf{M}\mathbf{v}$, as `prec` of `conjugate_gradients`. |
+| `maxcor` | Number of pairs kept. Default `20`. |
+| `gtol` | Stop when $\|\mathbf{r}\|_\infty <$ `gtol`. Default `1e-5`. A `gtol` whose square is below the round-off of the objective cannot be reached. |
+| `xtol` | Stop when the largest change of a variable in a step is below `xtol` (not tested on a step made without pairs). Default `0`: off. |
+| `ftol` | Stop when the objective changes by less than `ftol` · max(1, \|f\|) in a step. Default `0`: off. |
+| `maxiter` | Maximum number of iterations. Default `500`. |
+| `c1`, `max_halvings` | Armijo constant and maximal number of step halvings. Defaults `1e-4`, `40`. |
+| `callback` | `callback(iteration, state)` after every accepted step; `state` holds `x`, `gradient`, `fun`, `max_grad`, `step`. Returning `True` stops the run. |
+
+Returns an `OptimizeResult` with `success`, `message`, `fun`, `nit`, `nfev`,
+`max_grad`, `x` and `gradient`. Reaching `maxiter` or a failed line search
+gives `success = False`; no exception is raised, and the best iterate
+remains in `x`.
+
 ## Linear algebra
 
 `muGrid.linalg` provides ghost-aware BLAS-1 kernels on fields (`vecdot`,
 `norm_sq`, `axpy`, `scal`, `axpby`, `copy`, `axpy_norm_sq`,
-`pipelined_cg_dots`, `cross`, `leray_project`); see
-[Linear algebra](linalg.md).
+`pipelined_cg_dots`, `cross`, `leray_project`) and the kernels of the
+bound-constrained minimiser (`norm_inf`, `axpy_clip`, `mask_bound_active`);
+see [Linear algebra](linalg.md).
 
 ## Device selection
 

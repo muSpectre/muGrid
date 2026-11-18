@@ -204,6 +204,80 @@ def axpy_norm_sq(alpha, x, y):
     return _linalg.axpy_norm_sq(alpha, _get_cpp(x), _get_cpp(y))
 
 
+def norm_inf(x):
+    """
+    Largest absolute value of a real field (interior only).
+
+    Parameters
+    ----------
+    x : Field
+        Real field (float64 or float32)
+
+    Returns
+    -------
+    float
+        Local maximum of ``|x|`` (not MPI-reduced); 0 for an empty field
+    """
+    return _linalg.norm_inf(_get_cpp(x))
+
+
+def axpy_clip(alpha, d, x, lower, upper, out):
+    """
+    Step along a direction, projected onto a box:
+    ``out = min(max(x + alpha * d, lower), upper)``, entry by entry.
+
+    One pass over the fields, without temporaries. Operates on the full
+    buffer.
+
+    Parameters
+    ----------
+    alpha : float
+        Step length
+    d : Field
+        Direction
+    x : Field
+        Start of the step
+    lower, upper : float or Field
+        The bounds: two scalars (``-inf``/``inf`` for no bound), or two
+        fields with one bound per entry
+    out : Field
+        The projected point; may be one of the input fields
+    """
+    _linalg.axpy_clip(alpha, _get_cpp(d), _get_cpp(x), _get_cpp(lower),
+                      _get_cpp(upper), _get_cpp(out))
+
+
+def mask_bound_active(gradient, x, lower, upper, v, out):
+    """
+    Restrict a vector to the free variables of a box-constrained problem:
+    ``out = 0`` where the variable is bound-active, ``out = v`` elsewhere.
+
+    A variable is bound-active when it sits on a bound (within 1e-12) and
+    the objective decreases only by leaving the box there: ``x`` on the
+    lower bound with ``gradient >= 0``, or on the upper bound with
+    ``gradient <= 0``. With ``v = gradient`` the result is the projected
+    gradient; with any other ``v`` it applies the 0/1 projector onto the
+    free variables. The set is recomputed from ``gradient`` and ``x`` on
+    every call, so no mask is stored.
+
+    Parameters
+    ----------
+    gradient : Field
+        Gradient of the objective at `x`
+    x : Field
+        Current point
+    lower, upper : float or Field
+        The bounds: two scalars, or two fields with one bound per entry
+    v : Field
+        Vector to restrict
+    out : Field
+        The restricted vector; may be `v`
+    """
+    _linalg.mask_bound_active(_get_cpp(gradient), _get_cpp(x),
+                              _get_cpp(lower), _get_cpp(upper), _get_cpp(v),
+                              _get_cpp(out))
+
+
 def cross(a, b, out):
     """
     Per-pixel three-vector cross product: out = a x b (full buffer).
@@ -251,7 +325,8 @@ def leray_project(k, invk, N, out):
 
 
 __all__ = ["vecdot", "norm_sq", "axpy", "scal", "axpby", "copy", "axpy_norm_sq",
-           "cross", "leray_project"]
+           "cross", "leray_project", "norm_inf", "axpy_clip",
+           "mask_bound_active"]
 
 
 # Fused block-Thomas sweeps, one per block size and precision. These operate on

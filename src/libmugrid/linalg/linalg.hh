@@ -277,6 +277,97 @@ reduction_result_t<T> axpy_norm_sq(T alpha,
                                    const TypedField<T, MemorySpace>& x,
                                    TypedField<T, MemorySpace>& y);
 
+/* ---------------------------------------------------------------------- */
+/* Kernels for bound-constrained optimisation                              */
+/*                                                                         */
+/* A box-constrained minimiser (muGrid.Optimize.l_bfgs_bounded) needs      */
+/* three operations beyond the BLAS-like ones above. Each is one pass over */
+/* the fields. The bounds are either two scalars or two fields; the scalar */
+/* form needs no bound fields at all. Real and Real32 fields only.         */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * A variable counts as sitting on a bound when it is within this distance
+ * of it (the value NuMPI's bounded L-BFGS uses).
+ */
+constexpr Real BOUND_TOLERANCE = 1e-12;
+
+/**
+ * Largest absolute value `max_{i∈Ω} |x_i|` over the interior (ghosts
+ * excluded), 0 for an empty field.
+ *
+ * @return the local maximum (not MPI-reduced), in double precision
+ */
+template <typename T, typename MemorySpace>
+Real norm_inf(const TypedField<T, MemorySpace>& x);
+
+/**
+ * Step along a direction, projected onto the box:
+ * `out = min(max(x + alpha * d, lower), upper)`, entry by entry.
+ *
+ * Operates on the full buffer. `out` may be one of the inputs.
+ *
+ * @param alpha step length
+ * @param d direction
+ * @param x start of the step
+ * @param lower,upper the bounds; ±infinity for no bound
+ * @param out the projected point
+ */
+template <typename T, typename MemorySpace>
+void axpy_clip(T alpha,
+               const TypedField<T, MemorySpace>& d,
+               const TypedField<T, MemorySpace>& x,
+               T lower, T upper,
+               TypedField<T, MemorySpace>& out);
+
+//! axpy_clip with one lower and one upper bound per entry.
+template <typename T, typename MemorySpace>
+void axpy_clip(T alpha,
+               const TypedField<T, MemorySpace>& d,
+               const TypedField<T, MemorySpace>& x,
+               const TypedField<T, MemorySpace>& lower,
+               const TypedField<T, MemorySpace>& upper,
+               TypedField<T, MemorySpace>& out);
+
+/**
+ * Restrict a vector to the free variables of a box-constrained problem:
+ * `out = 0` where the variable is bound-active, `out = v` elsewhere.
+ *
+ * A variable is bound-active when it sits on a bound and the objective
+ * decreases only by leaving the box there:
+ *
+ *     x <= lower + BOUND_TOLERANCE and gradient >= 0, or
+ *     x >= upper - BOUND_TOLERANCE and gradient <= 0.
+ *
+ * With `v = gradient` the result is the projected gradient, whose norm
+ * measures how far `x` is from a constrained minimiser. With any other `v`
+ * it applies the 0/1 projector onto the free variables. The set is
+ * recomputed from `gradient` and `x` on every call, so no mask is stored.
+ *
+ * Operates on the full buffer. `out` may be `v`.
+ *
+ * @param gradient gradient of the objective at `x`
+ * @param x current point
+ * @param lower,upper the bounds; ±infinity for no bound
+ * @param v vector to restrict
+ * @param out the restricted vector
+ */
+template <typename T, typename MemorySpace>
+void mask_bound_active(const TypedField<T, MemorySpace>& gradient,
+                       const TypedField<T, MemorySpace>& x,
+                       T lower, T upper,
+                       const TypedField<T, MemorySpace>& v,
+                       TypedField<T, MemorySpace>& out);
+
+//! mask_bound_active with one lower and one upper bound per entry.
+template <typename T, typename MemorySpace>
+void mask_bound_active(const TypedField<T, MemorySpace>& gradient,
+                       const TypedField<T, MemorySpace>& x,
+                       const TypedField<T, MemorySpace>& lower,
+                       const TypedField<T, MemorySpace>& upper,
+                       const TypedField<T, MemorySpace>& v,
+                       TypedField<T, MemorySpace>& out);
+
 /**
  * Scale operation with per-pixel multiplier: x[c, i] *= alpha[c, i].
  *

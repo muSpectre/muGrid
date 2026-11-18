@@ -16,6 +16,12 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.7.0 (not yet released)
+-------------------------
+
+- ENH: Bound-constrained L-BFGS on fields, with an optional preconditioner as the initial
+  inverse Hessian; all vectors stay on the device and are allocated once
+
 v1.6.2 (13Nov26)
 ----------------
 
