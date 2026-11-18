@@ -23,6 +23,10 @@ v1.7.0 (not yet released)
   from the operator's action (no element built in); CPU, GPU, MPI and single precision
 - ENH: Its Chebyshev smoother uses a guaranteed eigenvalue bound on every level, not an estimate,
   so a crack or other mode that appears after setup cannot make the cycle diverge
+- ENH: Optional re-discretised coarse levels for the fused isotropic operator, as muFFTTO's:
+  a setup without probing (16x faster at 128^3) and no stored stencils, at a few more CG iterations
+- PERF: The multigrid setup keeps no double copies of the stencils and frees its check vectors:
+  about 250 bytes per voxel less at the peak; its Jacobi step and casts run on contiguous buffers
 - ENH: Nodal operator with its own symmetric 3^d stencil at every node, on host and device
 - ENH: The multigrid grid transfer (prolongation and restriction) runs on GPUs
 - BUG: The 3D isotropic stiffness operator on GPUs read material values past the end of their

@@ -174,7 +174,7 @@ def axis_colouring(n):
 
 def galerkin_by_probing(apply_fine, transfer, fine_decomposition,
                         coarse_decomposition, layout, stencil,
-                        name="mg-probe", dtype=np.float64):
+                        name="mg-probe", dtype=np.float64, fine_vectors=None):
     """Measure ``R A P`` into the coarse stencil field ``stencil``.
 
     ``apply_fine(x, y)`` computes ``y = A x`` on nodal fields of
@@ -192,6 +192,13 @@ def galerkin_by_probing(apply_fine, transfer, fine_decomposition,
 
     ``dtype`` is the precision of the probe vectors, i.e. of ``apply_fine``;
     the measured blocks are written into ``stencil`` in its own precision.
+
+    ``fine_vectors``, optional: two nodal fields of ``fine_decomposition`` in
+    ``dtype`` to hold ``P e`` and ``A P e`` (e.g. a multigrid level's own work
+    vectors, free while the setup runs). Without them two fields are created
+    (named ``<name>-Pe``, ``<name>-APe``). Their content on entry does not
+    matter: the prolongation and ``apply_fine`` overwrite the interior, and
+    ghosts are exchanged before they are read.
     """
     nc = layout.nb_components
     dim = layout.dim
@@ -200,8 +207,14 @@ def galerkin_by_probing(apply_fine, transfer, fine_decomposition,
     local = tuple(int(n) for n in coarse_decomposition.nb_subdomain_grid_pts)
 
     probe = _real_field(coarse_decomposition, f"{name}-e", nc, dtype)
-    fine_in = _real_field(fine_decomposition, f"{name}-Pe", nc, dtype)
-    fine_out = _real_field(fine_decomposition, f"{name}-APe", nc, dtype)
+    if fine_vectors is None:
+        fine_in = _real_field(fine_decomposition, f"{name}-Pe", nc, dtype)
+        fine_out = _real_field(fine_decomposition, f"{name}-APe", nc, dtype)
+    else:
+        fine_in, fine_out = fine_vectors
+        if any(np.dtype(v.dtype) != np.dtype(dtype) for v in fine_vectors):
+            raise ValueError("fine_vectors must have the probe precision "
+                             f"{np.dtype(dtype)}")
     response = _real_field(coarse_decomposition, f"{name}-RAPe", nc, dtype)
     xp = _array_module(probe)
 
@@ -630,6 +643,19 @@ class ScaledLocalMatrices:
         the verdict is collective.
         """
         comm = _communicator(decomposition, communicator)
+        try:
+            return self._check_operator(apply, decomposition, nb_components,
+                                        comm, nb_patches, seed, rtol)
+        finally:
+            # two vectors of the fine grid, needed only here: freed, not kept
+            # for the whole run (their memory goes once x and y are gone)
+            collection = _collection(decomposition)
+            for name in ("mg-check-x", "mg-check-y"):
+                if collection.field_exists(name):
+                    collection.pop_field(name)
+
+    def _check_operator(self, apply, decomposition, nb_components, comm,
+                        nb_patches, seed, rtol):
         x = _real_field(decomposition, "mg-check-x", nb_components)
         y = _real_field(decomposition, "mg-check-y", nb_components)
         local = tuple(x.s.shape[2:])
@@ -824,6 +850,30 @@ def stencil_diagonal(stencil, layout, out):
         out.s[i] = stencil.s[layout.centre_entry[(i, i)]]
 
 
+def dense_from_local_matrices(local_matrices, nb_components):
+    """Dense matrix ``Σ_pixels Σ_k s_k(p) K_k`` of a periodic operator on
+    the whole (serial) grid of its scales, rows and columns in the order of
+    ``field.s.ravel()`` of a nodal field with ``nb_components``."""
+    lm = local_matrices
+    nc = int(nb_components)
+    scales = _to_host(lm.scale_values()).astype(np.float64)   # (n_k, *grid)
+    grid = tuple(scales.shape[1:])
+    nodes = int(np.prod(grid))
+    corners = _corner_index(len(grid))
+    A = np.zeros((nc * nodes, nc * nodes))
+    for pixel in np.ndindex(*grid):
+        # the pixel's matrix, Σ_k s_k K_k, scattered onto its corner nodes
+        local = np.tensordot(scales[(slice(None),) + pixel], lm.matrices,
+                             axes=1)
+        index = [np.ravel_multi_index(
+            tuple((p + c) % n for p, c, n in zip(pixel, corner, grid)), grid)
+            for corner in corners]
+        rows = np.array([i * nodes + node for node in index
+                         for i in range(nc)])
+        A[np.ix_(rows, rows)] += local
+    return A
+
+
 def dense_from_stencil(stencil, layout):
     """Dense matrix of a periodic stencil field on the whole (serial) grid,
     rows and columns in the order of ``field.s.ravel()``."""
@@ -881,6 +931,15 @@ class MultigridPreconditioner(Preconditioner):
       explicit entries, recomputed at every setup. On the fine level the
       entries are probed (``nc ∏ k_α`` applies).
 
+    Coarsening: by default (``coarsening="galerkin"``) the coarse operators
+    are the Galerkin products above, measured at every :meth:`setup` and
+    stored as stencils. A coarsening rule (e.g.
+    :class:`muGrid.MultigridCoarsening.IsotropicRediscretisation`) instead
+    re-discretises the operator on every coarse level with the material
+    averaged onto it: no probing, no stencils, a fused kernel per level. The
+    diagonals, the guaranteed bounds and the coarsest matrix then come from
+    the local matrices of the rule's levels.
+
     Precision: the setup (probing, RAP, bounds, coarsest pseudo-inverse) is
     done in double precision whatever the cycle's. With
     ``precision="single"`` the stencils, work vectors and pseudo-inverse are
@@ -923,13 +982,16 @@ class MultigridPreconditioner(Preconditioner):
         Records "setup" stages and "vcycle".
     name : str
         Prefix of the work fields.
+    coarsening : "galerkin" or a coarsening rule
+        How the coarse operators are made (see above). Default
+        ``"galerkin"``.
     """
 
     def __init__(self, operator, decomposition, nb_components,
                  local_matrices=None, diagonal=None, degree=2, alpha=30.0,
                  n_coarsest=4, n_agglomerate=16, precision="double",
                  operator_single=None, communicator=None, timer=None,
-                 name="mg"):
+                 name="mg", coarsening="galerkin"):
         if precision not in ("double", "single"):
             raise ValueError(f"precision must be 'double' or 'single', got "
                              f"{precision!r}")
@@ -945,6 +1007,13 @@ class MultigridPreconditioner(Preconditioner):
         self.precision = precision
         self._timer = timer
         self._name = name
+        if isinstance(coarsening, str):
+            if coarsening != "galerkin":
+                raise ValueError(f"coarsening must be 'galerkin' or a "
+                                 f"coarsening rule, got {coarsening!r}")
+            coarsening = None
+        #: the coarsening rule, or None for Galerkin coarse operators
+        self.coarsening = coarsening
         self.comm = _communicator(decomposition, communicator)
         nb_grid_pts = tuple(int(n) for n in decomposition.nb_domain_grid_pts)
         self.dim = dim = len(nb_grid_pts)
@@ -989,8 +1058,8 @@ class MultigridPreconditioner(Preconditioner):
                 self.comm, list(level_pts), nb_subdivisions=subdivisions,
                 nb_ghosts_left=[1] * dim, nb_ghosts_right=[1] * dim,
                 device=device)
-            self.levels.append(_Level(len(self.levels), coarse, self.layout,
-                                      dtype, name))
+            self.levels.append(self._coarse_level(len(self.levels), coarse,
+                                                  dtype, name))
         if len(self.levels) < 2:
             raise ValueError(
                 f"{nb_grid_pts} cannot be coarsened towards n_coarsest="
@@ -1018,10 +1087,9 @@ class MultigridPreconditioner(Preconditioner):
                             nb_subdivisions=[1] * dim,
                             nb_ghosts_left=[1] * dim,
                             nb_ghosts_right=[1] * dim, device=device)
-                    self.tail.append(_Level(
+                    self.tail.append(self._coarse_level(
                         len(self.levels) - 1 + len(self.tail),
-                        tail_decomposition, self.layout, dtype,
-                        f"{name}-tail"))
+                        tail_decomposition, dtype, f"{name}-tail"))
                     if not _coarsenable(level_pts, self.n_coarsest):
                         break
                     level_pts = tuple(n // 2 for n in level_pts)
@@ -1044,6 +1112,21 @@ class MultigridPreconditioner(Preconditioner):
         if local_matrices is not None:
             local_matrices.check_operator(operator, decomposition, nc,
                                           self.comm)
+        if self.coarsening is not None:
+            self.coarsening.check(operator, decomposition, nc, self.comm)
+
+    def _coarse_level(self, index, decomposition, dtype, name):
+        """A coarse level: a Galerkin stencil level, or with a coarsening
+        rule an operator level applying the rule's operator (kept as
+        ``level.rule``)."""
+        if self.coarsening is None:
+            return _Level(index, decomposition, self.layout, dtype, name)
+        rule = self.coarsening.level(index, decomposition, dtype,
+                                     f"{name}-l{index}")
+        level = _Level(index, decomposition, self.layout, dtype, name,
+                       operator=rule.apply)
+        level.rule = rule
+        return level
 
     def _timed(self, label):
         return self._timer(label) if self._timer is not None else nullcontext()
@@ -1055,19 +1138,18 @@ class MultigridPreconditioner(Preconditioner):
         Jacobi diagonals, smoother bounds and the coarsest pseudo-inverse.
         Call after every change of the operator (material update).
 
-        Computed in double precision into transient fields, then stored in the
-        cycle's precision; the transient fields are freed."""
+        The coarse stencils are measured straight into the levels' own
+        fields, in the cycle's precision (see :meth:`_setup_stencils`); the
+        diagonal of the fine level is computed in double precision. Fields
+        used only by the setup are freed at its end."""
         if self.local_matrices is not None:
             self.local_matrices.check_nonnegative(self.comm)
-        # double-precision fine level for the setup: the cycle's own, or a
-        # transient twin applying the double operator
+        if self.coarsening is not None:
+            self._setup_rediscretised()
+            return
         fine = self.levels[0]
-        setup_fine = fine if fine.dtype == np.float64 else _Level(
-            0, self.decomposition, self.layout, np.float64,
-            f"{self._name}-setup", operator=self.operator)
+        setup_fine, diagonal_0 = self._fine_setup_level()
         stencils = self._setup_stencils(self.levels[1:])
-        diagonal_0 = (setup_fine.dinv if setup_fine is fine
-                      else setup_fine.vector("dinv"))
 
         with self._timed("setup: diagonal"):
             self._fine_diagonal(setup_fine, diagonal_0)
@@ -1076,19 +1158,17 @@ class MultigridPreconditioner(Preconditioner):
             # GPUs with weak double throughput the double operator costs ~10x
             # more, and probing dominates the setup. The blocks are summed in
             # double either way (R A P is accumulated in the stencil field).
+            # The probe vectors on the fine grid are the fine level's own
+            # work vectors d and t (free while the setup runs).
             galerkin_by_probing(fine.operator, self.transfer,
                                 self.decomposition,
                                 self.levels[1].decomposition, self.layout,
                                 stencils[1], name=f"{self._name}-probe",
-                                dtype=fine.dtype)
+                                dtype=fine.dtype,
+                                fine_vectors=(fine.d, fine.t))
             self._rap_chain(self.levels[1:], stencils)
         with self._timed("setup: bounds"):
-            fine.decomposition.communicate_ghosts(diagonal_0)
-            fine.bound, fine.bound_source = self._bound(
-                fine, setup_fine, None, diagonal_0)
-            _invert_in_place(diagonal_0)
-            if diagonal_0 is not fine.dinv:
-                _copy_cast(diagonal_0, fine.dinv)
+            self._fine_smoother(setup_fine, diagonal_0)
             self._smoother_setup(self.levels[1:-1], stencils, setup_fine)
         with self._timed("setup: coarsest"):
             if self.tail is None:
@@ -1099,21 +1179,114 @@ class MultigridPreconditioner(Preconditioner):
                                         self.levels[-1])
                 if self.comm.rank == 0:
                     self._setup_tail(gathered)
-        self._install(self.levels[1:], stencils)
         if setup_fine is not fine:
             for field_name in ("dinv", "r", "d", "t"):
                 setup_fine.pop(field_name)
         self._free_probe_fields()
 
+    def _fine_setup_level(self):
+        """The double-precision fine level of the setup and its diagonal
+        field: the cycle's own fine level, or a transient twin applying the
+        double operator (its fields are freed at the end of the setup)."""
+        fine = self.levels[0]
+        if fine.dtype == np.float64:
+            return fine, fine.dinv
+        twin = _Level(0, self.decomposition, self.layout, np.float64,
+                      f"{self._name}-setup", operator=self.operator)
+        return twin, twin.vector("dinv")
+
+    def _fine_smoother(self, setup_fine, diagonal):
+        """Bound and inverse diagonal of the fine level from its double
+        diagonal."""
+        fine = self.levels[0]
+        fine.decomposition.communicate_ghosts(diagonal)
+        fine.bound, fine.bound_source = self._bound(fine, setup_fine, None,
+                                                    diagonal)
+        _invert_in_place(diagonal)
+        if diagonal is not fine.dinv:
+            _copy_cast(diagonal, fine.dinv)
+
+    def _setup_rediscretised(self):
+        """The setup with a coarsening rule: the fine diagonal and bound as
+        with Galerkin; then per coarse level the material averaged from the
+        next finer one, the diagonal from the level's local matrices and
+        their guaranteed bound; the coarsest pseudo-inverse from the local
+        matrices of the coarsest level. No probing, no stencils."""
+        fine = self.levels[0]
+        setup_fine, diagonal_0 = self._fine_setup_level()
+        with self._timed("setup: diagonal"):
+            self._fine_diagonal(setup_fine, diagonal_0)
+        with self._timed("setup: bounds"):
+            self._fine_smoother(setup_fine, diagonal_0)
+        if setup_fine is not fine:
+            for field_name in ("dinv", "r", "d", "t"):
+                setup_fine.pop(field_name)
+        with self._timed("setup: coarse material"):
+            finer = None
+            for level in self.levels[1:]:
+                level.rule.coarsen_from(finer)
+                finer = level.rule
+        with self._timed("setup: bounds"):
+            self._rediscretised_smoothers(self.levels[1:-1])
+        with self._timed("setup: coarsest"):
+            if self.tail is None:
+                self._factorise_coarsest_from_local_matrices(self.levels[-1])
+            else:
+                # the serial tail on rank 0 starts from the material of the
+                # last distributed level
+                last = self.levels[-1]
+                gathered = [self._gather(field, last)
+                            for field in last.rule.material_fields()]
+                if self.comm.rank == 0:
+                    tail = self.tail
+                    tail[0].rule.set_material(*gathered)
+                    for upper, lower in zip(tail[:-1], tail[1:]):
+                        lower.rule.coarsen_from(upper.rule)
+                    self._rediscretised_smoothers(tail[:-1])
+                    self._factorise_coarsest_from_local_matrices(tail[-1])
+
+    def _rediscretised_smoothers(self, levels):
+        """Diagonal, bound and inverse diagonal of re-discretised smoothed
+        levels, all from the level's local matrices: ``diag(A_l) = Σ s_k
+        diag(K_k)``, and the bound ``c`` of the one element matrix, which
+        is guaranteed for any non-negative material (mediant inequality)
+        and needs no reduction over ranks."""
+        for level in levels:
+            lm = level.rule.local_matrices
+            diagonal = (level.dinv if self.dtype == np.float64
+                        else level.vector("dinv64", np.float64))
+            self._diagonal_from_local_matrices(diagonal, lm,
+                                               level.decomposition)
+            level.decomposition.communicate_ghosts(diagonal)
+            level.bound = lm.bound(0)
+            level.bound_source = "local matrices (re-discretised)"
+            _invert_in_place(diagonal)
+            if diagonal is not level.dinv:
+                _copy_cast(diagonal, level.dinv)
+                level.pop("dinv64")
+
+    def _factorise_coarsest_from_local_matrices(self, level):
+        """Dense pseudo-inverse of a re-discretised coarsest level, the
+        matrix assembled exactly from its local matrices (on the host). The
+        cut-off follows the cycle's precision, as for a stencil."""
+        A = dense_from_local_matrices(level.rule.local_matrices,
+                                      self.nb_components)
+        A = 0.5 * (A + A.T)
+        rcond = 1e-12 if level.dtype == np.float64 else 1e-5
+        pinv = np.linalg.pinv(A, rcond=rcond, hermitian=True)
+        xp = _array_module(level.x)
+        self._coarse_pinv = xp.asarray(pinv.astype(level.dtype))
+
     def _setup_stencils(self, levels):
-        """The double-precision stencils of the setup: the levels' own in a
-        double cycle, transient copies in a single one."""
-        if self.dtype == np.float64:
-            return {level.index: level.stencil for level in levels}
-        return {level.index: make_stencil_field(
-                    level.decomposition, self.layout,
-                    f"{level.name}-stencil64")
-                for level in levels}
+        """The stencils the setup measures into: the levels' own, in the
+        cycle's precision. A single-precision cycle loses nothing by this: a
+        float32 fine level probes with its float32 operator (the measured
+        entries are float32 values), RAP accumulates in double and rounds
+        each entry once, the Gershgorin bound promotes the entries to double,
+        and the coarsest level is factorised in double on the host. Transient
+        double copies of all coarse stencils were the largest part of the
+        setup's memory (about 175 bytes per fine voxel in 3D elasticity)."""
+        return {level.index: level.stencil for level in levels}
 
     def _rap_chain(self, levels, stencils):
         for upper, lower in zip(levels[:-1], levels[1:]):
@@ -1135,14 +1308,6 @@ class MultigridPreconditioner(Preconditioner):
                 _copy_cast(diagonal, level.dinv)
                 level.pop("dinv64")
 
-    def _install(self, levels, stencils):
-        """Store the double setup stencils in the cycle's precision."""
-        if self.dtype == np.float64:
-            return
-        for level in levels:
-            _copy_cast(stencils[level.index], level.stencil)
-            level.pop("stencil64")
-
     def _setup_tail(self, gathered):
         """Rank 0: the serial hierarchy below the last distributed level,
         starting from that level's gathered stencil."""
@@ -1157,7 +1322,6 @@ class MultigridPreconditioner(Preconditioner):
         self._smoother_setup(tail[:-1], stencils,
                              comm=_serial_communicator())
         self._factorise_coarsest(tail[-1], stencils[tail[-1].index])
-        self._install(tail, stencils)
 
     def _free_probe_fields(self):
         """The fine probe vectors and the RAP block are setup-only."""
@@ -1213,12 +1377,16 @@ class MultigridPreconditioner(Preconditioner):
         else:
             self._probe_diagonal(setup_fine, out)
 
-    def _diagonal_from_local_matrices(self, out):
+    def _diagonal_from_local_matrices(self, out, lm=None,
+                                      decomposition=None):
         """``diag(A) = Σ_a Σ_k K_k[a, a] s_k(n - a)``: node ``n`` is corner
-        ``a`` of pixel ``n - a``, read through the ghosts of the scales."""
-        lm = self.local_matrices
+        ``a`` of pixel ``n - a``, read through the ghosts of the scales.
+        Default: the fine operator's local matrices."""
+        lm = self.local_matrices if lm is None else lm
+        decomposition = (self.decomposition if decomposition is None
+                         else decomposition)
         nc, dim = self.nb_components, self.dim
-        self.decomposition.communicate_ghosts(lm.scales)
+        decomposition.communicate_ghosts(lm.scales)
         with_ghosts = lm.scales.sg
         s = with_ghosts.reshape((-1,) + tuple(with_ghosts.shape[-dim:]))
         g = _ghosts_left(lm.scales)
@@ -1322,16 +1490,18 @@ class MultigridPreconditioner(Preconditioner):
 
     def _factorise_coarsest(self, level, stencil):
         """Dense pseudo-inverse of the coarsest operator (periodic: the
-        constants are its null space), from its double-precision stencil.
+        constants are its null space), from its stencil, in double precision
+        on the host.
 
-        The cut-off is relative to the largest eigenvalue: 1e-12 when the
-        hierarchy was probed in double, 1e-5 when in single precision, where
-        rounding leaves the null space at about 1e-7 instead of 0 (it must be
-        cut, not inverted); the smallest nonzero eigenvalue of a 4^d grid is
-        O(0.1) of the largest."""
+        The cut-off is relative to the largest eigenvalue and follows the
+        precision of the stencil: 1e-12 for a double stencil, 1e-5 for a
+        float32 one (also when the fine level probed in double), whose
+        rounding leaves the null space at about 1e-7 instead of 0, possibly
+        negative: it must be cut, not inverted. The smallest nonzero
+        eigenvalue of a 4^d grid is O(0.1) of the largest."""
         A = dense_from_stencil(stencil, self.layout)
         A = 0.5 * (A + A.T)
-        rcond = 1e-12 if self.levels[0].dtype == np.float64 else 1e-5
+        rcond = 1e-12 if np.dtype(stencil.dtype) == np.float64 else 1e-5
         pinv = np.linalg.pinv(A, rcond=rcond, hermitian=True)
         xp = _array_module(level.x)
         self._coarse_pinv = xp.asarray(pinv.astype(level.dtype))
@@ -1430,9 +1600,22 @@ class MultigridPreconditioner(Preconditioner):
 
     @staticmethod
     def _jacobi(level, r, z):
-        """``z = D⁻¹ r`` on the interior."""
+        """``z = D⁻¹ r``, exact on the interior.
+
+        On a GPU the product runs over the whole contiguous buffers (see
+        :func:`_contiguous_view`): an elementwise kernel on the strided
+        ghost-free views ``.s`` computes a multi-dimensional index per
+        element and took a sixth of a V-cycle at 128³. The ghost entries of
+        ``z`` then hold ``dinv · r`` of the ghosts; they are finite (``dinv``
+        is inverted on the whole buffer) and every reader of ``z`` exchanges
+        its ghosts first."""
         xp = _array_module(r)
-        xp.multiply(level.dinv.s, r.s, out=z.s)
+        dim = len(level.nb_grid_pts)
+        views = [_contiguous_view(field, dim) for field in (level.dinv, r, z)]
+        if all(view is not None for view in views):
+            xp.multiply(views[0], views[1], out=views[2])
+        else:
+            xp.multiply(level.dinv.s, r.s, out=z.s)
 
     # -- diagnostics -------------------------------------------------------------
 
@@ -1466,10 +1649,37 @@ def _invert_in_place(field):
     xp.divide(1.0, values, out=values)
 
 
+def _contiguous_view(field, dim):
+    """The whole buffer of a device field (ghosts included) as a C-contiguous
+    array, or None if there is no such view (host fields keep the components
+    of a node together).
+
+    On a device muGrid stores a field component by component with the grid
+    points innermost, x fastest: reversing the spatial axes of ``field.sg``
+    gives a C-contiguous array ``[components..., sub-points, z, y, x]``.
+    Elementwise kernels on it run at memory bandwidth; use it for pointwise
+    operations whose result on the ghosts does not matter."""
+    values = field.sg
+    if _array_module(field) is np:
+        return None
+    lead = values.ndim - dim
+    view = values.transpose(*range(lead), *reversed(range(lead, values.ndim)))
+    return view if view.flags.c_contiguous else None
+
+
 def _copy_cast(source, target):
     """``target = source`` for fields of possibly different precision (whole
-    buffers, ghosts included)."""
+    buffers, ghosts included). On a device the cast runs over the contiguous
+    buffers (:func:`_contiguous_view`): on the component-first strided view
+    ``.sg`` the elementwise kernel computes an index per element, which made
+    the two casts per V-cycle 7 ms of 43 at 256³ on an L40S."""
     if np.dtype(source.dtype) == np.dtype(target.dtype):
         linalg.copy(source, target)
+        return
+    dim = len(_ghosts_left(source))
+    source_view = _contiguous_view(source, dim)
+    target_view = _contiguous_view(target, dim)
+    if source_view is not None and target_view is not None:
+        target_view[...] = source_view
     else:
         target.sg[...] = source.sg

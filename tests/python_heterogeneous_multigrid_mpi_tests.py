@@ -27,19 +27,24 @@ def power_of_two_ranks(comm):
         pytest.skip("needs a power-of-two number of ranks")
 
 
+@pytest.mark.parametrize("coarsening", ["galerkin", "rediscretised"])
 @pytest.mark.parametrize("device", devices(),
                          ids=lambda d: "gpu" if d is not None else "cpu")
 @pytest.mark.parametrize("nb_grid_pts, precision", [
     ((32, 32), "double"), ((16, 16, 16), "double"), ((32, 32), "single")])
 def test_distributed_multigrid_matches_serial(comm, nb_grid_pts, precision,
-                                              device):
+                                              device, coarsening):
     """On 2^k ranks: the same V-cycle output, smoother bounds and CG
-    iteration count as the serial multigrid of the same problem."""
+    iteration count as the serial multigrid of the same problem, with
+    Galerkin and with re-discretised coarse levels (whose serial tail on rank
+    0 starts from the gathered material)."""
     power_of_two_ranks(comm)
     scale = phase_field(nb_grid_pts, 1e4)
-    serial = FusedProblem(nb_grid_pts, precision=precision, device=device)
+    serial = FusedProblem(nb_grid_pts, precision=precision, device=device,
+                          coarsening=coarsening)
     distributed = FusedProblem(nb_grid_pts, precision=precision,
-                               device=device, comm=comm)
+                               device=device, comm=comm,
+                               coarsening=coarsening)
     for problem in (serial, distributed):
         problem.set_scale(scale)
         problem.mg.setup()
