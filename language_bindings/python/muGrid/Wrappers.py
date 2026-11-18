@@ -1614,8 +1614,13 @@ class FEMGradientOperator:
     A hard-coded, optimized finite-element gradient operator. The element is
     bilinear/trilinear Q1 (one element per pixel/voxel, 2x2 or 2x2x2 Gauss
     points) by default, or linear P1 simplices (2 triangles per pixel, 5
-    tetrahedra per voxel, one quadrature point each). ``nb_quad_pts`` reports
-    the count for the chosen element.
+    tetrahedra per voxel, one quadrature point each), or in 3D the trilinear
+    hexahedron with reduced integration (one quadrature point at the voxel
+    centre). ``nb_quad_pts`` reports the count for the chosen element.
+
+    The reduced element makes every quadrature-point field 8 times smaller,
+    but a stiffness built from it alone is rank deficient (its hourglass
+    modes cost no energy) and needs a stabilisation of its own.
 
     Parameters
     ----------
@@ -1624,7 +1629,8 @@ class FEMGradientOperator:
     grid_spacing : sequence of float, optional
         Grid spacing in each direction. Default is [1.0, ...] for each dimension.
     element : muGrid.FEMElement, optional
-        ``FEMElement.q1`` (default) or ``FEMElement.p1``.
+        ``FEMElement.q1`` (default), ``FEMElement.p1`` or, in 3D only,
+        ``FEMElement.q1_reduced``.
     dtype : data-type, optional
         ``np.float64`` (default) or ``np.float32``: the precision of the
         fields the operator is applied to.
@@ -1656,9 +1662,15 @@ class FEMGradientOperator:
             raise ValueError(
                 f"FEMGradientOperator dtype must be float32 or float64, "
                 f"got {dt}")
-        q1 = element == _muGrid.FEMElement.q1
-        name = (f"FEMGradientOperatorQ1_{spatial_dim}D" if q1
-                else f"FEMGradientOperator{spatial_dim}D")
+        if element == _muGrid.FEMElement.q1:
+            name = f"FEMGradientOperatorQ1_{spatial_dim}D"
+        elif element == _muGrid.FEMElement.q1_reduced:
+            if spatial_dim != 3:
+                raise ValueError(
+                    "FEMElement.q1_reduced is implemented in 3D only")
+            name = "FEMGradientOperatorQ1Reduced_3D"
+        else:
+            name = f"FEMGradientOperator{spatial_dim}D"
         self._cpp = getattr(_muGrid, name + suffix)(gs)
 
     def apply(self, nodal_field: Field, quadrature_point_field: Field) -> None:

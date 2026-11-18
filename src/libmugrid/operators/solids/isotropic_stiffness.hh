@@ -183,8 +183,13 @@ namespace muGrid {
      *        from its reference shape-function gradients (fem_element.hh); the
      *        per-call kernels are element-agnostic, so it is selected at
      *        construction rather than as a template parameter.
+     *
+     *        Q1Reduced (the 3D hexahedron with one quadrature point) names an
+     *        element of the gradient operator only. Alone it gives a rank-
+     *        deficient stiffness, so the fused stiffness operator and the
+     *        nodal moments reject it.
      */
-    enum class FEMElementKind { P1, Q1 };
+    enum class FEMElementKind { P1, Q1, Q1Reduced };
 
     /**
      * @struct IsotropicStiffnessTraits
@@ -830,6 +835,12 @@ namespace muGrid {
 
         //! Copy the chosen element's B / Wfrac / NbQuad out of its traits.
         void load_element(FEMElementKind element) {
+            if (element == FEMElementKind::Q1Reduced) {
+                throw RuntimeError{
+                    "IsotropicStiffnessOperator: the one-point element "
+                    "q1_reduced is not supported, because its stiffness is "
+                    "rank deficient without hourglass control."};
+            }
             auto load = [this](auto trait) {
                 using T = decltype(trait);
                 static_assert(T::SpatialDim == Dim,

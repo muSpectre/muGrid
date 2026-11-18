@@ -287,6 +287,38 @@ namespace muGrid {
                                                0.125, 0.125, 0.125, 0.125};
     };
 
+    /**
+     * @struct Q1Hex3DReduced
+     * @brief 3D trilinear hexahedron with reduced integration: one quadrature
+     *        point at the voxel centre, carrying the whole voxel volume.
+     *
+     * B[0][d][n] = trilinear ∂N_n/∂ξ_d at the centre of the unit cube
+     * (physical gradient = B/h_d), node order the binary corner index. At the
+     * centre every shape function has the value 1/8 and the gradient ±1/4:
+     * plus if the node lies on the upper side in direction d, minus on the
+     * lower side. The centre gradient is the mean of the eight Gauss-point
+     * gradients of Q1Hex3D.
+     *
+     * All quadrature-point fields are 8 times smaller than with Q1Hex3D. The
+     * price: one point integrates a product of two trilinear gradients
+     * exactly only when both are constant. The four "hourglass" patterns of
+     * the corner values per component, whose gradient vanishes at the centre,
+     * cost no energy, so the stiffness built from this element alone is rank
+     * deficient: a stiffness needs an hourglass control of its own. A scalar
+     * gradient penalty evaluated at the voxel centres needs none.
+     */
+    struct Q1Hex3DReduced {
+        static constexpr Dim_t SpatialDim = 3;
+        static constexpr Index_t NbNodes = 8;
+        static constexpr Index_t NbQuad = 1;
+        static constexpr Real B[NbQuad][SpatialDim][NbNodes] = {
+            {{-0.25, 0.25, -0.25, 0.25, -0.25, 0.25, -0.25, 0.25},
+             {-0.25, -0.25, 0.25, 0.25, -0.25, -0.25, 0.25, 0.25},
+             {-0.25, -0.25, -0.25, -0.25, 0.25, 0.25, 0.25, 0.25}},
+        };
+        static constexpr Real Wfrac[NbQuad] = {1.0};
+    };
+
 
     /* ----------------------------------------------------------------------
      * Moment quadrature
