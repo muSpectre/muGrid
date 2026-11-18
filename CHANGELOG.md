@@ -21,6 +21,8 @@ v1.7.0 (not yet released)
 
 - ENH: Bound-constrained L-BFGS on fields, with an optional preconditioner as the initial
   inverse Hessian; all vectors stay on the device and are allocated once
+- ENH: The L-BFGS can keep its curvature pairs in host memory, for grids whose device cannot hold
+  them; the iterates are the same, at the cost of copying the pairs once or twice per iteration
 
 v1.6.2 (13Nov26)
 ----------------

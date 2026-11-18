@@ -696,3 +696,101 @@ def test_grid_problem_matches_serial_reference(comm, device, dtype,
         f_ref, rel=1e-10 if dtype == np.float64 else 1e-6)
     assert float(to_host(x.p).min()) >= 0.0
     assert float(to_host(x.p).max()) <= 0.5
+
+
+# ---------------------------------------------------------------------------
+# Pairs in host memory
+# ---------------------------------------------------------------------------
+
+# Every path through the pair memory: plain and preconditioned two-loop
+# recursion, pairs dropped on a bad direction or a failed line search (many
+# active bounds), and maxcor overflow (maxcor 3 over hundreds of iterations).
+HOST_PAIR_PROBLEMS = ["quadratic-box", "laplacian-helmholtz-smoother",
+                      "many-active", "many-active-smoother", "many-active-xtol"]
+
+
+@serial_only
+@pytest.mark.parametrize("device", get_test_devices())
+@pytest.mark.parametrize("maxcor", [3, 20])
+@pytest.mark.parametrize("name", HOST_PAIR_PROBLEMS)
+def test_host_pairs_give_the_iterates_of_device_pairs(name, maxcor, device):
+    """The host copies of the pairs are exact: same solution bit for bit,
+    same objective, iterations, evaluations and message. On the CPU the
+    two stores are the same thing."""
+    skip_if_gpu_unavailable(device)
+    fun_grad, x0, options = PROBLEMS[name]
+    options = dict(options, maxcor=maxcor)
+    on_device, x_device, _ = solve_on_fields(
+        fun_grad, x0, device=device, **options)
+    on_host, x_host, _ = solve_on_fields(
+        fun_grad, x0, device=device, pair_store="host", **options)
+    np.testing.assert_array_equal(x_host, x_device)
+    assert on_host.fun == on_device.fun
+    assert (on_host.nit, on_host.nfev) == (on_device.nit, on_device.nfev)
+    assert on_host.message == on_device.message
+
+
+@serial_only
+@pytest.mark.parametrize("device", get_test_devices())
+def test_host_pairs_keep_one_pair_of_fields(device):
+    """With the pairs on the host a GPU run has the work fields and one pair
+    of fields (the candidate, which also stages the stored pairs); on the
+    CPU the pairs stay fields."""
+    skip_if_gpu_unavailable(device)
+    fun_grad, helmholtz = laplacian()
+    maxcor = 5
+    _, _, fc = solve_on_fields(
+        fun_grad, np.zeros(256), lower=-5.0, upper=5.0, gtol=1e-6,
+        maxiter=40, maxcor=maxcor, precond=helmholtz(0.05),
+        device=device, pair_store="host")
+    names = {name for name in fc.field_names
+             if name.startswith("lbfgs-work")}
+    expected_pairs = 1 if device == "gpu" else maxcor + 1
+    assert len(names) == 8 + 2 * expected_pairs
+
+
+def test_unknown_pair_store():
+    fun_grad, _ = quadratic()
+    with pytest.raises(ValueError, match="unknown pair store"):
+        solve_on_fields(fun_grad, np.zeros(64), pair_store="disk")
+
+
+@pytest.mark.parametrize("device", get_test_devices())
+def test_distributed_host_pairs_give_the_iterates_of_device_pairs(comm,
+                                                                  device):
+    """On a decomposed grid with ghosts (every rank keeps its part of the
+    pairs): the same iterates with the pairs on the host."""
+    skip_if_gpu_unavailable(device)
+    xp = get_array_module(device)
+    _, _, b_global = grid_problem()
+    laplace = muGrid.LaplaceOperator(2, -1.0)
+    decomposition = muGrid.CartesianDecomposition(
+        comm, NB_GRID_PTS, ghosts=laplace, device=create_device(device))
+    location = decomposition.subdomain_locations
+    size = decomposition.nb_subdomain_grid_pts
+    local = tuple(slice(o, o + n) for o, n in zip(location, size))
+    b = xp.asarray(b_global[local])
+    Ax = decomposition.real_field("Ax")
+
+    def fun(point, gradient):
+        decomposition.communicate_ghosts(point)
+        laplace.apply(point, Ax)                     # -Laplace u
+        gradient.p[...] = point.p + Ax.p - b
+        return comm.sum(float(
+            (0.5 * point.p * (point.p + Ax.p) - b * point.p).sum()))
+
+    def jacobi(v, out):
+        out.p[...] = v.p / 5.0
+
+    solutions = {}
+    for store in ("device", "host"):
+        x = decomposition.real_field(f"x-{store}")
+        result = l_bfgs_bounded(
+            comm, decomposition, fun, x, lower=0.0, upper=0.5,
+            precond=jacobi, gtol=1e-6, maxcor=4, pair_store=store)
+        assert result.success, result.message
+        solutions[store] = (to_host(x.p).copy(), result.fun, result.nit,
+                            result.nfev)
+    np.testing.assert_array_equal(solutions["host"][0],
+                                  solutions["device"][0])
+    assert solutions["host"][1:] == solutions["device"][1:]

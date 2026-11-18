@@ -134,6 +134,154 @@ class _NumpyOperations(_KernelOperations):
         out.s[...] = np.where(active, 0.0, v.s)
 
 
+#: Where :func:`l_bfgs_bounded` keeps its curvature pairs
+PAIR_STORES = ("device", "host")
+
+
+class _FieldPairs:
+    """The curvature pairs ``(s, y, 1 / sᵀy)`` of the L-BFGS memory, newest
+    first, as fields of the collection (``pair_store="device"``).
+
+    The next pair is formed in the fields :meth:`candidate_for_writing`
+    returns; :meth:`keep_candidate` makes it the newest pair and takes fresh
+    fields for the next candidate. Fields of pairs that dropped out are
+    reused, so at most ``maxcor + 1`` pairs of fields are allocated.
+    """
+
+    def __init__(self, new_field, maxcor):
+        self._new_field = new_field
+        self._maxcor = maxcor
+        self._pairs = []                  # [(s, y, 1 / s.y)], newest first
+        self._spare = []                  # (s, y) fields free for reuse
+        self._nb_allocated = 0
+        self._candidate = self._fields()
+
+    def _fields(self):
+        if self._spare:
+            return self._spare.pop()
+        self._nb_allocated += 1
+        return (self._new_field(f"pair{self._nb_allocated}-s"),
+                self._new_field(f"pair{self._nb_allocated}-y"))
+
+    def __len__(self):
+        return len(self._pairs)
+
+    def candidate_for_writing(self):
+        """The fields ``(s, y)`` into which the next pair is formed."""
+        return self._candidate
+
+    def keep_candidate(self, rho):
+        """Store the candidate as the newest pair, ``rho = 1 / sᵀy``,
+        dropping the oldest one beyond ``maxcor``."""
+        s, y = self._candidate
+        self._pairs.insert(0, (s, y, rho))
+        if len(self._pairs) > self._maxcor:
+            oldest_s, oldest_y, _ = self._pairs.pop()
+            self._spare.append((oldest_s, oldest_y))
+        self._candidate = self._fields()
+
+    def drop(self):
+        """Forget all pairs."""
+        self._spare.extend((s, y) for s, y, _ in self._pairs)
+        self._pairs.clear()
+
+    def newest(self):
+        """``(s, y)`` of the newest pair, as fields."""
+        s, y, _ = self._pairs[0]
+        return s, y
+
+    def newest_first(self):
+        """``(s, y, rho)`` of every pair, newest first. ``s`` and ``y`` are
+        fields, valid until the next pair is taken."""
+        return iter(self._pairs)
+
+    def oldest_first(self):
+        """As :meth:`newest_first`, oldest first."""
+        return reversed(self._pairs)
+
+
+class _HostPairs:
+    """The curvature pairs in host memory (``pair_store="host"``), for runs
+    whose device cannot hold ``2 * maxcor`` more fields. Same interface as
+    :class:`_FieldPairs`.
+
+    Only the candidate pair has fields on the device. It doubles as the
+    staging area of the two-loop recursion: :meth:`newest_first` and
+    :meth:`oldest_first` copy one stored pair at a time into it. A pair that
+    is there already (the newest right after it was stored, the last one of
+    the previous loop) is not copied again, so an iteration moves about
+    ``4 * maxcor`` fields between host and device. The host buffers are
+    page-locked (pinned), and every copy moves a field's whole buffer,
+    ghosts included, which is contiguous: no temporary on the device. The
+    copies are exact, so the iterates are those of ``pair_store="device"``.
+    """
+
+    def __init__(self, new_field, maxcor):
+        import cupyx
+
+        self._empty_pinned = cupyx.empty_pinned
+        self._maxcor = maxcor
+        self._candidate = (new_field("pair1-s"), new_field("pair1-y"))
+        self._pairs = []                  # [(slot, 1 / s.y)], newest first
+        self._slots = []                  # [(s, y)] pinned host buffers
+        self._free_slots = []
+        self._resident = None             # slot whose pair is in _candidate
+
+    def __len__(self):
+        return len(self._pairs)
+
+    def candidate_for_writing(self):
+        # the caller overwrites the fields: no stored pair is there any more
+        self._resident = None
+        return self._candidate
+
+    def _host_buffer(self, field):
+        buffer = field.sg
+        order = ("F" if buffer.flags.f_contiguous
+                 and not buffer.flags.c_contiguous else "C")
+        return self._empty_pinned(buffer.shape, dtype=buffer.dtype,
+                                  order=order)
+
+    def keep_candidate(self, rho):
+        if self._free_slots:
+            slot = self._free_slots.pop()
+        else:
+            slot = len(self._slots)
+            self._slots.append(tuple(self._host_buffer(field)
+                                     for field in self._candidate))
+        for field, buffer in zip(self._candidate, self._slots[slot]):
+            field.sg.get(out=buffer)
+        self._pairs.insert(0, (slot, rho))
+        self._resident = slot
+        if len(self._pairs) > self._maxcor:
+            oldest_slot, _ = self._pairs.pop()
+            self._free_slots.append(oldest_slot)
+
+    def drop(self):
+        self._free_slots.extend(slot for slot, _ in self._pairs)
+        self._pairs.clear()
+        self._resident = None
+
+    def _load(self, slot):
+        """The pair of ``slot``, in the candidate fields."""
+        if self._resident != slot:
+            for field, buffer in zip(self._candidate, self._slots[slot]):
+                field.sg.set(buffer)
+            self._resident = slot
+        return self._candidate
+
+    def newest(self):
+        return self._load(self._pairs[0][0])
+
+    def newest_first(self):
+        for slot, rho in self._pairs:
+            yield (*self._load(slot), rho)
+
+    def oldest_first(self):
+        for slot, rho in reversed(self._pairs):
+            yield (*self._load(slot), rho)
+
+
 def l_bfgs_bounded(
         comm,
         fc,
@@ -151,6 +299,7 @@ def l_bfgs_bounded(
         max_halvings: int = 40,
         callback: callable = None,
         timer=None,
+        pair_store: str = "device",
         _arithmetic: str = "kernels",
 ):
     """
@@ -205,7 +354,9 @@ def l_bfgs_bounded(
     **Memory.** ``2 * maxcor`` fields for the pairs and 8 work fields
     (10 with a preconditioner), all of the size of `x`, registered in `fc`
     under names starting with ``lbfgs-work`` and kept for the next call.
-    With scalar bounds no field is used for the bounds.
+    With scalar bounds no field is used for the bounds. With
+    ``pair_store="host"`` the pairs are kept in page-locked host memory
+    instead, and the device holds 2 pair fields; see `pair_store`.
 
     Parameters
     ----------
@@ -272,6 +423,13 @@ def l_bfgs_bounded(
     timer : muGrid.Timer, optional
         Timer for the evaluations ("fun"), the preconditioner ("precond")
         and the vector work of the minimiser ("optimizer").
+    pair_store : {"device", "host"}, optional
+        Where the ``maxcor`` pairs are kept. "device" (default): as fields
+        next to `x`. "host": for fields on a GPU, in page-locked host memory,
+        copied to the device one pair at a time when the search direction is
+        formed (about ``4 * maxcor`` field copies per iteration); this saves
+        ``2 * maxcor - 2`` fields of device memory and gives the same
+        iterates. For fields in host memory both are the same.
 
     Returns
     -------
@@ -280,6 +438,9 @@ def l_bfgs_bounded(
         search is reported by ``success = False``, not by an exception: the
         iterate reached is the best one found and remains in `x`.
     """
+    if pair_store not in PAIR_STORES:
+        raise ValueError(f"unknown pair store '{pair_store}'; choose from "
+                         f"{PAIR_STORES}")
     if _arithmetic == "kernels":
         ops = _KernelOperations(comm)
     elif _arithmetic == "numpy":
@@ -324,24 +485,11 @@ def l_bfgs_bounded(
         if precond is not None:
             masked = new_field("masked")                # P v, the input of M
             scaling = new_field("scaling")              # P M P y, for gamma
-        # The pairs, newest first; (s, y) fields that dropped out are reused
-        pairs = []                                      # [(s, y, 1 / s.y)]
-        spare_pairs = []
-        nb_pair_fields = 0
-
-        def pair_fields():
-            nonlocal nb_pair_fields
-            if spare_pairs:
-                return spare_pairs.pop()
-            nb_pair_fields += 1
-            return (new_field(f"pair{nb_pair_fields}-s"),
-                    new_field(f"pair{nb_pair_fields}-y"))
-
-        def drop_pairs():
-            spare_pairs.extend((s, y) for s, y, _ in pairs)
-            pairs.clear()
-
-        candidate = pair_fields()
+        # The pairs, newest first: fields next to x, or host buffers (only
+        # meaningful when the fields are on a GPU)
+        on_gpu = bool(getattr(x, "is_on_gpu", False))
+        pairs = (_HostPairs if pair_store == "host" and on_gpu
+                 else _FieldPairs)(new_field, maxcor)
 
         # ---- the pieces of one iteration --------------------------------
         def evaluate(point, gradient_out):
@@ -370,27 +518,31 @@ def l_bfgs_bounded(
             """direction = -H r by the two-loop recursion (Nocedal &
             Wright, Numerical Optimization, Algorithm 7.4)"""
             ops.copy(projected, direction)
+            # Scale gamma of the initial inverse Hessian, from the newest
+            # pair. It does not depend on the direction, so it is computed
+            # first: with the pairs on the host the newest pair is then still
+            # on the device.
+            gamma = None
+            if len(pairs) > 0:
+                s, y = pairs.newest()
+                if precond is not None:
+                    initial_inverse_hessian(y, scaling)
+                    gamma = ops.dot(s, y) / ops.dot(y, scaling)
+                else:
+                    gamma = ops.dot(s, y) / ops.dot(y, y)
             # first loop, newest to oldest pair
             coefficients = []
-            for s, y, rho in pairs:
+            for s, y, rho in pairs.newest_first():
                 a = rho * ops.dot(s, direction)
                 ops.axpy(-a, y, direction)
                 coefficients.append(a)
-            # initial inverse Hessian, scaled with the newest pair
+            # initial inverse Hessian gamma I or gamma P M P
             if precond is not None:
-                if pairs:
-                    s, y, _ = pairs[0]
-                    initial_inverse_hessian(y, scaling)
-                    gamma = ops.dot(s, y) / ops.dot(y, scaling)
-                    initial_inverse_hessian(direction, direction)
-                    ops.scale(gamma, direction)
-                else:
-                    initial_inverse_hessian(direction, direction)
-            elif pairs:
-                s, y, _ = pairs[0]
-                ops.scale(ops.dot(s, y) / ops.dot(y, y), direction)
+                initial_inverse_hessian(direction, direction)
+            if gamma is not None:
+                ops.scale(gamma, direction)
             # second loop, oldest to newest pair
-            for (s, y, rho), a in zip(reversed(pairs),
+            for (s, y, rho), a in zip(pairs.oldest_first(),
                                       reversed(coefficients)):
                 b = rho * ops.dot(y, direction)
                 ops.axpy(a - b, s, direction)
@@ -437,7 +589,7 @@ def l_bfgs_bounded(
                 used_pairs = len(pairs) > 0
                 if slope >= 0.0:
                     # outdated pairs gave a direction that does not descend
-                    drop_pairs()
+                    pairs.drop()
                     steepest_descent()
                     slope = ops.dot(projected, direction)
 
@@ -446,7 +598,7 @@ def l_bfgs_bounded(
                 # typically the set of free variables has just changed:
                 # retry once along the steepest descent, with a step of
                 # unit length
-                drop_pairs()
+                pairs.drop()
                 steepest_descent()
                 slope = ops.dot(projected, direction)
                 length = np.sqrt(ops.dot(direction, direction))
@@ -462,7 +614,7 @@ def l_bfgs_bounded(
                               trial_gradient, trial_projected)
 
                 # the pair of this step: s = x_new - x, y = r_new - r
-                s, y = candidate
+                s, y = pairs.candidate_for_writing()
                 ops.copy(trial_x, s)
                 ops.axpy(-1.0, x, s)
                 ops.copy(trial_projected, y)
@@ -476,11 +628,7 @@ def l_bfgs_bounded(
                 # otherwise the approximation H would lose definiteness
                 if curvature > 1e-12 * (s_norm * y_norm
                                         + np.finfo(float).eps):
-                    pairs.insert(0, (s, y, 1.0 / curvature))
-                    if len(pairs) > maxcor:
-                        oldest_s, oldest_y, _ = pairs.pop()
-                        spare_pairs.append((oldest_s, oldest_y))
-                    candidate = pair_fields()
+                    pairs.keep_candidate(1.0 / curvature)
 
             # The two step-size tests return the point *before* the step,
             # as NuMPI does.

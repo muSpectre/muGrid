@@ -715,7 +715,8 @@ from muGrid.Optimize import l_bfgs_bounded
 ```python
 result = l_bfgs_bounded(comm, fc, fun, x, lower=0.0, upper=1.0, precond=None,
                         maxcor=20, gtol=1e-5, xtol=0.0, ftol=0.0, maxiter=500,
-                        c1=1e-4, max_halvings=40, callback=None, timer=None)
+                        c1=1e-4, max_halvings=40, callback=None, timer=None,
+                        pair_store="device")
 ```
 
 Limited-memory BFGS for
@@ -756,6 +757,7 @@ optimisation. The algorithm is that of `NuMPI.Optimization.l_bfgs_bounded`.
 | `maxiter` | Maximum number of iterations. Default `500`. |
 | `c1`, `max_halvings` | Armijo constant and maximal number of step halvings. Defaults `1e-4`, `40`. |
 | `callback` | `callback(iteration, state)` after every accepted step; `state` holds `x`, `gradient`, `fun`, `max_grad`, `step`. Returning `True` stops the run. |
+| `pair_store` | `"device"` (default): the pairs are fields next to `x`. `"host"`: for fields on a GPU, the pairs are kept in page-locked host memory and copied to the device one at a time when the direction is formed (about 4 · `maxcor` field copies per iteration); the device holds 2 pair fields, the iterates are the same. On the host both are the same. |
 
 Returns an `OptimizeResult` with `success`, `message`, `fun`, `nit`, `nfev`,
 `max_grad`, `x` and `gradient`. Reaching `maxiter` or a failed line search
