@@ -2,13 +2,14 @@
 Matrix-free, MPI-parallel Krylov solvers for symmetric positive definite
 systems :math:`A x = b` on muGrid fields.
 
-Both solvers take the operator as a callable ``hessp(input, output)`` that
+The solvers take the operator as a callable ``hessp(input, output)`` that
 writes :math:`A p` and an optional preconditioner ``prec(input, output)``
 that writes :math:`M r` with :math:`M \\approx A^{-1}` symmetric positive
 definite. Vector updates go through :mod:`muGrid.linalg` (host or device);
 global inner products are local reductions summed with ``comm.sum``.
 
-Convergence is declared on the true residual :math:`r = b - A x`,
+Unless stated otherwise, convergence is declared on the true residual
+:math:`r = b - A x`,
 
 .. math::
 
@@ -22,6 +23,9 @@ reaches the order of the tolerance.
 - :func:`conjugate_gradients_pipelined` -- Ghysels--Vanroose pipelined CG
   with one (non-blocking) global reduction per iteration and residual
   replacement.
+- :func:`conjugate_gradients_energy` -- preconditioned CG stopped on an
+  estimate of the energy-norm error (:class:`EnergyErrorEstimate`) instead
+  of the residual.
 """
 
 import warnings
@@ -533,6 +537,424 @@ def conjugate_gradients(
             "Preconditioned conjugate gradient algorithm did not converge in "
             f"{maxiter} iterations (recursive |r| = {np.sqrt(rr_val):.6e}, "
             f"tolerance {np.sqrt(tol_sq):.6e})"
+        )
+
+
+class EnergyErrorEstimate:
+    """
+    Lower estimate of the energy-norm error of conjugate gradients, with an
+    adaptively chosen delay.
+
+    CG makes steps that are orthogonal in the energy (:math:`A`) inner
+    product, so the squared energy error of iterate :math:`x_k` is the sum
+    of the squared lengths of all steps still to come,
+
+    .. math::
+
+        \\|x - x_k\\|_A^2 = \\sum_{j \\ge k} \\Delta_j, \\qquad
+        \\Delta_j = \\alpha_j\\, r_j^T z_j = \\|x_{j+1} - x_j\\|_A^2 .
+
+    The :math:`\\Delta_j` are products of scalars CG computes anyway.
+    Keeping only the steps made so far, :math:`j = k, \\dots, k + d - 1`,
+    gives a lower estimate of the error of :math:`x_k` that is available
+    :math:`d` iterations later (Strakoš & Tichý 2002). The delay :math:`d`
+    must be long enough for the neglected rest of the sum to be small. The
+    rule of Meurant, Papež & Tichý (2021) decides this from the scalars
+    alone: the estimate for iterate :math:`\\ell` is accepted at iteration
+    :math:`k` when
+
+    .. math::
+
+        \\frac{S\\, \\Delta_k}{\\sum_{j=\\ell}^{k-1} \\Delta_j} \\le \\tau ,
+
+    where :math:`S\\,\\Delta_k` estimates the neglected rest (see
+    :meth:`_safety_factor`). The rule aims at an estimate of at least
+    :math:`1 - \\tau` times the true squared error. This is a heuristic,
+    because the rest of the sum can only be guessed from the past; that the
+    estimate never exceeds the true error is certain.
+
+    The object holds scalars only, which are the same on every MPI rank. It
+    is fed once per CG iteration::
+
+        estimator = EnergyErrorEstimate()
+        ...
+        estimator.update(alpha, rz)      # alpha_k and r_k^T z_k
+        if estimator.error_sq is not None:
+            ...                          # estimate of |x - x_l|_A^2,
+                                         # l = estimator.iteration
+
+    Parameters
+    ----------
+    tau : float, optional
+        Targeted relative underestimation of the squared error, between 0
+        and 1. Smaller values give a sharper estimate and a longer delay.
+        The default 0.25 is the value recommended by Meurant, Papež & Tichý.
+    d_min : int, optional
+        Minimal number of steps an estimate must contain. The default 0
+        leaves the delay to the adaptive rule alone. A larger value guards
+        against accepting an estimate too early when CG stagnates for a
+        while and then converges on, which the adaptive rule cannot foresee.
+
+    Attributes
+    ----------
+    error_sq : float or None
+        Latest accepted estimate of :math:`\\|x - x_\\ell\\|_A^2`; None
+        until the first estimate is accepted.
+    iteration : int or None
+        The iterate :math:`\\ell` that `error_sq` belongs to (0 is the
+        start vector). Later iterates have a smaller error.
+    initial_error_sq : float
+        Sum of all steps so far: the estimate of
+        :math:`\\|x - x_0\\|_A^2`, which grows towards the true value.
+
+    References
+    ----------
+    Z. Strakoš, P. Tichý, On error estimation in the conjugate gradient
+    method and why it works in finite precision computations, Electron.
+    Trans. Numer. Anal. 13 (2002) 56-80.
+
+    G. Meurant, J. Papež, P. Tichý, Accurate error estimation in CG, Numer.
+    Algorithms 88 (2021) 1337-1359.
+    """
+
+    #: An earlier iterate takes part in the safety factor only while its
+    #: estimated squared error is less than this factor above the one of the
+    #: iterate being estimated (Meurant, Papež & Tichý use 1e4).
+    SAFETY_WINDOW = 1e4
+
+    def __init__(self, tau=0.25, d_min=0):
+        if not 0.0 < tau < 1.0:
+            raise ValueError(f"tau must lie between 0 and 1, got {tau}")
+        if d_min < 0:
+            raise ValueError(f"d_min must not be negative, got {d_min}")
+        self.tau = tau
+        self.d_min = d_min
+        # steps[j] = Delta_j, the squared energy length of CG step j
+        self._steps = []
+        # tails[j] = Delta_j + ... + Delta_k with k the latest step: the
+        # current lower estimate of the squared error of iterate j
+        self._tails = []
+        # the iterate whose error is estimated next (l in the docstring)
+        self._next = 0
+        self.error_sq = None
+        self.iteration = None
+
+    @property
+    def initial_error_sq(self):
+        return self._tails[0] if self._tails else 0.0
+
+    def update(self, alpha, rz):
+        """
+        Register one CG step and accept the estimates that have become
+        reliable.
+
+        Parameters
+        ----------
+        alpha : float
+            Step length :math:`\\alpha_k = r_k^T z_k / p_k^T A p_k`.
+        rz : float
+            :math:`r_k^T z_k` of the residual *before* the step.
+        """
+        step = float(alpha) * float(rz)
+        self._steps.append(step)
+        # every earlier iterate is one step further from the solution than
+        # was known so far
+        self._tails = [tail + step for tail in self._tails] + [step]
+
+        # An estimate is the sum of the steps next, ..., k. It is split into
+        # the latest step and the steps before it (`previous`); the latest
+        # step, scaled by the safety factor, stands for the neglected rest
+        # of the sum.
+        #
+        # The loop accepts estimates for consecutive iterates as long as the
+        # rule holds, so a fast phase of convergence shortens the delay
+        # again. As in the reference implementation of Meurant, Papež &
+        # Tichý, `previous` must contain at least two steps.
+        if len(self._steps) - 1 - self._next < 2:
+            return
+        neglected = self._safety_factor() * step
+        while len(self._steps) - 1 - self._next >= 2:
+            previous = float(np.sum(self._steps[self._next:-1]))
+            reliable = previous > 0.0 and neglected / previous <= self.tau
+            long_enough = len(self._steps) - self._next >= self.d_min
+            if not (reliable and long_enough):
+                break
+            self.error_sq = previous + step
+            self.iteration = self._next
+            self._next += 1
+
+    def _safety_factor(self):
+        """
+        The factor :math:`S` that turns the latest step into an estimate of
+        the neglected rest of the sum.
+
+        If the error decreased from now on at the rate seen so far, the
+        ratio (error of iterate j) / (step j) would stay the same, and the
+        rest of the sum after step k would be that ratio times
+        :math:`\\Delta_k`. :math:`S` is the largest such ratio over the
+        recent iterates, which is the cautious choice. "Recent" excludes
+        the iterates from the last one whose estimated error is still
+        `SAFETY_WINDOW` times larger than that of the iterate being
+        estimated: the convergence rate of that early phase says nothing
+        about the present one.
+        """
+        tails = np.array(self._tails)
+        steps = np.array(self._steps)
+        much_larger = np.flatnonzero(
+            tails[self._next] / tails <= 1.0 / self.SAFETY_WINDOW)
+        start = much_larger[-1] if much_larger.size > 0 else 0
+        # the latest iterate is left out: its tail is its own step
+        return float(np.max(tails[start:-1] / steps[start:-1]))
+
+
+def conjugate_gradients_energy(
+        comm,
+        fc,
+        b,
+        x,
+        hessp: callable,
+        prec: callable = None,
+        rtol: float = 1e-6,
+        d_min: int = 0,
+        tau: float = 0.25,
+        maxiter: int = 1000,
+        callback: callable = None,
+        timer=None,
+):
+    """
+    Preconditioned conjugate gradients, stopped on an estimate of the
+    energy-norm error instead of the residual.
+
+    The iteration is the one of :func:`conjugate_gradients`. It stops when
+
+    .. math::
+
+        \\|x - x_\\ell\\|_A \\le \\mathrm{rtol}\\, \\|x\\|_A ,
+
+    where the left-hand side is the lower estimate of
+    :class:`EnergyErrorEstimate` for an iterate :math:`\\ell` a few
+    iterations back, and the energy of the solution on the right is taken as
+
+    - :math:`x_0^T A x_0` for a warm start: the start vector is assumed to be
+      close to the solution, as when it is the solution of a previous,
+      similar problem;
+    - the estimate of :math:`\\|x - x_0\\|_A^2` for the start
+      :math:`x_0 = 0`, where :math:`x - x_0` is the solution itself.
+
+    The energy error is the quantity CG minimises, and it is what matters
+    when the solution enters an energy, e.g. a homogenised stiffness or a
+    compliance. The residual norm can be orders of magnitude away from it,
+    by a factor that depends on the conditioning.
+
+    The estimate uses scalars CG computes anyway. Compared with
+    :func:`conjugate_gradients`, a solve needs one global reduction per
+    iteration less (:math:`|r|^2` is not needed) and one ``hessp`` less (the
+    true residual is not recomputed at the end). The returned iterate is the
+    latest one, not :math:`x_\\ell`, so its error is smaller than the
+    estimate that stopped the solve.
+
+    Because the recursively updated scalars are trusted, the estimate is
+    only meaningful above the accuracy attainable in the working precision.
+    For float32 fields keep `rtol` at or above :data:`FLOAT32_RTOL_FLOOR`.
+
+    Parameters
+    ----------
+    comm : muGrid.Communicator
+        Communicator for the global reductions.
+    fc : muGrid.GlobalFieldCollection, muGrid.LocalFieldCollection, or
+         muGrid.CartesianDecomposition
+        Collection holding the work fields. They are named
+        ``cg-energy-work<depth>-<role>-...`` and stay registered for the
+        next solve to reuse.
+    b : muGrid.Field
+        Right-hand side. Its dtype sets the working precision.
+    x : muGrid.Field
+        Start vector, overwritten with the solution.
+    hessp : callable
+        ``hessp(input_field, output_field)`` writes the product with A.
+    prec : callable, optional
+        ``prec(input_field, output_field)`` writes :math:`z = M r` with M
+        symmetric positive definite. Default: no preconditioner.
+    rtol : float, optional
+        Relative energy error at which the solve stops. The default is 1e-6.
+    d_min : int, optional
+        Minimal number of steps in an error estimate, see
+        :class:`EnergyErrorEstimate`. The default is 0.
+    tau : float, optional
+        Targeted relative underestimation of the squared error, see
+        :class:`EnergyErrorEstimate`. The default is 0.25.
+    maxiter : int, optional
+        Maximum number of iterations. The default is 1000.
+    callback : callable, optional
+        Called once before the first iteration (with iteration 0) and after
+        each iteration as ``callback(iteration, state_dict)``, where
+        state_dict contains:
+
+        - "x", "r", "p", "z": solution, recursive residual, search
+          direction and preconditioned residual fields ("z" is "r" when
+          `prec` is None)
+        - "rz": global inner product :math:`r^T z`
+        - "energy_error_sq": latest accepted estimate of
+          :math:`\\|x - x_\\ell\\|_A^2`, or None before the first one
+        - "energy_error_iteration": the iterate :math:`\\ell` it belongs to
+        - "energy_sq": the squared energy the estimate is compared with
+    timer : muGrid.Timer, optional
+        Timer for the individual solver operations.
+
+    Returns
+    -------
+    x : muGrid.Field
+        The solution (same as the input field x).
+
+    Raises
+    ------
+    ConvergenceError
+        If the estimate does not fall below the tolerance within `maxiter`
+        iterations; if ``p^T A p`` or ``r^T M r`` is not positive, i.e. the
+        operator or the preconditioner is not positive definite; or if one
+        of these scalars becomes NaN or infinite.
+    """
+    solver = "conjugate_gradients_energy"
+
+    # Timer context manager (no-op if timer is None)
+    from contextlib import nullcontext
+
+    def timed(name):
+        return timer(name) if timer is not None else nullcontext()
+
+    # Without a preconditioner z is identically r: alias the two fields and
+    # skip the apply, as in conjugate_gradients.
+    unpreconditioned = prec is None
+    if unpreconditioned:
+        def prec(src, dst):
+            return None
+
+    dtype = getattr(b, "dtype", np.float64)
+    _warn_unreachable_rtol(dtype, rtol, solver)
+
+    estimator = EnergyErrorEstimate(tau=tau, d_min=d_min)
+
+    def state(rz, energy_sq):
+        return {"x": x, "r": r, "p": p, "z": z, "rz": rz,
+                "energy_error_sq": estimator.error_sq,
+                "energy_error_iteration": estimator.iteration,
+                "energy_sq": energy_sq}
+
+    with _WorkFields(fc, "cg-energy") as work:
+        with timed("startup"):
+            r = work.field("residual", b, dtype)
+            p = work.field("search-direction", b, dtype)
+            if unpreconditioned:
+                z = r
+            else:
+                z = work.field("preconditioned-residual", b, dtype)
+            Ap = work.field("hessian-product", b, dtype)
+
+            # The product A x_0 gives the initial residual and, with one
+            # more dot product, the energy of the start vector: the scale of
+            # the stopping test for a warm start.
+            hessp(x, Ap)
+            start_energy_sq = float(comm.sum(linalg.vecdot(x, Ap)))
+            _reject_non_finite(start_energy_sq, "the start energy x^T A x",
+                               0, dtype, solver)
+            linalg.copy(b, r)
+            linalg.axpy(-1.0, Ap, r)
+
+            with timed("prec"):
+                prec(r, z)
+            linalg.copy(z, p)
+            with timed("dot_rz"):
+                rz = float(comm.sum(linalg.vecdot(r, z)))
+            _reject_non_finite(rz, "r^T M r", 0, dtype, solver)
+
+            if callback:
+                callback(0, state(rz, start_energy_sq))
+
+            # r^T M r = 0 for positive definite M means r = 0: the start
+            # vector is the solution.
+            if rz == 0.0:
+                return x
+            if rz < 0.0:
+                raise ConvergenceError(
+                    f"{solver}: r^T M r = {rz:.6e} is negative at iteration "
+                    "0; the preconditioner is not positive definite."
+                )
+
+        with timed("iteration"):
+            for iteration in range(1, maxiter + 1):
+                with timed("hessp"):
+                    hessp(p, Ap)
+
+                with timed("dot_pAp"):
+                    pAp = float(comm.sum(linalg.vecdot(p, Ap)))
+                _reject_non_finite(pAp, "the curvature p^T A p", iteration,
+                                   dtype, solver)
+                if pAp <= 0.0:
+                    raise ConvergenceError(
+                        f"{solver}: the curvature p^T A p = {pAp:.6e} is not "
+                        f"positive at iteration {iteration}; the operator is "
+                        "not positive definite (singular along the search "
+                        "direction or indefinite)."
+                    )
+
+                alpha = rz / pAp
+
+                with timed("update_x"):
+                    linalg.axpy(alpha, p, x)
+                with timed("update_r"):
+                    linalg.axpy(-alpha, Ap, r)
+                with timed("prec"):
+                    prec(r, z)
+                with timed("dot_rz"):
+                    next_rz = float(comm.sum(linalg.vecdot(r, z)))
+                _reject_non_finite(next_rz, "r^T M r", iteration, dtype,
+                                   solver)
+
+                # The step just made had the squared energy length
+                # alpha * rz; the estimator needs nothing else.
+                estimator.update(alpha, rz)
+
+                # Energy of the solution: of the start vector if there is
+                # one, otherwise of x - x_0 = x as estimated so far.
+                if start_energy_sq > 0.0:
+                    energy_sq = start_energy_sq
+                else:
+                    energy_sq = estimator.initial_error_sq
+
+                if callback:
+                    with timed("callback"):
+                        callback(iteration, state(next_rz, energy_sq))
+
+                if (estimator.error_sq is not None
+                        and estimator.error_sq < rtol * rtol * energy_sq):
+                    return x
+
+                # The residual vanished exactly, so x is the solution (this
+                # happens on small systems, where CG terminates before an
+                # estimate is accepted).
+                if next_rz == 0.0:
+                    return x
+                if next_rz < 0.0:
+                    raise ConvergenceError(
+                        f"{solver}: r^T M r = {next_rz:.6e} is negative at "
+                        f"iteration {iteration}; the preconditioner is not "
+                        "positive definite."
+                    )
+
+                beta = next_rz / rz
+                rz = next_rz
+
+                # p = z + beta * p
+                with timed("update_p"):
+                    linalg.axpby(1.0, z, beta, p)
+
+        estimate = estimator.error_sq
+        raise ConvergenceError(
+            f"{solver} did not converge in {maxiter} iterations (estimated "
+            "energy error "
+            + ("not yet available" if estimate is None
+               else f"{np.sqrt(estimate):.6e}")
+            + f", tolerance {rtol * np.sqrt(energy_sq):.6e})"
         )
 
 
