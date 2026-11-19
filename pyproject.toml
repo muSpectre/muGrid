@@ -57,7 +57,7 @@ local_scheme = "node-and-date"
 select = "*manylinux*"
 # Build static NetCDF library
 before-all = [
-    "NETCDF_VERSION='4.9.3'",
+    "NETCDF_VERSION='4.10.1'",
     "curl -L https://github.com/Unidata/netcdf-c/archive/refs/tags/v${NETCDF_VERSION}.tar.gz | tar -xzC /tmp",
     "mkdir /tmp/build-netcdf",
     "pushd /tmp/build-netcdf",

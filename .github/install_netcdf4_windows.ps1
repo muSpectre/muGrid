@@ -66,14 +66,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Download and build NetCDF-C
-$netcdfVersion = "4.9.3"
+$netcdfVersion = "4.10.1"
 Write-Host "Installing netcdf-c-$netcdfVersion"
 $netcdfUrl = "https://github.com/Unidata/netcdf-c/archive/refs/tags/v$netcdfVersion.zip"
 $netcdfArchive = "$buildDir/netcdf.zip"
 Invoke-WebRequest -Uri $netcdfUrl -OutFile $netcdfArchive
 
-# Extract using PowerShell (more reliable than tar on Windows)
-Expand-Archive -Path $netcdfArchive -DestinationPath $buildDir -Force
+# Extract with .NET directly (more reliable than tar on Windows).
+# Expand-Archive depends on the runner's archive module, which fails under
+# Windows PowerShell on newer images ("Cannot find an overload for
+# ExtractToDirectory"). The two-argument call does not overwrite, which is
+# fine: $buildDir was created above and holds no netcdf-c tree yet.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory($netcdfArchive, $buildDir)
 
 # Build NetCDF
 $netcdfBuildDir = "$buildDir/build-netcdf"
