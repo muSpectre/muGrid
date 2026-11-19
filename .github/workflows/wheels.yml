@@ -26,8 +26,8 @@ jobs:
         - [macos-15, macosx, arm64]
         - [windows-2022, win, AMD64]
         - [windows-2022, win, ARM64]
-        # Build all Python versions on main branch and tags, only 3.10 and 3.14 otherwise
-        python: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && fromJSON('["cp310", "cp311", "cp312", "cp313", "cp314"]') || fromJSON('["cp310", "cp314"]') }}
+        # Build all Python versions on main branch and tags, only 3.10 and 3.15 otherwise
+        python: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && fromJSON('["cp310", "cp311", "cp312", "cp313", "cp314", "cp315"]') || fromJSON('["cp310", "cp315"]') }}
       fail-fast: false
 
     env:
