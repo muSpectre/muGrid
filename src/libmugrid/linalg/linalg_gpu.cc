@@ -98,15 +98,39 @@ constexpr int REDUCE_BLOCK_SIZE = 256;
 // The cap is a plain constant rather than a device query: it only has to be
 // large enough to fill any GPU (several blocks per SM even on a
 // many-hundred-SM device) and small enough to amortise the tree, and the
-// measured optimum is broad. Below the cap there is one block per
-// REDUCE_BLOCK_SIZE elements, so small grids -- and MPI ranks with few local
-// pixels -- launch only as many blocks as they have elements to fill.
+// measured optimum is broad.
+//
+// Below the cap every thread is given REDUCE_ELEMENTS_PER_THREAD elements, not
+// one. The tree is double-precision work that every warp of a block executes
+// at every level, and on a device whose double-precision throughput is a
+// fraction of its single-precision one (1/64 on consumer GPUs) it is what a
+// reduction over a field that fits the cache is bound by: with one block per
+// REDUCE_BLOCK_SIZE elements the tree was 45-75% of a kernel's double-precision
+// instructions at 64^3 (Nsight Compute, 14-SM laptop GPU), and fewer blocks
+// took a third off its time. Fields large enough to be bound by memory
+// bandwidth instead reach the cap, where more threads keep more loads in
+// flight.
+//
+// A thread's elements are a serial chain of loads, though, so the smallest
+// fields want the opposite: with too few blocks the kernel takes as long as
+// one thread's chain while most of the device idles (five blocks for 18^3 x 3
+// took three times as long as 69). Up to REDUCE_MIN_BLOCKS blocks there is
+// therefore still one block per REDUCE_BLOCK_SIZE elements.
 constexpr int REDUCE_MAX_BLOCKS = 1024;
+constexpr int REDUCE_MIN_BLOCKS = 64;
+constexpr int REDUCE_ELEMENTS_PER_THREAD = 16;
 
 inline int reduction_blocks(Index_t n) {
+    constexpr Index_t per_block =
+        static_cast<Index_t>(REDUCE_BLOCK_SIZE) * REDUCE_ELEMENTS_PER_THREAD;
+    // One element per thread, at most REDUCE_MIN_BLOCKS blocks of them...
     const Index_t full = (n + REDUCE_BLOCK_SIZE - 1) / REDUCE_BLOCK_SIZE;
-    return static_cast<int>(full < REDUCE_MAX_BLOCKS ? full
-                                                     : REDUCE_MAX_BLOCKS);
+    const Index_t floor = full < REDUCE_MIN_BLOCKS ? full : REDUCE_MIN_BLOCKS;
+    // ...then REDUCE_ELEMENTS_PER_THREAD per thread, up to the cap.
+    const Index_t wanted = (n + per_block - 1) / per_block;
+    const Index_t blocks = wanted > floor ? wanted : floor;
+    return static_cast<int>(blocks < REDUCE_MAX_BLOCKS ? blocks
+                                                       : REDUCE_MAX_BLOCKS);
 }
 
 /* ---------------------------------------------------------------------- */

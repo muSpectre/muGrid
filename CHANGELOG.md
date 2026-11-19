@@ -28,6 +28,8 @@ v1.6.2 (13Nov26)
   operator applied to a range of planes, so a stencil can overlap the halo exchange
 - PERF: The fused residual update of CG reads its fields once on a GPU when they have
   ghosts, and CG combines two of its three global reductions per iteration into one
+- PERF: Dot products and norms of small fields (up to about 64^3 points) take up to two
+  thirds less time on GPUs with slow double precision, such as consumer cards
 
 v1.6.1 (02Nov26)
 ----------------
