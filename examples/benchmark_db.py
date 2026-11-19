@@ -31,7 +31,7 @@ Run parameters:
   device nranks dim n npts precond precision maxiter tol
   (`precision` is "double"/"single"; a blank cell reads as "double")
 Results:
-  iters secs gbps E
+  iters secs gbps E setup_secs prec_precision
 Unused columns for a given row are left blank.
 """
 
@@ -62,6 +62,9 @@ FIELDS = [
     # status: blank/"ok" for a normal point, "oom" for a run that ran out of
     # memory (recorded so the tables can flag it; left out of the plots)
     "status",
+    # preconditioner setup time (s) and the preconditioner's own precision
+    # when it differs from the solver's (blank: the solver's)
+    "setup_secs", "prec_precision",
 ]
 
 
@@ -411,7 +414,7 @@ def load(path=DB_PATH):
     if not os.path.exists(path):
         return []
     numeric = {"dirty", "nranks", "dim", "n", "npts", "maxiter", "tol",
-               "iters", "secs", "gbps", "E"}
+               "iters", "secs", "gbps", "E", "setup_secs"}
     rows = []
     with open(path, newline="") as fh:
         for r in csv.DictReader(fh):
@@ -536,7 +539,8 @@ OOM = "oom"
 # with identical values here yield the same measurement, so the result is safe
 # to reuse. Result columns (iters/secs/gbps/npts/status) are deliberately absent.
 CACHE_KEY_FIELDS = ("benchmark", "study", "label", "device", "nranks", "dim",
-                    "n", "precision", "precond", "maxiter", "tol")
+                    "n", "precision", "precond", "maxiter", "tol",
+                    "prec_precision", "material")
 
 
 def _cache_digest(fields, commit):

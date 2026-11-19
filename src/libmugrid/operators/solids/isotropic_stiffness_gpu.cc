@@ -410,11 +410,19 @@ __global__ __launch_bounds__(256, 2) void isotropic_stiffness_3d_kernel(
         if constexpr (Uniform) {
             lam = lam_u;
             mu_val = mu_u;
-        } else {
+        } else if (in_grid) {
             Index_t mat_idx =
                 ex * mat_stride_x + ey * mat_stride_y + ez * mat_stride_z;
             lam = lambda[mat_idx];
             mu_val = mu[mat_idx];
+        } else {
+            // A thread beyond the grid only helps stage the tile; its result
+            // is discarded. Its elements lie up to a tile past the last
+            // plane, past the end of the material fields, so it must not
+            // read them (an illegal address whenever the allocation ends on
+            // an unmapped page).
+            lam = T(0);
+            mu_val = T(0);
         }
 
         // Gather displacements from all 8 nodes of this element. Element

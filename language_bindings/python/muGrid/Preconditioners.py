@@ -46,6 +46,11 @@ Available preconditioners:
 - :class:`HybridFourierTridiagonalPreconditioner` -- the exact ``(Kʳᵉᶠ)⁺``
   by FFT along the rank-local axes and a block-tridiagonal (block-Thomas plus
   parallel cyclic reduction) solve along the distributed axis.
+- :class:`~muGrid.Multigrid.MultigridPreconditioner` -- a V-cycle on the
+  heterogeneous operator itself (Galerkin coarse levels, Chebyshev-Jacobi
+  smoothing with a guaranteed eigenvalue bound; defined in
+  :mod:`muGrid.Multigrid`, importable from here too, with
+  :class:`~muGrid.Multigrid.ScaledLocalMatrices`).
 """
 
 import warnings
@@ -55,6 +60,16 @@ import numpy as np
 
 from . import linalg
 from .Field import wrap_field
+
+
+def __getattr__(name):
+    """The heterogeneous multigrid lives in :mod:`muGrid.Multigrid`, which
+    imports this module's base class; it is re-exported here lazily, so the
+    import does not become circular."""
+    if name in ("MultigridPreconditioner", "ScaledLocalMatrices"):
+        from . import Multigrid
+        return getattr(Multigrid, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _real_field_like(field, name):

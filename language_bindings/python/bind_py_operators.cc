@@ -42,6 +42,7 @@
 #include "operators/solids/isotropic_stiffness.hh"
 #include "operators/nodal_moments.hh"
 #include "operators/transfer.hh"
+#include "operators/variable_stencil.hh"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -1546,6 +1547,104 @@ void add_grid_transfer(py::module & mod, const char * name) {
                  &Op::restrict),
              "fine"_a, "coarse"_a,
              "Restrict: coarse = P^T fine (float32).");
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using FD = TypedFieldBase<Real, muGrid::DefaultDeviceSpace>;
+    using FD32 = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    auto cls = py::reinterpret_borrow<py::class_<Op>>(mod.attr(name));
+    cls.def("prolong",
+            static_cast<void (Op::*)(const FD &, FD &) const>(&Op::prolong),
+            "coarse"_a, "fine"_a, "Interpolate on device fields (float64).")
+        .def("prolong",
+             static_cast<void (Op::*)(const FD32 &, FD32 &) const>(
+                 &Op::prolong),
+             "coarse"_a, "fine"_a, "Interpolate on device fields (float32).")
+        .def("restrict",
+             static_cast<void (Op::*)(const FD &, FD &) const>(&Op::restrict),
+             "fine"_a, "coarse"_a, "Restrict on device fields (float64).")
+        .def("restrict",
+             static_cast<void (Op::*)(const FD32 &, FD32 &) const>(
+                 &Op::restrict),
+             "fine"_a, "coarse"_a, "Restrict on device fields (float32).");
+#endif
+}
+
+// ----------------------------------------------------------------------------
+// Bind class VariableStencilOperator{2,3}D (dimension-templated)
+// ----------------------------------------------------------------------------
+template <muGrid::Dim_t Dim>
+void add_variable_stencil_operator(py::module & mod, const char * name) {
+    using Op = muGrid::VariableStencilOperator<Dim>;
+    using FH = TypedFieldBase<Real, HostSpace>;
+    using FH32 = TypedFieldBase<Real32, HostSpace>;
+
+    py::class_<Op>(mod, name, R"pbdoc(
+        Nodal operator with its own symmetric 3^dim stencil of nc x nc blocks
+        at every node (the explicit Galerkin coarse operator R A P of the
+        heterogeneous multigrid).
+
+        The coefficients are a field with ``nb_entries`` components on the
+        collection of x and y. Half of the blocks are stored: block k of node
+        n (entries ``k nc^2 + i nc + j``) is A(n, n + s_k)_ij for the offsets
+        ``half_offsets``; the centre block follows as its upper triangle, row
+        by row. The block of a negative offset is the transposed block of the
+        neighbour, so x and the stencil field need one ghost layer on each
+        side, filled by communicate_ghosts. Only interior nodes of y are
+        written.
+        )pbdoc")
+        .def(py::init<muGrid::Index_t>(), "nb_components"_a)
+        .def_property_readonly("nb_components", &Op::get_nb_components,
+                               "Unknowns per node.")
+        .def_property_readonly("nb_entries", &Op::get_nb_entries,
+                               "Scalars per node of the stencil field.")
+        .def_property_readonly_static(
+            "spatial_dim", [](py::object) { return Op::get_spatial_dim(); },
+            "Spatial dimension.")
+        .def_property_readonly_static(
+            "half_offsets",
+            [](py::object) { return Op::get_half_offsets(); },
+            "The stored offsets s_k, in storage order.")
+        .def("apply",
+             static_cast<void (Op::*)(const FH &, const FH &, FH &) const>(
+                 &Op::apply),
+             "stencil"_a, "x"_a, "y"_a, "y = A x (float64).")
+        .def("apply",
+             static_cast<void (Op::*)(const FH32 &, const FH32 &, FH32 &)
+                             const>(&Op::apply),
+             "stencil"_a, "x"_a, "y"_a, "y = A x (float32).")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const FH &, const FH &, Real, FH &)
+                             const>(&Op::apply_increment),
+             "stencil"_a, "x"_a, "alpha"_a, "y"_a,
+             "y += alpha A x (float64).")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const FH32 &, const FH32 &, Real32,
+                                      FH32 &) const>(&Op::apply_increment),
+             "stencil"_a, "x"_a, "alpha"_a, "y"_a,
+             "y += alpha A x (float32).");
+#if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
+    using FD = TypedFieldBase<Real, muGrid::DefaultDeviceSpace>;
+    using FD32 = TypedFieldBase<Real32, muGrid::DefaultDeviceSpace>;
+    auto cls = py::reinterpret_borrow<py::class_<Op>>(mod.attr(name));
+    cls.def("apply",
+            static_cast<void (Op::*)(const FD &, const FD &, FD &) const>(
+                &Op::apply),
+            "stencil"_a, "x"_a, "y"_a, "y = A x on device fields (float64).")
+        .def("apply",
+             static_cast<void (Op::*)(const FD32 &, const FD32 &, FD32 &)
+                             const>(&Op::apply),
+             "stencil"_a, "x"_a, "y"_a,
+             "y = A x on device fields (float32).")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const FD &, const FD &, Real, FD &)
+                             const>(&Op::apply_increment),
+             "stencil"_a, "x"_a, "alpha"_a, "y"_a,
+             "y += alpha A x on device fields (float64).")
+        .def("apply_increment",
+             static_cast<void (Op::*)(const FD32 &, const FD32 &, Real32,
+                                      FD32 &) const>(&Op::apply_increment),
+             "stencil"_a, "x"_a, "alpha"_a, "y"_a,
+             "y += alpha A x on device fields (float32).");
+#endif
 }
 
 void add_convolution_operator_classes(py::module & mod) {
@@ -1561,6 +1660,8 @@ void add_convolution_operator_classes(py::module & mod) {
     add_nodal_moment_operator<3>(mod, "NodalMomentOperator3D");
     add_grid_transfer<2>(mod, "GridTransfer2D");
     add_grid_transfer<3>(mod, "GridTransfer3D");
+    add_variable_stencil_operator<2>(mod, "VariableStencilOperator2D");
+    add_variable_stencil_operator<3>(mod, "VariableStencilOperator3D");
 
     // Deprecated alternative names, kept for code that imports them
     mod.attr("ConvolutionOperatorBase") = mod.attr("GradientOperator");

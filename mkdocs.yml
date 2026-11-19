@@ -56,6 +56,7 @@ nav:
   - FFT: fft.md
   - Operators: operators.md
   - Linear algebra: linalg.md
+  - Heterogeneous multigrid: heterogeneous_multigrid.md
   - GPU: gpu.md
   - Examples: examples.md
   - Benchmark (Poisson): benchmark.md

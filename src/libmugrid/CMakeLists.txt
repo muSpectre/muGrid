@@ -48,6 +48,7 @@ set(MUGRID_SOURCES
         operators/laplace.cc
         operators/nodal_moments.cc
         operators/transfer.cc
+        operators/variable_stencil.cc
         operators/solids/isotropic_stiffness_2d.cc
         operators/solids/isotropic_stiffness_3d.cc
     # io/
@@ -88,6 +89,8 @@ if(MUGRID_ENABLE_CUDA)
     list(APPEND MUGRID_SOURCES fft/cufft_backend.cc)
     list(APPEND MUGRID_SOURCES operators/generic_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/transfer_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/variable_stencil_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/nodal_moments_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
@@ -102,6 +105,8 @@ if(MUGRID_ENABLE_CUDA)
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/cufft_backend.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/generic_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/transfer_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/variable_stencil_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/nodal_moments_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc
@@ -117,6 +122,8 @@ elseif(MUGRID_ENABLE_HIP)
     list(APPEND MUGRID_SOURCES fft/rocfft_backend.cc)
     list(APPEND MUGRID_SOURCES operators/generic_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/laplace_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/transfer_gpu.cc)
+    list(APPEND MUGRID_SOURCES operators/variable_stencil_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/nodal_moments_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/fem_gradient_gpu.cc)
     list(APPEND MUGRID_SOURCES operators/solids/isotropic_stiffness_gpu.cc)
@@ -131,6 +138,8 @@ elseif(MUGRID_ENABLE_HIP)
         ${CMAKE_CURRENT_SOURCE_DIR}/fft/rocfft_backend.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/generic_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/laplace_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/transfer_gpu.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/operators/variable_stencil_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/nodal_moments_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/fem_gradient_gpu.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/operators/solids/isotropic_stiffness_gpu.cc

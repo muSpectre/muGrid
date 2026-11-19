@@ -115,6 +115,7 @@ from .Wrappers import (  # noqa: F401, E402, E305
     NodalMomentOperator,
     NodalMomentOperator2D,
     NodalMomentOperator3D,
+    VariableStencilOperator,
 )
 
 # Cache for runtime GPU availability check
@@ -337,6 +338,7 @@ __all__ = [
     "GridTransfer",
     "GridTransfer2D",
     "GridTransfer3D",
+    "VariableStencilOperator",
     "Decomposition",
     "DynCoord",
     "DynRcoord",

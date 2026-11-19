@@ -256,7 +256,8 @@ src/libmugrid/operators/
 ├── fem_gradient.hh, fem_gradient_gpu.cc      # FEMGradientOperator<Element>
 ├── laplace.hh/.cc, laplace_gpu.cc            # LaplaceOperator<Dim>
 ├── nodal_moments.hh/.cc, nodal_moments_gpu.cc  # NodalMomentOperator
-├── transfer.hh/.cc               # GridTransfer (multigrid prolongation/restriction)
+├── transfer.hh/.cc, transfer_gpu.cc  # GridTransfer (multigrid prolongation/restriction)
+├── variable_stencil.hh/.cc, variable_stencil_gpu.cc  # VariableStencilOperator
 └── solids/
     ├── isotropic_stiffness.hh    # MaterialOperator, IsotropicStiffnessOperator<Dim>
     ├── isotropic_stiffness_2d.cc # 2D element matrices and host kernels

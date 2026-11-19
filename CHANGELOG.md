@@ -16,6 +16,22 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.7.0 (not yet released)
+-------------------------
+
+- ENH: Geometric multigrid preconditioner for heterogeneous operators, its coarse levels measured
+  from the operator's action (no element built in); CPU, GPU, MPI and single precision
+- ENH: Its Chebyshev smoother uses a guaranteed eigenvalue bound on every level, not an estimate,
+  so a crack or other mode that appears after setup cannot make the cycle diverge
+- ENH: Nodal operator with its own symmetric 3^d stencil at every node, on host and device
+- ENH: The multigrid grid transfer (prolongation and restriction) runs on GPUs
+- BUG: The 3D isotropic stiffness operator on GPUs read material values past the end of their
+  fields when an extent was not a multiple of its tile, which could fail with an illegal address
+- ENH: The homogenization example offers the heterogeneous multigrid and Green-Jacobi, a material
+  scale per voxel from a file, and a preconditioner precision of its own
+- ENH: The preconditioner benchmark compares several preconditioners per study, records their
+  setup time and adds a high-contrast phase-field study
+
 v1.6.2 (13Nov26)
 ----------------
 
