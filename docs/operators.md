@@ -153,6 +153,7 @@ with volume fractions $\sum_q \bar{w}_q = 1$.
 |---|---|---|
 | Q1 (default) | bilinear quadrilateral, $2 \times 2$ Gauss points, $\bar{w}_q = 1/4$ | trilinear hexahedron, $2 \times 2 \times 2$ Gauss points, $\bar{w}_q = 1/8$ |
 | P1 | 2 linear triangles, one point each, $\bar{w}_q = 1/2$ | 5 linear tetrahedra, one point each: central $\bar{w}_0 = 1/3$, four corner $\bar{w}_q = 1/6$ |
+| Q1 reduced | not available | trilinear hexahedron, one point at the voxel centre, $\bar{w}_0 = 1$; see [the reduced hexahedron](#the-reduced-hexahedron) |
 
 <!-- TODO: rationale for Q1 as the default element? -->
 
@@ -225,6 +226,27 @@ Properties: `grid_spacing`, `quadrature_weights`,
 describing the equivalent generic stencil (so
 `GenericLinearOperator(grad.offset, grad.coefficients)` reproduces
 $\mathbf{B}$).
+
+### The reduced hexahedron
+
+`FEMElement.q1_reduced` evaluates the gradient of the trilinear hexahedron at
+the voxel centre only, so every quadrature-point field (strain, stress,
+material) is 8 times smaller than with $2 \times 2 \times 2$ Gauss points.
+The centre gradient is the mean of the eight Gauss-point gradients. A
+stiffness $\mathbf{B}_1^\top w\, \mathbf{C}\, \mathbf{B}_1$ built from it
+alone is rank deficient: of the eight corner values of a displacement
+component, the centre gradient sees the constant and the three linear
+patterns, but not the four *hourglass* patterns
+
+$$
+h_1 = \eta\zeta, \quad h_2 = \zeta\xi, \quad h_3 = \xi\eta, \quad
+h_4 = \xi\eta\zeta \qquad (\xi, \eta, \zeta = \pm 1 \text{ at the corners}).
+$$
+
+They cost no energy, so a stiffness needs an hourglass control of its own; the
+fused `IsotropicStiffnessOperator` and the nodal moments refuse the element.
+A scalar gradient penalty such as $\int |\nabla \rho|^2$, evaluated at the
+voxel centres, is a valid one-point rule on its own.
 
 ## LaplaceOperator
 

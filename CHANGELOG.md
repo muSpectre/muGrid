@@ -16,6 +16,12 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.7.0 (not yet released)
+-------------------------
+
+- ENH: The 3D trilinear hexahedron gradient can use one quadrature point per voxel, which
+  makes quadrature fields 8 times smaller
+
 v1.6.2 (13Nov26)
 ----------------
 

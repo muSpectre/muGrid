@@ -138,6 +138,7 @@ so a new element only needs a new table.
 | `P1Tet3D` | 8 | 5 (central tetrahedron, four corner tetrahedra) | $1/3, 1/6, 1/6, 1/6, 1/6$ |
 | `Q1Quad2D` | 4 | 4 ($2 \times 2$ Gauss) | $1/4$ each |
 | `Q1Hex3D` | 8 | 8 ($2 \times 2 \times 2$ Gauss) | $1/8$ each |
+| `Q1Hex3DReduced` | 8 | 1 (voxel centre) | $1$ |
 
 The 3D P1 split (central tetrahedron on the odd-parity corners $(1,0,0)$,
 $(0,1,0)$, $(0,0,1)$, $(1,1,1)$; corner tetrahedra with apex $(0,0,0)$,

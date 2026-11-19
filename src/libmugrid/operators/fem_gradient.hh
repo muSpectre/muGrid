@@ -833,12 +833,17 @@ namespace muGrid {
     using FEMGradientOperatorQ1_2D = FEMGradientOperator<Q1Quad2D>;
     //! 3D trilinear-hex (Q1) FEM gradient.
     using FEMGradientOperatorQ1_3D = FEMGradientOperator<Q1Hex3D>;
+    //! 3D trilinear-hex FEM gradient with one quadrature point per voxel.
+    using FEMGradientOperatorQ1Reduced_3D =
+        FEMGradientOperator<Q1Hex3DReduced>;
 
     //! Single-precision (Real32) variants of the FEM gradient operators.
     using FEMGradientOperator2D_32 = FEMGradientOperator<P1Tri2D, Real32>;
     using FEMGradientOperator3D_32 = FEMGradientOperator<P1Tet3D, Real32>;
     using FEMGradientOperatorQ1_2D_32 = FEMGradientOperator<Q1Quad2D, Real32>;
     using FEMGradientOperatorQ1_3D_32 = FEMGradientOperator<Q1Hex3D, Real32>;
+    using FEMGradientOperatorQ1Reduced_3D_32 =
+        FEMGradientOperator<Q1Hex3DReduced, Real32>;
 
 }  // namespace muGrid
 

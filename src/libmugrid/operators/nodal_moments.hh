@@ -183,6 +183,12 @@ namespace muGrid {
             const std::array<Real, Dim> & grid_spacing,
             FEMElementKind element = FEMElementKind::Q1)
             : element{element} {
+            if (element == FEMElementKind::Q1Reduced) {
+                throw RuntimeError{
+                    operator_name() +
+                    ": the one-point element q1_reduced is not supported; "
+                    "moments of the interpolant need the full quadrature"};
+            }
             Real vol{1.0};
             for (Dim_t d = 0; d < Dim; ++d) {
                 if (not(grid_spacing[d] > 0.0)) {

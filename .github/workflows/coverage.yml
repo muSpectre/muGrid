@@ -143,6 +143,7 @@ jobs:
               tests/python_ghost_overlap_tests.py \
               tests/python_decomposition_tests.py \
               tests/python_solvers_tests.py \
+              tests/python_fem_q1_reduced_tests.py \
               --cov=muGrid "$report"' || true
 
       - name: Upload coverage reports as artifacts
@@ -287,6 +288,7 @@ jobs:
               tests/python_ghost_overlap_tests.py \
               tests/python_decomposition_tests.py \
               tests/python_solvers_tests.py \
+              tests/python_fem_q1_reduced_tests.py \
               --cov=muGrid "$report"' || true
 
       - name: Generate C++ coverage reports

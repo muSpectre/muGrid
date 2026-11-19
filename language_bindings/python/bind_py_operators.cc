@@ -841,6 +841,14 @@ void add_fem_gradient_operator_3d(py::module & mod) {
     bind_fem_gradient_operator<muGrid::FEMGradientOperatorQ1_3D_32>(
         mod, "FEMGradientOperatorQ1_3D_32",
         "Single-precision (float32) 3D Q1 FEM gradient operator.");
+    bind_fem_gradient_operator<muGrid::FEMGradientOperatorQ1Reduced_3D>(
+        mod, "FEMGradientOperatorQ1Reduced_3D",
+        "3D Q1 (trilinear hex) FEM gradient operator with reduced "
+        "integration: one quadrature point at the voxel centre.");
+    bind_fem_gradient_operator<muGrid::FEMGradientOperatorQ1Reduced_3D_32>(
+        mod, "FEMGradientOperatorQ1Reduced_3D_32",
+        "Single-precision (float32) 3D Q1 FEM gradient operator with one "
+        "quadrature point.");
 }
 
 // Add the single-precision (Real32) apply overloads to an already-bound
@@ -990,7 +998,10 @@ void add_isotropic_stiffness_operator_2d(py::module & mod) {
         .value("p1", FEMElementKind::P1,
                "P1 linear simplices (2 triangles / 5 tetrahedra per pixel)")
         .value("q1", FEMElementKind::Q1,
-               "Q1 (bilinear quad / trilinear hex) with Gauss quadrature");
+               "Q1 (bilinear quad / trilinear hex) with Gauss quadrature")
+        .value("q1_reduced", FEMElementKind::Q1Reduced,
+               "Q1 trilinear hex with one quadrature point at the voxel "
+               "centre (gradient operator only)");
 
     // Function pointer types for explicit overload selection
     using ApplyHostFn = void (IsotropicStiffnessOperator2D::*)(
