@@ -16,6 +16,12 @@ Style for this changelog (keep to it so entries stay uniform):
 Change log for µGrid
 ====================
 
+v1.7.0 (not yet released)
+-------------------------
+
+- ENH: Conjugate gradients can stop on an estimate of the energy-norm error, with an
+  adaptive delay, at one global reduction per iteration less than the residual test
+
 v1.6.2 (13Nov26)
 ----------------
 

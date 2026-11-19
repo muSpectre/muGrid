@@ -611,7 +611,8 @@ They work for host and device fields and in MPI runs.
 
 ```python
 from muGrid.Solvers import (conjugate_gradients,
-                            conjugate_gradients_pipelined, ConvergenceError)
+                            conjugate_gradients_pipelined,
+                            conjugate_gradients_energy, ConvergenceError)
 ```
 
 ### conjugate_gradients
@@ -666,6 +667,49 @@ Pipelined CG (Ghysels–Vanroose) with one non-blocking global reduction per
 iteration, overlapped with the operator and preconditioner applications, and
 periodic residual replacement every `replacement_interval` iterations.
 Parameters, return value and exceptions are as for `conjugate_gradients`.
+
+### conjugate_gradients_energy
+
+```python
+conjugate_gradients_energy(comm, fc, b, x, hessp, prec=None, rtol=1e-6,
+                           d_min=0, tau=0.25, maxiter=1000, callback=None,
+                           timer=None)
+```
+
+Preconditioned CG stopped on the energy-norm error instead of the residual:
+the solve ends when an estimate of
+$\|\mathbf{x} - \mathbf{x}_k\|_\mathbf{A}$ falls below
+$\mathrm{rtol}\,\|\mathbf{x}\|_\mathbf{A}$. The energy error is what CG
+minimises and what matters when the solution enters an energy, such as a
+homogenised stiffness or a compliance; the residual can differ from it by
+orders of magnitude, depending on the conditioning.
+
+The estimate is the sum of the squared energy lengths
+$\alpha_j\,\mathbf{r}_j^T\mathbf{z}_j$ of the CG steps after iterate $k$
+(Strakoš & Tichý 2002). It is a lower estimate, and it becomes available a
+few iterations later; the delay is chosen adaptively from the same scalars
+(Meurant, Papež & Tichý 2021). It costs nothing: compared with
+`conjugate_gradients`, each iteration has one global reduction less and the
+solve one operator product less.
+
+The energy of the solution is taken as
+$\mathbf{x}_0^T\mathbf{A}\mathbf{x}_0$ for a warm start, which should
+therefore be close to the solution, and as the estimate of
+$\|\mathbf{x} - \mathbf{x}_0\|_\mathbf{A}^2$ for the start
+$\mathbf{x}_0 = \mathbf{0}$.
+
+| Parameter | Description |
+|-----------|-------------|
+| `comm`, `fc`, `b`, `x`, `hessp`, `prec`, `maxiter`, `timer` | As for `conjugate_gradients`. The work fields' names start with `cg-energy-work`. |
+| `rtol` | Relative energy error at which the solve stops. Default `1e-6`. |
+| `d_min` | Minimal number of CG steps in an error estimate. Default `0`: the adaptive rule alone. A larger value guards against stopping in a phase of stagnation. |
+| `tau` | Targeted relative underestimation of the squared error, between 0 and 1. Default `0.25`. |
+| `callback` | `callback(iteration, state)`; `state` holds `x`, `r`, `p`, `z`, `rz`, and `energy_error_sq`, `energy_error_iteration`, `energy_sq`: the latest estimate (`None` before the first), the iterate it belongs to and the squared energy it is compared with. |
+
+Returns `x`. Raises `ConvergenceError` at `maxiter` and for an operator or
+preconditioner that is not positive definite. The estimator is also available
+on its own as `EnergyErrorEstimate`, fed with $\alpha_k$ and
+$\mathbf{r}_k^T\mathbf{z}_k$ once per iteration.
 
 ## Preconditioners
 
