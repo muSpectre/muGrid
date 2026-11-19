@@ -892,6 +892,34 @@ void add_linalg_functions(py::module &mod) {
         "r"_a, "u"_a, "w"_a,
         "Fused interior reduction for pipelined CG (float32).");
 
+    // --- Kernels for bound-constrained optimisation (host) ---
+    // norm_inf, axpy_clip and mask_bound_active for float64 and float32
+    // fields; the bounds are two scalars or two fields.
+#define MUGRID_BIND_BOUND_KERNELS(F, T, S)                                     \
+    linalg.def("norm_inf",                                                     \
+        static_cast<Real (*)(const F&)>(&muGrid::linalg::norm_inf<T, S>),      \
+        "x"_a);                                                                \
+    linalg.def("axpy_clip",                                                    \
+        static_cast<void (*)(T, const F&, const F&, T, T, F&)>(                \
+            &muGrid::linalg::axpy_clip<T, S>),                                 \
+        "alpha"_a, "d"_a, "x"_a, "lower"_a, "upper"_a, "out"_a);               \
+    linalg.def("axpy_clip",                                                    \
+        static_cast<void (*)(T, const F&, const F&, const F&, const F&, F&)>(  \
+            &muGrid::linalg::axpy_clip<T, S>),                                 \
+        "alpha"_a, "d"_a, "x"_a, "lower"_a, "upper"_a, "out"_a);               \
+    linalg.def("mask_bound_active",                                            \
+        static_cast<void (*)(const F&, const F&, T, T, const F&, F&)>(         \
+            &muGrid::linalg::mask_bound_active<T, S>),                         \
+        "gradient"_a, "x"_a, "lower"_a, "upper"_a, "v"_a, "out"_a);            \
+    linalg.def("mask_bound_active",                                            \
+        static_cast<void (*)(const F&, const F&, const F&, const F&,           \
+                             const F&, F&)>(                                   \
+            &muGrid::linalg::mask_bound_active<T, S>),                         \
+        "gradient"_a, "x"_a, "lower"_a, "upper"_a, "v"_a, "out"_a);
+    MUGRID_BIND_BOUND_KERNELS(RealFieldHost, Real, HostSpace)
+    MUGRID_BIND_BOUND_KERNELS(Real32FieldHost, Real32, HostSpace)
+#undef MUGRID_BIND_BOUND_KERNELS
+
 #if defined(MUGRID_ENABLE_CUDA) || defined(MUGRID_ENABLE_HIP)
     // --- Real field operations (device) ---
 
@@ -1098,5 +1126,32 @@ void add_linalg_functions(py::module &mod) {
         "k"_a, "invk"_a, "N"_a, "out"_a,
         "Fused Leray projection out[c] -= k[c] * sum_d(invk[d] * N[d]) for "
         "complex64 fields with float32 coefficients on device (GPU).");
+    // --- Kernels for bound-constrained optimisation (device) ---
+    // norm_inf, axpy_clip and mask_bound_active for float64 and float32
+    // fields; the bounds are two scalars or two fields.
+#define MUGRID_BIND_BOUND_KERNELS(F, T, S)                                     \
+    linalg.def("norm_inf",                                                     \
+        static_cast<Real (*)(const F&)>(&muGrid::linalg::norm_inf<T, S>),      \
+        "x"_a);                                                                \
+    linalg.def("axpy_clip",                                                    \
+        static_cast<void (*)(T, const F&, const F&, T, T, F&)>(                \
+            &muGrid::linalg::axpy_clip<T, S>),                                 \
+        "alpha"_a, "d"_a, "x"_a, "lower"_a, "upper"_a, "out"_a);               \
+    linalg.def("axpy_clip",                                                    \
+        static_cast<void (*)(T, const F&, const F&, const F&, const F&, F&)>(  \
+            &muGrid::linalg::axpy_clip<T, S>),                                 \
+        "alpha"_a, "d"_a, "x"_a, "lower"_a, "upper"_a, "out"_a);               \
+    linalg.def("mask_bound_active",                                            \
+        static_cast<void (*)(const F&, const F&, T, T, const F&, F&)>(         \
+            &muGrid::linalg::mask_bound_active<T, S>),                         \
+        "gradient"_a, "x"_a, "lower"_a, "upper"_a, "v"_a, "out"_a);            \
+    linalg.def("mask_bound_active",                                            \
+        static_cast<void (*)(const F&, const F&, const F&, const F&,           \
+                             const F&, F&)>(                                   \
+            &muGrid::linalg::mask_bound_active<T, S>),                         \
+        "gradient"_a, "x"_a, "lower"_a, "upper"_a, "v"_a, "out"_a);
+    MUGRID_BIND_BOUND_KERNELS(RealFieldDevice, Real, DeviceSpace)
+    MUGRID_BIND_BOUND_KERNELS(Real32FieldDevice, Real32, DeviceSpace)
+#undef MUGRID_BIND_BOUND_KERNELS
 #endif
 }

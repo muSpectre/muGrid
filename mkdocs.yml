@@ -65,6 +65,7 @@ nav:
   - Developer notes:
       - FFT engine design: fft_design.md
       - Operator kernel design: kernel_design.md
+      - Bounded L-BFGS: lbfgs.md
 
 exclude_docs: |
   requirements.txt

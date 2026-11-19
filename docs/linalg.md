@@ -29,6 +29,9 @@ rank-local values over all $P$ ranks.
 | `pipelined_cg_dots(r, u, w)` | returns $[\langle r,u\rangle, \langle w,u\rangle, \langle r,r\rangle]$ in one pass | $\Omega_\text{int}$ | — |
 | `cross(a, b, out)` | $\text{out}_p = a_p \times b_p$ (three-vectors) | $\Omega_\text{buf}$ | — |
 | `leray_project(k, invk, N, out)` | $\text{out}_{pc} \mathrel{-}= k_{pc} \sum_{d} \text{invk}_{pd}\, N_{pd}$ | $\Omega_\text{buf}$ | — |
+| `norm_inf(x)` | returns $\max_{p,c} \lvert x_{pc}\rvert$ | $\Omega_\text{int}$ | `IxAMAX` |
+| `axpy_clip(alpha, d, x, lower, upper, out)` | $\text{out} \leftarrow \min(\max(x + \alpha d, \text{lower}), \text{upper})$ | $\Omega_\text{buf}$ | — |
+| `mask_bound_active(g, x, lower, upper, v, out)` | $\text{out}_{pc} \leftarrow 0$ where $x_{pc}$ is bound-active, $v_{pc}$ elsewhere | $\Omega_\text{buf}$ | — |
 
 All operations require their fields to share a collection and component
 shape. Real (`float64`, `float32`) and complex (`complex128`, `complex64`)
@@ -114,6 +117,32 @@ $\mathbf{k}\,(\mathbf{k}\cdot\mathbf{N})/|\mathbf{k}|^2$, i.e. the
 longitudinal part of $\mathbf{N}$, from `out` (the Helmholtz/Leray projection
 onto divergence-free modes). The coefficients are real, so real and imaginary
 parts are updated independently; `out` may alias `N`.
+
+### Kernels for bound-constrained optimisation
+
+`norm_inf`, `axpy_clip` and `mask_bound_active` are the operations a
+box-constrained minimiser needs beyond the BLAS-like ones; see
+[`l_bfgs_bounded`](python.md#optimisation). They take real fields (`float64`
+or `float32`). The bounds are either two scalars ($\pm\infty$ for no bound)
+or two fields with one bound per entry; with scalars no bound field exists.
+
+**`axpy_clip`** makes a step along a direction and projects it onto the box
+in one pass. `out` may be one of the inputs.
+
+**`mask_bound_active`** restricts a vector to the free variables. A variable
+is *bound-active* when it sits on a bound (within $10^{-12}$) and the
+objective decreases only by leaving the box there:
+
+$$
+x \le \text{lower} + 10^{-12} \text{ and } g \ge 0, \qquad \text{or} \qquad
+x \ge \text{upper} - 10^{-12} \text{ and } g \le 0 ,
+$$
+
+with $g$ the gradient of the objective. With $v = g$ the result is the
+projected gradient, which vanishes at a constrained minimiser; with any
+other $v$ it is the 0/1 projector onto the free variables applied to $v$.
+The set is recomputed from $g$ and $x$ on every call, so no mask is stored.
+`out` may be `v`.
 
 ## Usage
 
